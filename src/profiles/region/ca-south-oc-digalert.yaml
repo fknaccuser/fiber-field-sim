@@ -1,0 +1,17 @@
+id: ca-south-oc-digalert
+oneCallCenterName: "DigAlert (USA South)"
+statute: "California Government Code Section 4216"
+advanceNoticeBusinessDays: 2
+ticketValidityDays: 28
+toleranceZoneInches: 24
+positiveResponseRequired: true
+citationNote: >
+  Seeded for crews working South Orange County. Southern California's one-call
+  center is DigAlert (USA South), a distinct service from USA North 811, which
+  covers Northern California under the same statute (Cal. Gov. Code Section 4216).
+  The 2-business-day advance notice, 28-day ticket validity, and 24-inch tolerance
+  zone above are standard California/Common Ground Alliance figures; confirm them
+  against DigAlert's current published requirements before treating this table as
+  a verified compliance reference. This is a config table by design — correcting
+  any of these values, or adding a sibling profile for a different one-call
+  center/region, requires no code change.

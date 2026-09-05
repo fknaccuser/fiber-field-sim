@@ -1,0 +1,37 @@
+id: hexatronic-commscope-default
+splitterFiberVendor: Hexatronic
+cabinetVendor: CommScope
+labelFormat:
+  pattern: "SPL{ratioCode}{suffix}"
+  example: "SPL1X02DNDNNLPK"
+serialFormat:
+  pattern: "{2 digits}{1 letter}{2 digits}{1 letter}{4 digits}"
+  example: "22C23B0980"
+catalog:
+  - id: distribution-terminal-32
+    kind: distribution-terminal
+    portCount: 32
+    notes: >
+      Confirmed by a field tech: this is the port count seen on a distribution-tier
+      splitter/terminal enclosure in the field.
+  - id: pop-capacity-192
+    kind: olt-chassis-capacity
+    portCount: 192
+    needsConfirmation: true
+    notes: >
+      Field tech recalled roughly 192 at the POP tier. Public spec sheets checked
+      during Stage 1 kickoff (Calix E7-2 chassis, CommScope FDH cabinet lines)
+      did not confirm this exact figure — it could be a multi-chassis PON port
+      total, an FDH/ODF fiber count, or a subscriber-capacity figure rather than
+      a physical port count. Flagged here so a manager/tech can correct this one
+      field directly without touching any code, once confirmed against actual
+      chassis/cabinet inventory.
+  - id: fdh-cabinet-450-series
+    kind: fdh-cabinet
+    portCount: 288
+    needsConfirmation: true
+    notes: >
+      Field tech described a CommScope cabinet "similar to the 450 series." 288
+      ports used as a plausible seed from CommScope's FDH product family; the
+      exact model and port count for this crew's specific cabinet was not
+      independently verified against a datasheet.

@@ -1,0 +1,19 @@
+# Test fixture only: a hypothetical different company's equipment profile, used to
+# prove that swapping the active equipment profile changes labels/port counts with
+# no change to any engine or loader code.
+id: alt-example-vendor
+splitterFiberVendor: Corning
+cabinetVendor: AFL
+labelFormat:
+  pattern: "AFL-{ratioCode}-{suffix}"
+  example: "AFL-1X32-A9"
+serialFormat:
+  pattern: "{4 digits}-{4 digits}"
+  example: "4471-2290"
+catalog:
+  - id: distribution-terminal-16
+    kind: distribution-terminal
+    portCount: 16
+  - id: pop-capacity-96
+    kind: olt-chassis-capacity
+    portCount: 96

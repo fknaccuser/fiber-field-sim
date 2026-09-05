@@ -1,0 +1,45 @@
+id: switch-cisco-ios
+kind: switch
+displayName: Cisco IOS-style switch/router
+promptFormat: "{hostname}#"
+commandSet:
+  - pattern: "show ip interface brief"
+    description: "interface admin/line status and IP summary"
+  - pattern: "show interfaces status"
+    description: "per-port status, VLAN, duplex, speed"
+  - pattern: "show interfaces {id}"
+    description: "detailed interface counters and state"
+  - pattern: "show vlan brief"
+    description: "VLAN database summary"
+  - pattern: "show mac address-table"
+    description: "learned MAC addresses per VLAN/interface"
+  - pattern: "show ip route"
+    description: "routing table"
+  - pattern: "show cdp neighbors"
+    description: "directly connected Cisco-discoverable neighbors"
+  - pattern: "show running-config"
+    description: "active device configuration"
+  - pattern: "show logging"
+    description: "device log buffer"
+  - pattern: "show interfaces transceiver detail"
+    description: "SFP/optic rx/tx power and temperature"
+  - pattern: "ping {target}"
+    description: "ICMP echo"
+  - pattern: "traceroute {target}"
+    description: "hop-by-hop path trace"
+  - pattern: "configure terminal"
+    description: "enter global configuration mode"
+  - pattern: "interface {id}"
+    description: "enter interface configuration mode"
+  - pattern: "vlan {id}"
+    description: "enter VLAN configuration mode"
+  - pattern: "ip route {network} {mask} {next-hop}"
+    description: "add a static route"
+  - pattern: "ip helper-address {address}"
+    description: "configure a DHCP relay helper address on an interface/VLAN"
+syntaxErrorTemplate: "% Invalid input detected at '^' marker."
+notes: >
+  Access/distribution-layer command set only, per Stage 1 scope. Backbone-layer
+  commands (BGP, MPLS, core routing) are explicitly deferred to a later stage's
+  vendor profile. Command parsing/execution logic lives in the CLI/device-state
+  module (build item 3) — this file only declares the supported dialect.
