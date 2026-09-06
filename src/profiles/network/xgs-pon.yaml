@@ -53,6 +53,7 @@ backscatterCoefficientDb1ns:
 waterPeakExcessDbPerKm: 1.0
 waterPeakSigmaNm: 30
 oltTxPowerDbm: 4.0
+ontTxPowerDbm: 4.0
 citation: >
   XGS-PON wavelength plan (1577 nm downstream / 1270 nm upstream) and loss-budget
   classes N1/N2/E1/E2 per ITU-T G.9807.1. Confirmed with the crew: this plant is

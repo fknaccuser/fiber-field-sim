@@ -45,6 +45,8 @@ export const NetworkProfileSchema = z.object({
   waterPeakSigmaNm: z.number().default(30),
   /** XGS-PON OLT launch power (dBm), used by the power meter and ONT receive-power derivation. */
   oltTxPowerDbm: z.number().default(4.0),
+  /** ONT upstream launch power (dBm), used to derive the OLT's received power from each ONT. */
+  ontTxPowerDbm: z.number().default(4.0),
   citation: z.string().optional(),
 });
 export type NetworkProfile = z.infer<typeof NetworkProfileSchema>;

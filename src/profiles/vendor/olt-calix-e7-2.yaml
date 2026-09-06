@@ -13,16 +13,21 @@ messages:
   incompleteCommand: "% Incomplete command."
   unknownHost: "% Unknown host {input}"
 cdpCapable: false
+transceiverThresholds:
+  temperatureC: [80.0, 75.0, -5.0, -10.0]
+  txDbm: [6.0, 5.0, -3.0, -4.0]
+  rxDbm: [-3.0, -5.0, -25.0, -28.0]
 commandSet:
-  - { pattern: "enable",                  handler: enter-priv-exec,        modes: [user-exec], transitionsTo: priv-exec, description: Enter privileged EXEC }
-  - { pattern: "exit",                    handler: exit-mode,              modes: [priv-exec], description: Exit current mode }
-  - { pattern: "show ont status",         handler: olt-show-ont-status,    modes: [user-exec, priv-exec], description: ONT status across all PON ports }
-  - { pattern: "show ont status {ontId}", handler: olt-show-ont-detail,    modes: [user-exec, priv-exec], description: Detail for one ONT }
-  - { pattern: "show pon port",           handler: olt-show-pon-port,      modes: [user-exec, priv-exec], description: PON port summary }
-  - { pattern: "show interface pon {id}", handler: olt-show-pon-interface, modes: [user-exec, priv-exec], description: PON interface detail including optical levels }
-  - { pattern: "show alarms",             handler: olt-show-alarms,        modes: [user-exec, priv-exec], description: Active chassis/line-card/PON alarms }
-  - { pattern: "show logging",            handler: show-logging,           modes: [user-exec, priv-exec], description: Log buffer }
-  - { pattern: "ping {target}",           handler: ping,                   modes: [user-exec, priv-exec], description: Send ICMP echoes }
+  - { pattern: "enable",                            handler: enter-priv-exec,        modes: [user-exec], transitionsTo: priv-exec, description: Enter privileged EXEC }
+  - { pattern: "exit",                              handler: exit-mode,              modes: [priv-exec], description: Exit current mode }
+  - { pattern: "show ont status",                   handler: olt-show-ont-status,    modes: [user-exec, priv-exec], description: ONT status across all PON ports }
+  - { pattern: "show ont status {ontId}",           handler: olt-show-ont-detail,    modes: [user-exec, priv-exec], description: Detail for one ONT }
+  - { pattern: "show pon port",                     handler: olt-show-pon-port,      modes: [user-exec, priv-exec], description: PON port summary }
+  - { pattern: "show interface pon {id}",           handler: olt-show-pon-interface, modes: [user-exec, priv-exec], description: PON interface detail including optical levels }
+  - { pattern: "show interfaces transceiver detail", handler: show-transceiver-detail, modes: [user-exec, priv-exec], description: Uplink optic Tx/Rx power and thresholds }
+  - { pattern: "show alarms",                       handler: olt-show-alarms,        modes: [user-exec, priv-exec], description: Active chassis/line-card/PON alarms }
+  - { pattern: "show logging",                      handler: show-logging,           modes: [user-exec, priv-exec], description: Log buffer }
+  - { pattern: "ping {target}",                     handler: ping,                   modes: [user-exec, priv-exec], description: Send ICMP echoes }
 notes: >
   Seeded as the default OLT vendor profile per team confirmation: the crew said all
   their OLT-side gear "looks similar" and asked for whichever is most common and
