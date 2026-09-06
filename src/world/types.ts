@@ -191,7 +191,7 @@ export interface DnsRecord {
 export interface NetworkDeviceConfig {
   id: string;
   hostname: string;
-  /** References a profiles/vendor/*.yaml id, e.g. 'switch-cisco-ios' or 'olt-calix-axos-e'. */
+  /** References a profiles/vendor/*.yaml id, e.g. 'switch-cisco-ios' or 'olt-calix-e7-2'. */
   vendorProfileId: string;
   interfaces: InterfaceState[];
   vlans: VlanEntry[];

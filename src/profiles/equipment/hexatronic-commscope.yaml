@@ -19,13 +19,14 @@ catalog:
     portCount: 192
     needsConfirmation: true
     notes: >
-      Field tech recalled roughly 192 at the POP tier. Public spec sheets checked
-      during Stage 1 kickoff (Calix E7-2 chassis, CommScope FDH cabinet lines)
-      did not confirm this exact figure — it could be a multi-chassis PON port
-      total, an FDH/ODF fiber count, or a subscriber-capacity figure rather than
-      a physical port count. Flagged here so a manager/tech can correct this one
-      field directly without touching any code, once confirmed against actual
-      chassis/cabinet inventory.
+      Field tech recalled roughly 192 at the POP tier. OLT is confirmed as
+      Calix E7-2 (AXOS); its published XG1601 line card supports up to 32
+      XGS-PON ports per chassis, and 32 x 6 = 192 — a plausible read if this
+      POP runs six E7-2 chassis, but the chassis count itself is not yet
+      confirmed. Alternatively this could be an FDH/ODF fiber count or a
+      subscriber-capacity figure rather than a PON port count. Flagged here
+      so a manager/tech can correct this one field directly without touching
+      any code, once confirmed against actual chassis/cabinet inventory.
   - id: fdh-cabinet-450-series
     kind: fdh-cabinet
     portCount: 288

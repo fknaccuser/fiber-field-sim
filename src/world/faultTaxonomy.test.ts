@@ -5,7 +5,7 @@ import type { ActiveProfileSet, WorldState } from './types';
 
 const profiles: ActiveProfileSet = {
   network: 'xgs-pon-default',
-  oltVendor: 'olt-calix-axos-e',
+  oltVendor: 'olt-calix-e7-2',
   switchVendor: 'switch-cisco-ios',
   equipment: 'hexatronic-commscope-default',
   region: 'ca-south-oc-digalert',

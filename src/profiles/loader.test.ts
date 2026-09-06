@@ -8,7 +8,7 @@ import {
 import { loadDefaultProfileSet } from './index';
 
 import networkXgsPon from './network/xgs-pon.yaml?raw';
-import oltCalixAxosE from './vendor/olt-calix-axos-e.yaml?raw';
+import oltCalixE72 from './vendor/olt-calix-e7-2.yaml?raw';
 import equipmentHexatronicCommscope from './equipment/hexatronic-commscope.yaml?raw';
 import regionCaSouthOcDigalert from './region/ca-south-oc-digalert.yaml?raw';
 
@@ -53,7 +53,7 @@ describe('default profile set loads and validates', () => {
   });
 
   it('an OLT vendor profile validates independently of a switch vendor profile', () => {
-    const olt = loadVendorProfile(oltCalixAxosE);
+    const olt = loadVendorProfile(oltCalixE72);
     expect(olt.kind).toBe('olt');
   });
 });

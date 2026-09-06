@@ -1,0 +1,27 @@
+id: olt-calix-e7-2
+kind: olt
+displayName: Calix E7-2 (AXOS)
+promptFormat: "{hostname}>"
+commandSet:
+  - pattern: "show ont status"
+    description: "ONT status per PON port"
+  - pattern: "show pon port"
+    description: "PON port stats and alarms"
+  - pattern: "show interface pon"
+    description: "PON interface detail including optical levels"
+  - pattern: "show alarms"
+    description: "active chassis/line-card/PON alarms"
+syntaxErrorTemplate: "% Invalid command."
+notes: >
+  Confirmed by the crew: OLT chassis is the Calix E7-2 running AXOS. Published
+  line-card specs for this chassis (checked during Stage 1 kickoff): the XG1601
+  16-port XGS-PON line card supports up to 32 XGS-PON ports per E7-2 chassis,
+  and the XG801 8-port card supports up to 2,048 ONT connections per chassis via
+  128-way splits. Note 32 ports/chassis times 6 chassis equals 192 — a plausible
+  (not yet confirmed) explanation for the "~192 at the POP" figure recorded in
+  the equipment profile's pop-capacity-192 entry, if that POP runs six E7-2
+  chassis. Still flagged needsConfirmation there pending an actual chassis count.
+  Full command parsing/execution logic is implemented in the CLI/device-state
+  module (build item 3), not here — this file only declares which commands this
+  vendor's dialect supports. Fully swappable: point activeProfiles.oltVendor at
+  a different profiles/vendor/olt-*.yaml to change chassis, with zero engine change.

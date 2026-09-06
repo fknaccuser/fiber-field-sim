@@ -2,7 +2,7 @@ export * from './schema';
 export * from './loader';
 
 import networkXgsPon from './network/xgs-pon.yaml?raw';
-import oltCalixAxosE from './vendor/olt-calix-axos-e.yaml?raw';
+import oltCalixE72 from './vendor/olt-calix-e7-2.yaml?raw';
 import switchCiscoIos from './vendor/switch-cisco-ios.yaml?raw';
 import equipmentHexatronicCommscope from './equipment/hexatronic-commscope.yaml?raw';
 import regionCaSouthOcDigalert from './region/ca-south-oc-digalert.yaml?raw';
@@ -19,7 +19,7 @@ import type { ProfileSet } from './schema';
 export function loadDefaultProfileSet(): ProfileSet {
   return {
     network: loadNetworkProfile(networkXgsPon),
-    oltVendor: loadVendorProfile(oltCalixAxosE),
+    oltVendor: loadVendorProfile(oltCalixE72),
     switchVendor: loadVendorProfile(switchCiscoIos),
     equipment: loadEquipmentProfile(equipmentHexatronicCommscope),
     region: loadRegionProfile(regionCaSouthOcDigalert),
