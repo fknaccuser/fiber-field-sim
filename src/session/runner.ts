@@ -7,7 +7,7 @@
 import { cloneWorld, findNode } from '../world';
 import type { CustomerReport, PlantRecord, WorldState } from '../world';
 import { trace } from '../instruments/otdr';
-import type { OtdrTraceResult } from '../instruments/otdr';
+import type { OtdrTraceResult, PublicOtdrTraceResult } from '../instruments/otdr';
 import { read as powerMeterRead } from '../instruments/powerMeter/powerMeter';
 import { inspect as vflInspect } from '../instruments/vfl/vfl';
 import type { VflLeakKind } from '../instruments/vfl/vfl';
@@ -263,4 +263,82 @@ function performDiagnosis(state: SessionState, intent: Extract<Intent, { type: '
 /** Force-scores an unfinished session (e.g. time budget expiry in the UI), as if the trainee submitted "no fault in scope" with no claims. Item 6's "give up" button only. */
 export function endSession(state: SessionState): { state: SessionState; result: PerformResult } {
   return perform(state, { type: 'diagnosis', diagnosis: { claims: [], noFaultInScope: true } });
+}
+
+// --- UI redaction ------------------------------------------------------------------------
+//
+// `perform`'s own return value already strips `OtdrTraceResult.hidden` from the result it
+// hands back for the *current* action, but `SessionState` itself carries two other places
+// the answer key hides: `world`/`initialWorld.appliedFaults` (the true fault list) and
+// `state.blobs[traceRef]` (the full, unredacted `OtdrTraceResult` stashed so a later re-open
+// of that trace doesn't need to recompute it). `redactForUi` strips all of it in one pass;
+// the UI store holds only what this returns, never a raw `SessionState`.
+
+export type UiWorldState = Omit<WorldState, 'appliedFaults'>;
+
+/** `ActionEvent`, distributed over its own union, with `groundTruth` (present only on the otdr-shot member) removed. */
+export type UiActionEvent = ActionEvent extends infer T ? (T extends { groundTruth: unknown } ? Omit<T, 'groundTruth'> : T) : never;
+
+export type UiBlobs = Record<string, string[] | PublicOtdrTraceResult>;
+
+export interface UiSessionState {
+  meta: ScenarioMeta;
+  world: UiWorldState;
+  initialWorld: UiWorldState;
+  profiles: SessionState['profiles'];
+  clockSeconds: number;
+  locationNodeId: string;
+  log: UiActionEvent[];
+  blobs: UiBlobs;
+  hintsUsed: number;
+  cliSessions: Record<string, CliSession>;
+  ended: SessionState['ended'];
+}
+
+function redactWorld(world: WorldState): UiWorldState {
+  const { appliedFaults: _appliedFaults, ...rest } = world;
+  return rest;
+}
+
+/** `ActionEvent` with `groundTruth` removed (a no-op for every variant but otdr-shot, the only one that carries it). Also used by persistence.ts: a stored session's log is answer-key-free too. */
+export function stripGroundTruth(action: ActionEvent): UiActionEvent {
+  if (action.type === 'otdr-shot') {
+    const { groundTruth: _groundTruth, ...rest } = action;
+    return rest;
+  }
+  return action;
+}
+
+function isOtdrTraceBlob(value: unknown): value is OtdrTraceResult {
+  return !!value && typeof value === 'object' && 'hidden' in value;
+}
+
+function redactBlobs(blobs: Record<string, unknown>): UiBlobs {
+  const redacted: UiBlobs = {};
+  for (const [key, value] of Object.entries(blobs)) {
+    if (isOtdrTraceBlob(value)) {
+      const { hidden: _hidden, ...rest } = value;
+      redacted[key] = rest;
+    } else {
+      redacted[key] = value as string[];
+    }
+  }
+  return redacted;
+}
+
+/** Strips every place a `SessionState` carries the answer key. This is the only shape the UI store may hold or pass to a component. */
+export function redactForUi(state: SessionState): UiSessionState {
+  return {
+    meta: state.meta,
+    world: redactWorld(state.world),
+    initialWorld: redactWorld(state.initialWorld),
+    profiles: state.profiles,
+    clockSeconds: state.clockSeconds,
+    locationNodeId: state.locationNodeId,
+    log: state.log.map(stripGroundTruth),
+    blobs: redactBlobs(state.blobs),
+    hintsUsed: state.hintsUsed,
+    cliSessions: state.cliSessions,
+    ended: state.ended,
+  };
 }

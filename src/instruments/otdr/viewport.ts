@@ -3,7 +3,7 @@
  * downsampling. No DOM, no canvas -- the canvas component (item 6 territory, stubbed in
  * src/ui/otdr) calls these and only these to turn a trace result into pixels.
  */
-import type { DetectedEvent, OtdrTraceResult, TraceSample } from './types';
+import type { DetectedEvent, PublicOtdrTraceResult, TraceSample } from './types';
 
 export interface Viewport {
   xMinMeters: number;
@@ -12,7 +12,7 @@ export interface Viewport {
   yMaxDb: number;
 }
 
-export function defaultViewport(result: OtdrTraceResult): Viewport {
+export function defaultViewport(result: PublicOtdrTraceResult): Viewport {
   return {
     xMinMeters: 0,
     xMaxMeters: result.settings.rangeMeters,
@@ -35,7 +35,7 @@ export function fromPixelX(vp: Viewport, widthPx: number, xPx: number): number {
   return vp.xMinMeters + (xPx / widthPx) * xSpan;
 }
 
-export function levelAt(result: OtdrTraceResult, distanceMeters: number): number {
+export function levelAt(result: PublicOtdrTraceResult, distanceMeters: number): number {
   if (result.samples.length === 0) return result.noiseFloorDb;
   let best = result.samples[0];
   let bestDiff = Math.abs(best.distanceMeters - distanceMeters);
@@ -58,7 +58,7 @@ export interface CursorReadout {
   slopeDbPerKm: number | null;
 }
 
-export function cursorReadout(result: OtdrTraceResult, aMeters: number, bMeters: number): CursorReadout {
+export function cursorReadout(result: PublicOtdrTraceResult, aMeters: number, bMeters: number): CursorReadout {
   const aLevelDb = levelAt(result, aMeters);
   const bLevelDb = levelAt(result, bMeters);
   const deltaMeters = bMeters - aMeters;
@@ -91,7 +91,7 @@ export function pan(vp: Viewport, deltaMeters: number): Viewport {
   return { ...vp, xMinMeters: xMin, xMaxMeters: xMax };
 }
 
-export function hitTestEvent(result: OtdrTraceResult, vp: Viewport, widthPx: number, xPx: number, toleranceX = 8): DetectedEvent | null {
+export function hitTestEvent(result: PublicOtdrTraceResult, vp: Viewport, widthPx: number, xPx: number, toleranceX = 8): DetectedEvent | null {
   let best: DetectedEvent | null = null;
   let bestPixelDiff = Infinity;
   for (const ev of result.events) {

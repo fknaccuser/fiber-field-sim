@@ -305,3 +305,82 @@ export function pathLossDb(world: WorldState, network: NetworkProfile, fromNodeI
   if (!result) return { lossDb: NaN, broken: true, spanIds: [] };
   return { lossDb: result.lossDb, broken: false, spanIds: result.spanIds };
 }
+
+/**
+ * Converts a cursor position the trainee placed on the *displayed* distance axis (using
+ * their own `iorSetting`) back to a true span + position -- the UI's "send this event to
+ * a diagnosis claim" action. `trace.ts` displays the whole path on one axis using a single
+ * network-wide true IOR (`network.iorDefault`), not each span's own override, so the
+ * inverse mirrors that: `d_true = d_displayed * (iorSetting / network.iorDefault)`. A
+ * trainee who mis-set the IOR gets a genuinely wrong position back -- that mismatch is the
+ * point (the IOR teachable), not a bug to compensate for.
+ */
+export function distanceToSpanPosition(
+  world: WorldState,
+  network: NetworkProfile,
+  access: OtdrAccessLike,
+  displayedMeters: number,
+  iorSetting: number,
+  wavelengthNm: number,
+): { spanId: string; positionMeters: number } | null {
+  const key = wavelengthKey(wavelengthNm);
+  const nTrueDisplay = network.iorDefault[key] ?? 1.4682;
+  const trueDistanceMeters = displayedMeters * (iorSetting / nTrueDisplay);
+
+  let path: ResolvedPath;
+  try {
+    path = resolveTestPath(world, network, access);
+  } catch {
+    return null;
+  }
+
+  function segmentEnd(segment: PathSegment): number {
+    return segment.startMeters + findSpan(world, segment.spanId).lengthMeters;
+  }
+
+  function toSpanPosition(segment: PathSegment, trueDistance: number): { spanId: string; positionMeters: number } {
+    const span = findSpan(world, segment.spanId);
+    const withinSpan = clamp(trueDistance - segment.startMeters, 0, span.lengthMeters);
+    const positionMeters = segment.reversed ? span.lengthMeters - withinSpan : withinSpan;
+    return { spanId: segment.spanId, positionMeters };
+  }
+
+  /** The leaf segment whose range is closest to `trueDistance` -- used to clamp a cursor placed past the resolved path's actual end (e.g. from a wrong IOR guess) onto the nearest real point instead of returning nothing. */
+  function closestLeaf(segment: PathSegment): PathSegment {
+    if (segment.children.length === 0) return segment;
+    let best = segment;
+    let bestDistance = Math.abs(trueDistanceMeters - clamp(trueDistanceMeters, segment.startMeters, segmentEnd(segment)));
+    for (const child of segment.children) {
+      const candidate = closestLeaf(child);
+      const candidateEnd = segmentEnd(candidate);
+      const candidateDistance = Math.abs(trueDistanceMeters - clamp(trueDistanceMeters, candidate.startMeters, candidateEnd));
+      if (candidateDistance < bestDistance) {
+        best = candidate;
+        bestDistance = candidateDistance;
+      }
+    }
+    return best;
+  }
+
+  function findContaining(segment: PathSegment): PathSegment | null {
+    if (trueDistanceMeters >= segment.startMeters && trueDistanceMeters <= segmentEnd(segment)) {
+      for (const child of segment.children) {
+        const inChild = findContaining(child);
+        if (inChild) return inChild;
+      }
+      return segment;
+    }
+    for (const child of segment.children) {
+      const inChild = findContaining(child);
+      if (inChild) return inChild;
+    }
+    return null;
+  }
+
+  const containing = findContaining(path.root) ?? closestLeaf(path.root);
+  return toSpanPosition(containing, trueDistanceMeters);
+}
+
+function clamp(v: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, v));
+}

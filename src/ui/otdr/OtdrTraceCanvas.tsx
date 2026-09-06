@@ -7,7 +7,8 @@
  */
 import { useCallback, useEffect, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
-import type { DetectedEvent, OtdrTraceResult } from '../../instruments/otdr/types';
+import type { PublicOtdrTraceResult } from '../../instruments/otdr/types';
+import type { DetectedEvent } from '../../instruments/otdr/types';
 import { downsampleForWidth, fromPixelX, hitTestEvent, pan, toPixel, zoomAround, type Viewport } from '../../instruments/otdr/viewport';
 
 export interface OtdrTraceCanvasTheme {
@@ -21,7 +22,7 @@ export interface OtdrTraceCanvasTheme {
 }
 
 export interface OtdrTraceCanvasProps {
-  result: OtdrTraceResult | null;
+  result: PublicOtdrTraceResult | null;
   viewport: Viewport;
   cursors: { a: number; b: number };
   activeCursor: 'a' | 'b';

@@ -80,7 +80,8 @@ export interface OtdrHidden {
   trueTotalLengthMeters: number;
 }
 
-export interface OtdrTraceResult {
+/** Everything a trace result carries except the hidden ground truth -- what a renderer or a stashed-per-shot blob is allowed to hold. Named so call sites (and the UI's own source-grep guard) never have to spell out the redacted field itself. */
+export interface PublicOtdrTraceResult {
   access: OtdrAccess;
   settings: OtdrSettings;
   samples: TraceSample[];
@@ -91,6 +92,9 @@ export interface OtdrTraceResult {
   simulatedSecondsElapsed: number;
   violations: OtdrViolation[];
   warnings: OtdrWarning[];
+}
+
+export interface OtdrTraceResult extends PublicOtdrTraceResult {
   hidden: OtdrHidden;
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pathLossDb, resolveTestPath } from './opticalPath';
+import { distanceToSpanPosition, pathLossDb, resolveTestPath } from './opticalPath';
 import { AmbiguousPathError, StrandRequiredError } from './errors';
 import { createEmptyWorld } from '../../world';
 import type { ActiveProfileSet, WorldState } from '../../world';
@@ -126,5 +126,55 @@ describe('resolveTestPath', () => {
     const path = resolveTestPath(world, profiles.network, { accessNodeId: 'olt', launchSpanId: 'feeder' });
     expect(path.root.children.length).toBe(2);
     expect(path.root.nodeStepAtEnd).toEqual({ nodeId: 'spl', kind: 'splitter-node', lossDb: 7.2 });
+  });
+});
+
+describe('distanceToSpanPosition', () => {
+  function twoSpanWorld(): WorldState {
+    const world = createEmptyWorld(1, activeProfiles);
+    world.topology.nodes.push(
+      { id: 'olt', kind: 'olt', label: 'OLT' },
+      { id: 'spl', kind: 'splitter', label: 'Splitter', attributes: { splitRatio: '1x4' } },
+      { id: 'term', kind: 'terminal', label: 'Terminal' },
+    );
+    world.topology.spans.push(
+      { id: 'feeder', fromNodeId: 'olt', toNodeId: 'spl', lengthMeters: 2000, events: [] },
+      { id: 'leg', fromNodeId: 'spl', toNodeId: 'term', lengthMeters: 300, events: [] },
+    );
+    return world;
+  }
+
+  it('with the correct IOR, maps a displayed cursor straight onto the true span position', () => {
+    const world = twoSpanWorld();
+    const nDefault = profiles.network.iorDefault['1550']!;
+    const found = distanceToSpanPosition(world, profiles.network, { accessNodeId: 'olt', launchSpanId: 'feeder' }, 500, nDefault, 1550);
+    expect(found).toEqual({ spanId: 'feeder', positionMeters: 500 });
+  });
+
+  it('a wrong IOR setting produces a proportionally wrong position (the teachable)', () => {
+    const world = twoSpanWorld();
+    const nDefault = profiles.network.iorDefault['1550']!;
+    const found = distanceToSpanPosition(world, profiles.network, { accessNodeId: 'olt', launchSpanId: 'feeder' }, 500, nDefault * 2, 1550);
+    expect(found).toEqual({ spanId: 'feeder', positionMeters: 1000 });
+  });
+
+  it('resolves a position past a splitter, and converts back to from-span-start regardless of test direction', () => {
+    const world = twoSpanWorld();
+    const nDefault = profiles.network.iorDefault['1550']!;
+    // Forward: olt -> feeder(2000) -> spl -> leg, 100 m into leg.
+    const forward = distanceToSpanPosition(world, profiles.network, { accessNodeId: 'olt', launchSpanId: 'feeder' }, 2100, nDefault, 1550);
+    expect(forward).toEqual({ spanId: 'leg', positionMeters: 100 });
+
+    // Reversed: launched from term into leg (toward the splitter/OLT); 100 m along the
+    // true fiber from term is still 300 - 100 = 200 m from leg's own start (spl's end).
+    const reversed = distanceToSpanPosition(world, profiles.network, { accessNodeId: 'term', launchSpanId: 'leg' }, 100, nDefault, 1550);
+    expect(reversed).toEqual({ spanId: 'leg', positionMeters: 200 });
+  });
+
+  it('clamps a cursor placed past the resolved path onto the nearest real point', () => {
+    const world = twoSpanWorld();
+    const nDefault = profiles.network.iorDefault['1550']!;
+    const found = distanceToSpanPosition(world, profiles.network, { accessNodeId: 'olt', launchSpanId: 'feeder' }, 5000, nDefault, 1550);
+    expect(found).toEqual({ spanId: 'leg', positionMeters: 300 });
   });
 });
