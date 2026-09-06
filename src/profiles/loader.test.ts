@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   loadEquipmentProfile,
+  loadInstrumentProfile,
   loadNetworkProfile,
   loadRegionProfile,
   loadVendorProfile,
@@ -10,15 +11,17 @@ import { loadDefaultProfileSet } from './index';
 import networkXgsPon from './network/xgs-pon.yaml?raw';
 import oltCalixE72 from './vendor/olt-calix-e7-2.yaml?raw';
 import equipmentHexatronicCommscope from './equipment/hexatronic-commscope.yaml?raw';
+import otdrExfoMaxTester730c from './instrument/otdr-exfo-maxtester-730c.yaml?raw';
 import regionCaSouthOcDigalert from './region/ca-south-oc-digalert.yaml?raw';
 
 describe('default profile set loads and validates', () => {
-  it('loads all five profiles without throwing', () => {
+  it('loads all six profiles without throwing', () => {
     const set = loadDefaultProfileSet();
     expect(set.network.id).toBe('xgs-pon-default');
     expect(set.oltVendor.kind).toBe('olt');
     expect(set.switchVendor.kind).toBe('switch');
     expect(set.equipment.splitterFiberVendor).toBe('Hexatronic');
+    expect(set.otdrInstrument.displayName).toMatch(/MaxTester/);
     expect(set.region.oneCallCenterName).toMatch(/DigAlert/);
   });
 
@@ -55,5 +58,21 @@ describe('default profile set loads and validates', () => {
   it('an OLT vendor profile validates independently of a switch vendor profile', () => {
     const olt = loadVendorProfile(oltCalixE72);
     expect(olt.kind).toBe('olt');
+  });
+
+  it('the OTDR instrument profile carries a real pulse-width range and out-of-band live-test wavelengths', () => {
+    const otdr = loadInstrumentProfile(otdrExfoMaxTester730c);
+    expect(otdr.pulseWidthsNsRange.minNs).toBeLessThanOrEqual(5);
+    expect(otdr.pulseWidthsNsRange.maxNs).toBeGreaterThanOrEqual(20000);
+    expect(otdr.liveTestOutOfBandNm).toEqual(expect.arrayContaining([1625]));
+    expect(otdr.needsConfirmation).toBe(true); // exact MaxTester model not yet confirmed
+  });
+
+  it('rejects an instrument profile with an unknown kind', () => {
+    expect(() =>
+      loadInstrumentProfile(
+        'id: x\nkind: power-meter\ndisplayName: X\nuiStyle: tablet-touchscreen\npulseWidthsNsRange: {minNs: 3, maxNs: 20000}\ndynamicRangeDb: {}\nliveTestOutOfBandNm: []\nmaxSplitterSupported: "1x32"',
+      ),
+    ).toThrow();
   });
 });

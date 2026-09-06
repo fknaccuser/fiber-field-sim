@@ -75,6 +75,23 @@ export const EquipmentProfileSchema = z.object({
 });
 export type EquipmentProfile = z.infer<typeof EquipmentProfileSchema>;
 
+export const InstrumentProfileSchema = z.object({
+  id: z.string(),
+  kind: z.enum(['otdr']), // extend with 'power-meter', 'inspection-scope', etc. as later stages need them
+  displayName: z.string(),
+  uiStyle: z.enum(['tablet-touchscreen', 'button-panel']),
+  /** In nanoseconds. The engine's simulated pulse-width list (network profile) should stay within this instrument's real range. */
+  pulseWidthsNsRange: z.object({ minNs: z.number(), maxNs: z.number() }),
+  dynamicRangeDb: wavelengthTripleSchema,
+  liveTestOutOfBandNm: z.array(z.number()),
+  maxSplitterSupported: z.string(),
+  powerMeterMaxDbm: z.number().optional(),
+  needsConfirmation: z.boolean().optional(),
+  notes: z.string().optional(),
+  citation: z.string().optional(),
+});
+export type InstrumentProfile = z.infer<typeof InstrumentProfileSchema>;
+
 export const RegionProfileSchema = z.object({
   id: z.string(),
   oneCallCenterName: z.string(),
@@ -92,5 +109,6 @@ export interface ProfileSet {
   oltVendor: VendorProfile;
   switchVendor: VendorProfile;
   equipment: EquipmentProfile;
+  otdrInstrument: InstrumentProfile;
   region: RegionProfile;
 }

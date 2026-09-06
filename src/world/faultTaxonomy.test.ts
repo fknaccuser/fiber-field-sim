@@ -8,6 +8,7 @@ const profiles: ActiveProfileSet = {
   oltVendor: 'olt-calix-e7-2',
   switchVendor: 'switch-cisco-ios',
   equipment: 'hexatronic-commscope-default',
+  otdrInstrument: 'otdr-exfo-maxtester-730c',
   region: 'ca-south-oc-digalert',
 };
 

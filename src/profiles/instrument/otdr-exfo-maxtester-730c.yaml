@@ -1,0 +1,33 @@
+id: otdr-exfo-maxtester-730c
+kind: otdr
+displayName: EXFO MaxTester 730C (PON/Metro OTDR)
+uiStyle: tablet-touchscreen
+pulseWidthsNsRange:
+  minNs: 3
+  maxNs: 20000
+dynamicRangeDb:
+  '1310': 36
+  '1550': 39
+liveTestOutOfBandNm: [1625, 1650]
+maxSplitterSupported: "1x128"
+powerMeterMaxDbm: 27
+needsConfirmation: true
+notes: >
+  Crew confirmed the OTDR in the truck is an EXFO MaxTester, but not the exact
+  model — EXFO sells several (715D, 720C, 730C, 730D, 735D) with different
+  dynamic range and connector options. Defaulted to the 730C, EXFO's PON/Metro
+  variant, since it's built to test through splitters up to 1x128 (comfortably
+  covers this plant's 1x2-1x64 splitter ladder) and matches an FTTx crew's
+  workflow. Pulse width range (3 ns-20 microseconds) and the 1625/1650 nm
+  out-of-band live-test port are published across the MaxTester line generally.
+  The 7-inch outdoor touchscreen with a tablet-style GUI (uiStyle above) should
+  drive the OTDR panel's visual design in the UI shell (build item 6) — this is
+  not a button-and-knob legacy OTDR. Correct the id/displayName/specs here once
+  the exact model is confirmed; the OTDR physics and renderer modules (build
+  item 2) read pulse widths, dynamic range, and the live-test wavelengths from
+  this profile rather than hardcoding them.
+citation: >
+  EXFO MaxTester 730C PON/Metro OTDR spec sheet (dynamic range, splitter
+  support); EXFO MaxTester 700D-series spec sheet (pulse width range, live
+  fiber/out-of-band test port, touchscreen UI); EXFO PPM1/GeX power meter specs
+  (up to 27 dBm). Retrieved during Stage 1 kickoff, September 2026.

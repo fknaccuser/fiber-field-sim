@@ -237,6 +237,7 @@ export interface ActiveProfileSet {
   oltVendor: string;
   switchVendor: string;
   equipment: string;
+  otdrInstrument: string;
   region: string;
 }
 

@@ -1,10 +1,12 @@
 import { load as parseYamlDocument } from 'js-yaml';
 import {
   EquipmentProfileSchema,
+  InstrumentProfileSchema,
   NetworkProfileSchema,
   RegionProfileSchema,
   VendorProfileSchema,
   type EquipmentProfile,
+  type InstrumentProfile,
   type NetworkProfile,
   type RegionProfile,
   type VendorProfile,
@@ -24,6 +26,10 @@ export function loadVendorProfile(yamlText: string): VendorProfile {
 
 export function loadEquipmentProfile(yamlText: string): EquipmentProfile {
   return EquipmentProfileSchema.parse(parseYaml(yamlText));
+}
+
+export function loadInstrumentProfile(yamlText: string): InstrumentProfile {
+  return InstrumentProfileSchema.parse(parseYaml(yamlText));
 }
 
 export function loadRegionProfile(yamlText: string): RegionProfile {
