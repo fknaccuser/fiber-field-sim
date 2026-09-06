@@ -21,13 +21,28 @@ export type NodeKind =
   | 'customer-premise'
   | 'network-device'; // anchors a NetworkDeviceConfig (see `devices`) in the topology
 
+/**
+ * Topology conventions (enforced by the scenario validator, item 5):
+ * - A splitter is a TopologyNode of kind 'splitter' with `attributes.splitRatio` (e.g.
+ *   '1x32'): exactly one incident span arriving (`toNodeId === splitter.id`) and one or
+ *   more leaving (`fromNodeId === splitter.id`). Instruments insert the split loss
+ *   step themselves from the network profile's splitterLadder — a scenario author does
+ *   not put a 'splitter' FiberEvent on a span that represents a branching splitter node.
+ *   The 'splitter' FiberEventKind remains valid only for an *inline*, non-branching
+ *   splitter authored directly on a single span (its loss comes from the event's own
+ *   `lossDb`, or the ladder by `splitRatio` when `lossDb` is absent). Use one
+ *   representation per physical splitter, never both.
+ * - A node with more than one incident/continuing span that is not a splitter (e.g. a
+ *   splice closure) must have `attributes.spliceMap` (see SpliceMapEntry) describing how
+ *   fibers continue through it — see worldState.ts's `getSpliceMap`.
+ */
 export interface TopologyNode {
   id: string;
   kind: NodeKind;
   label: string;
   /** Equipment profile catalog entry id for the physical hardware at this node, if any. */
   equipmentRef?: string;
-  /** Node-specific ground truth not otherwise modeled: FAT optical power, aerial condition, locate ticket state, etc. */
+  /** Node-specific ground truth not otherwise modeled: FAT optical power, aerial condition, locate ticket state, splitter split ratio, splice map, etc. */
   attributes?: Record<string, unknown>;
 }
 
@@ -48,6 +63,8 @@ export interface FiberStrand {
   continuityBroken?: boolean;
   /** True if a splice fault mistakenly spliced through onto a dark/spare strand. */
   unexpectedlyActivated?: boolean;
+  /** True when this individual fiber currently carries live PON service. Overrides the span-level liveService below on stranded cables. A scenario's loader derives this by default. */
+  live?: boolean;
 }
 
 /**
@@ -92,11 +109,15 @@ export interface FiberEvent {
   splitRatio?: string;
   /** Free-form tag for scoring/explanations, e.g. 'tray-bend-radius-violation', 'dig-strike', 'vehicle-strike'. */
   causeTag?: string;
+  /** For 'mismatched-fiber-splice' only: the true splice loss that bidirectional OTDR averaging recovers. Defaults to MISMATCH_TRUE_LOSS_DB. */
+  trueLossDb?: number;
 }
 
 export interface FiberSpan {
   id: string;
+  /** The OLT/upstream side of this span. */
   fromNodeId: string;
+  /** The customer/downstream side of this span. */
   toNodeId: string;
   lengthMeters: number;
   /** Group index of refraction override for this span; defaults to the active network profile's value. */
@@ -105,6 +126,24 @@ export interface FiberSpan {
   events: FiberEvent[];
   /** Tube/fiber structure of this span, for continuity/rolling scenarios. Populated only where it matters (feeder/backbone spans). */
   strands?: FiberStrand[];
+  /** True when this span currently carries live PON service (unstranded cables only — see FiberStrand.live for stranded ones). Scenario-authored; a scenario loader may derive a default. */
+  liveService?: boolean;
+  /** 'legacy' fiber exhibits the 1383 nm water-peak excess loss; default is modern low-water-peak fiber. */
+  fiberGeneration?: 'legacy' | 'low-water-peak';
+  /** Relative backscatter offset for this span's fiber, in round-trip dB (default 0). Used only to author a gainer where the far fiber's backscatter coefficient differs from the near fiber's. */
+  backscatterOffsetDb?: number;
+}
+
+/**
+ * How fibers continue through a node with more than one incident span (e.g. a splice
+ * closure with a feeder in and multiple distribution cables out). Stored at
+ * `TopologyNode.attributes.spliceMap`; read via worldState.ts's `getSpliceMap`.
+ */
+export interface SpliceMapEntry {
+  fromSpanId: string;
+  fromStrand?: { tubeColor: FiberTubeColor; fiberColor: FiberTubeColor };
+  toSpanId: string;
+  toStrand?: { tubeColor: FiberTubeColor; fiberColor: FiberTubeColor };
 }
 
 // --- Network device state ----------------------------------------------------

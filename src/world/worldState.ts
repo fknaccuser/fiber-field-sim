@@ -3,9 +3,20 @@ import type {
   FiberEvent,
   FiberSpan,
   NetworkDeviceConfig,
+  SpliceMapEntry,
   TopologyNode,
   WorldState,
 } from './types';
+
+export class MissingSplitRatioError extends Error {
+  readonly code = 'MISSING_SPLIT_RATIO';
+  readonly nodeId: string;
+  constructor(nodeId: string) {
+    super(`Splitter node ${nodeId} has no attributes.splitRatio`);
+    this.name = 'MissingSplitRatioError';
+    this.nodeId = nodeId;
+  }
+}
 
 export function cloneWorld(world: WorldState): WorldState {
   // structuredClone is available in Node 18+ and all evergreen browsers; the world
@@ -56,4 +67,22 @@ export function findInterface(device: NetworkDeviceConfig, interfaceId: string) 
 export function addFiberEvent(span: FiberSpan, event: FiberEvent): void {
   span.events.push(event);
   span.events.sort((a, b) => a.positionMeters - b.positionMeters);
+}
+
+/** Reads a node's `attributes.spliceMap` (see SpliceMapEntry). Returns [] if the node has none. */
+export function getSpliceMap(node: TopologyNode): SpliceMapEntry[] {
+  const raw = node.attributes?.spliceMap;
+  return Array.isArray(raw) ? (raw as SpliceMapEntry[]) : [];
+}
+
+/** Reads a splitter node's `attributes.splitRatio` (e.g. '1x32'). Throws for a 'splitter' node missing it. */
+export function getSplitRatio(node: TopologyNode): string {
+  const ratio = node.attributes?.splitRatio;
+  if (typeof ratio !== 'string') throw new MissingSplitRatioError(node.id);
+  return ratio;
+}
+
+/** All fiber spans with an end at this node (either `fromNodeId` or `toNodeId`). */
+export function spansAtNode(world: WorldState, nodeId: string): FiberSpan[] {
+  return world.topology.spans.filter((s) => s.fromNodeId === nodeId || s.toNodeId === nodeId);
 }

@@ -11,6 +11,17 @@ dynamicRangeDb:
 liveTestOutOfBandNm: [1625, 1650]
 maxSplitterSupported: "1x128"
 powerMeterMaxDbm: 27
+attenuationDeadZoneFactor: 5
+dynamicRangeSpecConditions:
+  pulseWidthNs: 20000
+  averagingSeconds: 180
+averagingSecondsOptions: [5, 15, 30, 60, 180]
+frontPanelReflectanceDb: -45
+saturationHeadroomDb: 3
+liveTrafficNoisePenaltyDb: 10
+ghostThresholdReflectanceDb: -35
+ghostDecayDbPerOrder: 6
+sampleCount: 4096
 needsConfirmation: true
 notes: >
   Crew confirmed the OTDR in the truck is an EXFO MaxTester, but not the exact

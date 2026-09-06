@@ -38,6 +38,13 @@ export const NetworkProfileSchema = z.object({
   iorDefault: wavelengthTripleSchema,
   waterPeakNm: z.number().optional(),
   otdrPulseWidthsNs: z.array(z.number()).min(1),
+  /** Round-trip Rayleigh backscatter level relative to incident, for a 1 ns pulse (SMF-28-class defaults). */
+  backscatterCoefficientDb1ns: wavelengthTripleSchema.default({ '1310': -79.4, '1550': -81.9, '1625': -82.5 }),
+  /** Extra attenuation (dB/km) at the 1383 nm water peak on 'legacy' fiber spans, modeled as a Gaussian bump. */
+  waterPeakExcessDbPerKm: z.number().default(1.0),
+  waterPeakSigmaNm: z.number().default(30),
+  /** XGS-PON OLT launch power (dBm), used by the power meter and ONT receive-power derivation. */
+  oltTxPowerDbm: z.number().default(4.0),
   citation: z.string().optional(),
 });
 export type NetworkProfile = z.infer<typeof NetworkProfileSchema>;
@@ -86,6 +93,19 @@ export const InstrumentProfileSchema = z.object({
   liveTestOutOfBandNm: z.array(z.number()),
   maxSplitterSupported: z.string(),
   powerMeterMaxDbm: z.number().optional(),
+  /** Dead zone beyond the event dead zone before attenuation measurement recovers; multiple of the event dead zone. Spec range 5-10. */
+  attenuationDeadZoneFactor: z.number().default(5),
+  /** The pulse width / averaging time at which dynamicRangeDb above is quoted, per the instrument's spec sheet. */
+  dynamicRangeSpecConditions: z.object({ pulseWidthNs: z.number(), averagingSeconds: z.number() }).default({ pulseWidthNs: 20000, averagingSeconds: 180 }),
+  averagingSecondsOptions: z.array(z.number()).default([5, 15, 30, 60, 180]),
+  frontPanelReflectanceDb: z.number().default(-45),
+  /** Maximum displayed level above the launch level before the trace is considered saturated/clipped. */
+  saturationHeadroomDb: z.number().default(3),
+  /** Extra noise-floor penalty (dB) applied when testing in-band on a live PON. */
+  liveTrafficNoisePenaltyDb: z.number().default(10),
+  ghostThresholdReflectanceDb: z.number().default(-35),
+  ghostDecayDbPerOrder: z.number().default(6),
+  sampleCount: z.number().default(4096),
   needsConfirmation: z.boolean().optional(),
   notes: z.string().optional(),
   citation: z.string().optional(),
