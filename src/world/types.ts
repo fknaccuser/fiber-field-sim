@@ -178,6 +178,15 @@ export interface InterfaceState {
     txPowerDbm?: number;
     temperatureC?: number;
   };
+  description?: string;
+  /** Dotted quad. Presence makes this a routed/SVI interface. */
+  ipAddress?: string;
+  /** Required when ipAddress is set. */
+  prefixLength?: number;
+  /** 'aabb.ccdd.eeff'; if absent, derived deterministically from the world seed (CLI module). */
+  macAddress?: string;
+  /** Default 1500. */
+  mtu?: number;
 }
 
 export interface VlanEntry {
@@ -203,12 +212,17 @@ export interface DhcpConfig {
   helperAddresses: string[];
   scope?: { network: string; poolSize: number; leased: number };
   rogueDetected?: { rogueGateway: string };
+  /** Handed to DHCP clients; defaults to the SVI address when absent. */
+  dnsServerIp?: string;
 }
 
 export interface AclRule {
   id: string;
   action: 'permit' | 'deny';
+  /** Kept for display/explanations even when `match` is also structured. */
   matchDescription: string;
+  match?: { protocol: 'ip' | 'icmp' | 'tcp' | 'udp'; srcCidr: string; dstCidr: string; dstPort?: number };
+  appliedTo?: Array<{ interfaceId: string; direction: 'in' | 'out' }>;
 }
 
 export interface OspfNeighborState {
@@ -225,6 +239,28 @@ export interface DnsRecord {
   stale?: boolean;
   /** What DNS incorrectly resolves the hostname to, when stale. */
   resolvedIp?: string;
+}
+
+export interface OntRecord {
+  /** e.g. '1/1/xp1/1'. */
+  ontId: string;
+  /** Physical ONT serial, e.g. 'CXNK00A1B2C3'. */
+  serial: string;
+  /** What the OLT expects; a mismatch against `serial` means the ONT never ranges. */
+  provisionedSerial?: string;
+  /** The 'ont' TopologyNode this record corresponds to. */
+  ontNodeId: string;
+  /** 'rogue-tx': transmitting out of its assigned timeslot, taking down the whole PON. */
+  misbehaving?: 'rogue-tx';
+}
+
+export interface PonPortState {
+  /** e.g. '1/1/xp1'. */
+  id: string;
+  adminStatus: AdminStatus;
+  /** The feeder span leaving the OLT node for this port. */
+  spanId: string;
+  onts: OntRecord[];
 }
 
 export interface NetworkDeviceConfig {
@@ -244,6 +280,40 @@ export interface NetworkDeviceConfig {
   runningConfigLines?: string[];
   /** The device's own log buffer, shown (paginated/filtered) by `show logging`. */
   logLines?: string[];
+  /** Default 'switch'. */
+  role?: 'switch' | 'router' | 'l3-switch' | 'olt' | 'server' | 'dns-server';
+  /** Shown by CDP; defaults to the vendor profile's displayName. */
+  platform?: string;
+  /** Required for role 'olt': the 'olt' TopologyNode this device anchors. */
+  topologyNodeId?: string;
+  ponPorts?: PonPortState[];
+  /** The DNS server this device itself uses for name lookups. */
+  dnsResolverIp?: string;
+  /** Only meaningful on a device that also serves `dnsRecords`. */
+  dnsServerHealth?: 'ok' | 'degraded' | 'down';
+}
+
+export interface NetworkLink {
+  id: string;
+  a: { deviceId: string; interfaceId: string };
+  b: { deviceId: string; interfaceId: string } | { hostId: string };
+}
+
+export type HostAddressing =
+  | { mode: 'static'; ip: string; prefixLength: number; gateway: string; dns: string }
+  | { mode: 'dhcp' };
+
+export interface HostConfig {
+  id: string;
+  /** e.g. "Customer laptop". */
+  label: string;
+  premiseNodeId: string;
+  macAddress: string;
+  /** Exactly one attachment: a switch port (via a NetworkLink's `b.hostId`) or an ONT (L2 continues through the PON to the OLT's uplink). */
+  attachedOntNodeId?: string;
+  /** Service VLAN when attached via an ONT; when attached to a switch port the port's own accessVlan wins. */
+  vlan?: number;
+  addressing: HostAddressing;
 }
 
 // --- Faults -------------------------------------------------------------------
@@ -277,6 +347,7 @@ export interface ActiveProfileSet {
   switchVendor: string;
   equipment: string;
   otdrInstrument: string;
+  hostShell: string;
   region: string;
 }
 
@@ -289,6 +360,8 @@ export interface WorldState {
     spans: FiberSpan[];
   };
   devices: NetworkDeviceConfig[];
+  links: NetworkLink[];
+  hosts: HostConfig[];
   customerReports: CustomerReport[];
   environment: {
     weather: string;

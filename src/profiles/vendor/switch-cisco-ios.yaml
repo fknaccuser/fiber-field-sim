@@ -1,45 +1,65 @@
 id: switch-cisco-ios
 kind: switch
 displayName: Cisco IOS-style switch/router
-promptFormat: "{hostname}#"
+modePrompts:
+  user-exec: "{hostname}>"
+  priv-exec: "{hostname}#"
+  global-config: "{hostname}(config)#"
+  interface-config: "{hostname}(config-if)#"
+  vlan-config: "{hostname}(config-vlan)#"
+messages:
+  syntaxError: "% Invalid input detected at '^' marker."
+  ambiguousCommand: "% Ambiguous command:  \"{input}\""
+  incompleteCommand: "% Incomplete command."
+  unknownHost: "% Unrecognized host or address, or protocol not running."
+  enterConfig: "Enter configuration commands, one per line.  End with CNTL/Z."
+interfaceFamilies:
+  - { prefix: GigabitEthernet, abbrev: Gi, cdpAbbrev: "Gig ", typeLabel: 10/100/1000BaseTX, bandwidthKbit: 1000000 }
+  - { prefix: TenGigabitEthernet, abbrev: Te, cdpAbbrev: "Ten ", typeLabel: 10GBase-LR, bandwidthKbit: 10000000 }
+  - { prefix: FastEthernet, abbrev: Fa, cdpAbbrev: "Fas ", typeLabel: 10/100BaseTX, bandwidthKbit: 100000 }
+  - { prefix: Vlan, abbrev: Vl, cdpAbbrev: "Vla ", typeLabel: EtherSVI, bandwidthKbit: 1000000 }
+cdpCapable: true
+osVersionLine: "version 15.2"
+transceiverThresholds:
+  temperatureC: [75.0, 70.0, -5.0, -10.0]
+  txDbm: [4.0, 3.0, -4.0, -5.0]
+  rxDbm: [-1.0, -2.0, -23.0, -24.0]
 commandSet:
-  - pattern: "show ip interface brief"
-    description: "interface admin/line status and IP summary"
-  - pattern: "show interfaces status"
-    description: "per-port status, VLAN, duplex, speed"
-  - pattern: "show interfaces {id}"
-    description: "detailed interface counters and state"
-  - pattern: "show vlan brief"
-    description: "VLAN database summary"
-  - pattern: "show mac address-table"
-    description: "learned MAC addresses per VLAN/interface"
-  - pattern: "show ip route"
-    description: "routing table"
-  - pattern: "show cdp neighbors"
-    description: "directly connected Cisco-discoverable neighbors"
-  - pattern: "show running-config"
-    description: "active device configuration"
-  - pattern: "show logging"
-    description: "device log buffer"
-  - pattern: "show interfaces transceiver detail"
-    description: "SFP/optic rx/tx power and temperature"
-  - pattern: "ping {target}"
-    description: "ICMP echo"
-  - pattern: "traceroute {target}"
-    description: "hop-by-hop path trace"
-  - pattern: "configure terminal"
-    description: "enter global configuration mode"
-  - pattern: "interface {id}"
-    description: "enter interface configuration mode"
-  - pattern: "vlan {id}"
-    description: "enter VLAN configuration mode"
-  - pattern: "ip route {network} {mask} {next-hop}"
-    description: "add a static route"
-  - pattern: "ip helper-address {address}"
-    description: "configure a DHCP relay helper address on an interface/VLAN"
-syntaxErrorTemplate: "% Invalid input detected at '^' marker."
+  - { pattern: "enable",                                   handler: enter-priv-exec,          modes: [user-exec], transitionsTo: priv-exec, description: Enter privileged EXEC }
+  - { pattern: "disable",                                  handler: leave-priv-exec,          modes: [priv-exec], transitionsTo: user-exec, description: Leave privileged EXEC }
+  - { pattern: "exit",                                     handler: exit-mode,                modes: [priv-exec, global-config, interface-config, vlan-config], description: Exit current mode }
+  - { pattern: "end",                                      handler: end-config,               modes: [global-config, interface-config, vlan-config], transitionsTo: priv-exec, description: Return to privileged EXEC }
+  - { pattern: "show ip interface brief",                  handler: show-ip-interface-brief,  modes: [user-exec, priv-exec], description: Interface status and IP summary }
+  - { pattern: "show interfaces status",                   handler: show-interfaces-status,   modes: [user-exec, priv-exec], description: "Port status, VLAN, duplex, speed" }
+  - { pattern: "show interfaces {id}",                     handler: show-interface-detail,    modes: [user-exec, priv-exec], description: Interface counters and state }
+  - { pattern: "show interfaces transceiver detail",       handler: show-transceiver-detail,  modes: [user-exec, priv-exec], description: Optic Tx/Rx power and thresholds }
+  - { pattern: "show vlan brief",                          handler: show-vlan-brief,          modes: [user-exec, priv-exec], description: VLAN database }
+  - { pattern: "show mac address-table",                   handler: show-mac-address-table,   modes: [user-exec, priv-exec], description: Learned MAC addresses }
+  - { pattern: "show ip route",                            handler: show-ip-route,            modes: [user-exec, priv-exec], description: Routing table }
+  - { pattern: "show ip ospf neighbor",                    handler: show-ip-ospf-neighbor,    modes: [user-exec, priv-exec], description: OSPF adjacencies }
+  - { pattern: "show cdp neighbors",                       handler: show-cdp-neighbors,       modes: [user-exec, priv-exec], description: Directly connected neighbors }
+  - { pattern: "show running-config",                      handler: show-running-config,      modes: [priv-exec], description: Active configuration }
+  - { pattern: "show logging",                             handler: show-logging,             modes: [user-exec, priv-exec], description: Log buffer }
+  - { pattern: "ping {target}",                            handler: ping,                     modes: [user-exec, priv-exec], description: Send ICMP echoes }
+  - { pattern: "traceroute {target}",                      handler: traceroute,               modes: [user-exec, priv-exec], description: Trace the route }
+  - { pattern: "configure terminal",                       handler: enter-global-config,      modes: [priv-exec], transitionsTo: global-config, description: Enter global configuration }
+  - { pattern: "interface {id}",                           handler: enter-interface-config,   modes: [global-config], transitionsTo: interface-config, description: Configure an interface }
+  - { pattern: "vlan {id}",                                handler: enter-vlan-config,        modes: [global-config], transitionsTo: vlan-config, description: Configure a VLAN }
+  - { pattern: "name {name}",                              handler: vlan-name,                modes: [vlan-config], description: Name the VLAN }
+  - { pattern: "ip route {network} {mask} {nexthop}",      handler: ip-route-add,             modes: [global-config], description: Add a static route }
+  - { pattern: "no ip route {network} {mask} {nexthop}",   handler: ip-route-remove,          modes: [global-config], description: Remove a static route }
+  - { pattern: "switchport mode {mode}",                   handler: if-switchport-mode,       modes: [interface-config], description: access or trunk }
+  - { pattern: "switchport access vlan {id}",              handler: if-access-vlan,           modes: [interface-config], description: Set access VLAN }
+  - { pattern: "switchport trunk allowed vlan {list}",     handler: if-trunk-allowed,         modes: [interface-config], description: Set allowed VLAN list (replace) }
+  - { pattern: "switchport trunk allowed vlan add {list}", handler: if-trunk-allowed-add,     modes: [interface-config], description: Add to allowed VLANs }
+  - { pattern: "switchport trunk native vlan {id}",        handler: if-trunk-native,          modes: [interface-config], description: Set native VLAN }
+  - { pattern: "shutdown",                                 handler: if-shutdown,              modes: [interface-config], description: Administratively disable }
+  - { pattern: "no shutdown",                              handler: if-no-shutdown,           modes: [interface-config], description: Administratively enable }
+  - { pattern: "duplex {mode}",                            handler: if-duplex,                modes: [interface-config], description: "full, half, or auto" }
+  - { pattern: "speed {value}",                            handler: if-speed,                 modes: [interface-config], description: "10, 100, 1000, or auto" }
+  - { pattern: "ip address {ip} {mask}",                   handler: if-ip-address,            modes: [interface-config], description: Set interface IP }
+  - { pattern: "ip helper-address {ip}",                   handler: if-ip-helper,             modes: [interface-config], description: DHCP relay target }
+  - { pattern: "no ip helper-address {ip}",                handler: if-ip-helper-remove,      modes: [interface-config], description: Remove DHCP relay target }
+  - { pattern: "description {...rest}",                    handler: if-description,           modes: [interface-config], description: Interface description }
 notes: >
-  Access/distribution-layer command set only, per Stage 1 scope. Backbone-layer
-  commands (BGP, MPLS, core routing) are explicitly deferred to a later stage's
-  vendor profile. Command parsing/execution logic lives in the CLI/device-state
-  module (build item 3) — this file only declares the supported dialect.
+  Access/distribution-layer dialect only; backbone-layer commands are deferred to a later stage.

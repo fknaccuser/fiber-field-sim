@@ -49,15 +49,47 @@ export const NetworkProfileSchema = z.object({
 });
 export type NetworkProfile = z.infer<typeof NetworkProfileSchema>;
 
+export const CliModeSchema = z.enum(['user-exec', 'priv-exec', 'global-config', 'interface-config', 'vlan-config']);
+export type CliMode = z.infer<typeof CliModeSchema>;
+
+export const CommandEntrySchema = z.object({
+  /** Tokens: literals or {param}; a final {...rest} swallows the remainder of the input. */
+  pattern: z.string(),
+  /** Vendor-neutral handler id (src/instruments/cli/handlers), validated against HANDLER_IDS at registry load. */
+  handler: z.string(),
+  modes: z.array(CliModeSchema).min(1),
+  description: z.string(),
+  transitionsTo: CliModeSchema.optional(),
+});
+export type CommandEntry = z.infer<typeof CommandEntrySchema>;
+
 export const VendorProfileSchema = z.object({
   id: z.string(),
-  kind: z.enum(['olt', 'switch']),
+  kind: z.enum(['olt', 'switch', 'host']),
   displayName: z.string(),
-  promptFormat: z.string(), // e.g. "{hostname}#"
-  commandSet: z
-    .array(z.object({ pattern: z.string(), description: z.string() }))
-    .min(1),
-  syntaxErrorTemplate: z.string(),
+  /** Prompt templates with {hostname}, keyed by CliMode. A 'host' profile only meaningfully uses 'user-exec' but must supply all keys. */
+  modePrompts: z.record(CliModeSchema, z.string()),
+  commandSet: z.array(CommandEntrySchema).min(1),
+  messages: z.object({
+    syntaxError: z.string(),
+    ambiguousCommand: z.string(),
+    incompleteCommand: z.string(),
+    unknownHost: z.string(),
+    enterConfig: z.string().optional(),
+  }),
+  interfaceFamilies: z
+    .array(z.object({ prefix: z.string(), abbrev: z.string(), cdpAbbrev: z.string(), typeLabel: z.string(), bandwidthKbit: z.number() }))
+    .default([]),
+  cdpCapable: z.boolean().default(false),
+  osVersionLine: z.string().optional(),
+  transceiverThresholds: z
+    .object({
+      /** [highAlarm, highWarn, lowWarn, lowAlarm]. */
+      temperatureC: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+      txDbm: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+      rxDbm: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+    })
+    .optional(),
   notes: z.string().optional(),
 });
 export type VendorProfile = z.infer<typeof VendorProfileSchema>;
@@ -130,5 +162,6 @@ export interface ProfileSet {
   switchVendor: VendorProfile;
   equipment: EquipmentProfile;
   otdrInstrument: InstrumentProfile;
+  hostShell: VendorProfile;
   region: RegionProfile;
 }

@@ -11,10 +11,10 @@
  * trainee's actual problem to find, per the spec's minimum fault lists.
  */
 import { z } from 'zod';
-import type { DhcpConfig, FaultInstance, FaultTarget, FiberTubeColor, NetworkDeviceConfig, WorldState } from './types';
+import type { DhcpConfig, FaultInstance, FaultTarget, FiberTubeColor, NetworkDeviceConfig, OntRecord, PonPortState, WorldState } from './types';
 import { addFiberEvent, cloneWorld, findDevice, findInterface, findNode, findSpan } from './worldState';
 
-export type FaultDomain = 'optical' | 'network' | 'compliance';
+export type FaultDomain = 'optical' | 'network' | 'compliance' | 'cpe';
 
 export interface FaultDefinition<P = Record<string, unknown>> {
   id: string;
@@ -71,6 +71,23 @@ function dhcpEntryForVlan(device: NetworkDeviceConfig, vlan: number): DhcpConfig
   const created: DhcpConfig = { vlan, helperAddresses: [] };
   list.push(created);
   return created;
+}
+
+/** Finds an ONT record (and its PON port) by ontId across a device's ponPorts. */
+function findOnt(device: NetworkDeviceConfig, ontId: string): { port: PonPortState; ont: OntRecord } {
+  for (const port of device.ponPorts ?? []) {
+    const ont = port.onts.find((o) => o.ontId === ontId);
+    if (ont) return { port, ont };
+  }
+  throw new Error(`Unknown ONT ${ontId} on device ${device.id}`);
+}
+
+/** Prefix length from a CIDR string, e.g. '10.0.0.0/25' -> 25. Throws if malformed. */
+function cidrPrefixLength(cidr: string): number {
+  const parts = cidr.split('/');
+  const prefix = Number(parts[1]);
+  if (parts.length !== 2 || !Number.isInteger(prefix)) throw new Error(`Malformed CIDR: ${cidr}`);
+  return prefix;
 }
 
 // ---------------------------------------------------------------------------
@@ -453,6 +470,8 @@ const networkFaults: FaultDefinition<any>[] = [
         (r) => !(r.source === 'connected' && r.interfaceId === instance.params.interfaceId),
       );
       device.routeTable.push({ network: instance.params.wrongCidr, interfaceId: instance.params.interfaceId, source: 'connected' });
+      const iface = device.interfaces.find((i) => i.id === instance.params.interfaceId);
+      if (iface) iface.prefixLength = cidrPrefixLength(instance.params.wrongCidr);
       return world;
     },
   },
@@ -463,12 +482,29 @@ const networkFaults: FaultDefinition<any>[] = [
     description: 'An access list is dropping the traffic in question without any obvious error to the customer.',
     appliesTo: 'device-global',
     minTier: 4,
-    paramsSchema: z.object({ matchDescription: z.string() }),
+    paramsSchema: z.object({
+      matchDescription: z.string(),
+      match: z
+        .object({
+          protocol: z.enum(['ip', 'icmp', 'tcp', 'udp']),
+          srcCidr: z.string(),
+          dstCidr: z.string(),
+          dstPort: z.number().int().positive().optional(),
+        })
+        .optional(),
+      appliedTo: z.array(z.object({ interfaceId: z.string(), direction: z.enum(['in', 'out']) })).optional(),
+    }),
     apply(world, instance) {
       const device = deviceOnly(instance, world);
       device.acls = [
         ...(device.acls ?? []),
-        { id: instance.instanceId, action: 'deny', matchDescription: instance.params.matchDescription },
+        {
+          id: instance.instanceId,
+          action: 'deny',
+          matchDescription: instance.params.matchDescription,
+          match: instance.params.match,
+          appliedTo: instance.params.appliedTo,
+        },
       ];
       return world;
     },
@@ -480,12 +516,17 @@ const networkFaults: FaultDefinition<any>[] = [
     description: 'An MTU mismatch between neighbors stalls the adjacency in EXSTART.',
     appliesTo: 'device-interface',
     minTier: 4,
-    paramsSchema: z.object({ neighborId: z.string() }),
+    paramsSchema: z.object({ neighborId: z.string(), localMtu: z.number().int().positive().default(1500) }),
     apply(world, instance) {
       const { device, iface } = deviceIface(instance, world);
       device.ospfNeighbors = [
         ...(device.ospfNeighbors ?? []).filter((n) => n.interfaceId !== iface.id),
         { neighborId: instance.params.neighborId, interfaceId: iface.id, state: 'exstart', mtuMismatch: true },
+      ];
+      iface.mtu = instance.params.localMtu;
+      device.logLines = [
+        ...(device.logLines ?? []),
+        `%OSPF-5-ADJCHG: Process 1, Nbr ${instance.params.neighborId} on ${iface.id} from EXCHANGE to EXSTART, Negotiation Done`,
       ];
       return world;
     },
@@ -514,15 +555,68 @@ const networkFaults: FaultDefinition<any>[] = [
     description: 'The SFP/optic on this interface is reporting receive power below the acceptable range.',
     appliesTo: 'device-interface',
     minTier: 2,
-    paramsSchema: z.object({ rxPowerDbm: z.number(), txPowerDbm: z.number().optional(), temperatureC: z.number().optional() }),
+    paramsSchema: z.object({
+      rxPowerDbm: z.number(),
+      txPowerDbm: z.number().optional(),
+      temperatureC: z.number().optional(),
+      lowAlarmDbm: z.number().default(-24),
+    }),
     apply(world, instance) {
-      const { iface } = deviceIface(instance, world);
+      const { device, iface } = deviceIface(instance, world);
       iface.transceiver = {
         present: true,
         rxPowerDbm: instance.params.rxPowerDbm,
         txPowerDbm: instance.params.txPowerDbm ?? iface.transceiver?.txPowerDbm ?? 2.0,
         temperatureC: instance.params.temperatureC ?? iface.transceiver?.temperatureC ?? 35,
       };
+      device.logLines = [
+        ...(device.logLines ?? []),
+        `%SFF8472-3-THRESHOLD_VIOLATION: ${iface.id}: Rx power low alarm; Operating value: ${instance.params.rxPowerDbm} dBm, Threshold value: ${instance.params.lowAlarmDbm} dBm`,
+      ];
+      return world;
+    },
+  },
+  {
+    id: 'ont-serial-mismatch',
+    domain: 'network',
+    label: 'ONT provisioned with the wrong serial',
+    description: 'The OLT expects a different ONT serial than the one physically installed, so the ONT never ranges.',
+    appliesTo: 'device-global',
+    minTier: 2,
+    paramsSchema: z.object({ ontId: z.string(), provisionedSerial: z.string() }),
+    apply(world, instance) {
+      const device = deviceOnly(instance, world);
+      const { ont } = findOnt(device, instance.params.ontId);
+      ont.provisionedSerial = instance.params.provisionedSerial;
+      return world;
+    },
+  },
+  {
+    id: 'rogue-ont',
+    domain: 'network',
+    label: 'Rogue ONT transmitting out of its timeslot',
+    description: 'An ONT is transmitting outside its assigned timeslot, taking down every other ONT on the same PON port.',
+    appliesTo: 'device-global',
+    minTier: 5,
+    paramsSchema: z.object({ ontId: z.string() }),
+    apply(world, instance) {
+      const device = deviceOnly(instance, world);
+      const { ont } = findOnt(device, instance.params.ontId);
+      ont.misbehaving = 'rogue-tx';
+      return world;
+    },
+  },
+  {
+    id: 'dns-server-unresponsive',
+    domain: 'network',
+    label: 'DNS server unresponsive',
+    description: 'The DNS server itself is degraded or fully down, even though the network path to it is fine.',
+    appliesTo: 'device-global',
+    minTier: 5,
+    paramsSchema: z.object({ health: z.enum(['degraded', 'down']) }),
+    apply(world, instance) {
+      const device = deviceOnly(instance, world);
+      device.dnsServerHealth = instance.params.health;
       return world;
     },
   },
@@ -644,7 +738,28 @@ const complianceFaults: FaultDefinition<any>[] = [
   },
 ];
 
-export const FAULT_TAXONOMY: FaultDefinition<any>[] = [...opticalFaults, ...networkFaults, ...complianceFaults];
+// ---------------------------------------------------------------------------
+// Customer-premises-equipment faults
+// ---------------------------------------------------------------------------
+
+const cpeFaults: FaultDefinition<any>[] = [
+  {
+    id: 'ont-unpowered',
+    domain: 'cpe',
+    label: 'ONT unpowered',
+    description: 'The ONT has lost power (unplugged, tripped breaker, dead battery backup) while the fiber itself is fine.',
+    appliesTo: 'site',
+    minTier: 1,
+    paramsSchema: z.object({}),
+    apply(world, instance) {
+      const node = siteNode(instance, world);
+      node.attributes = { ...node.attributes, powered: false };
+      return world;
+    },
+  },
+];
+
+export const FAULT_TAXONOMY: FaultDefinition<any>[] = [...opticalFaults, ...networkFaults, ...complianceFaults, ...cpeFaults];
 
 export const FAULT_TAXONOMY_BY_ID: Record<string, FaultDefinition<any>> = Object.fromEntries(
   FAULT_TAXONOMY.map((f) => [f.id, f]),

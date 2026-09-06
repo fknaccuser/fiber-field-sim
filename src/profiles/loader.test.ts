@@ -10,16 +10,18 @@ import { loadDefaultProfileSet } from './index';
 
 import networkXgsPon from './network/xgs-pon.yaml?raw';
 import oltCalixE72 from './vendor/olt-calix-e7-2.yaml?raw';
+import hostWindows from './vendor/host-windows.yaml?raw';
 import equipmentHexatronicCommscope from './equipment/hexatronic-commscope.yaml?raw';
 import otdrExfoMaxTester730c from './instrument/otdr-exfo-maxtester-730c.yaml?raw';
 import regionCaSouthOcDigalert from './region/ca-south-oc-digalert.yaml?raw';
 
 describe('default profile set loads and validates', () => {
-  it('loads all six profiles without throwing', () => {
+  it('loads all seven profiles without throwing', () => {
     const set = loadDefaultProfileSet();
     expect(set.network.id).toBe('xgs-pon-default');
     expect(set.oltVendor.kind).toBe('olt');
     expect(set.switchVendor.kind).toBe('switch');
+    expect(set.hostShell.kind).toBe('host');
     expect(set.equipment.splitterFiberVendor).toBe('Hexatronic');
     expect(set.otdrInstrument.displayName).toMatch(/MaxTester/);
     expect(set.region.oneCallCenterName).toMatch(/DigAlert/);
@@ -45,7 +47,9 @@ describe('default profile set loads and validates', () => {
 
   it('rejects a vendor profile with an empty command set', () => {
     expect(() =>
-      loadVendorProfile('id: x\nkind: switch\ndisplayName: X\npromptFormat: "#"\ncommandSet: []\nsyntaxErrorTemplate: err'),
+      loadVendorProfile(
+        'id: x\nkind: switch\ndisplayName: X\nmodePrompts: {user-exec: ">", priv-exec: "#", global-config: "(config)#", interface-config: "(config-if)#", vlan-config: "(config-vlan)#"}\ncommandSet: []\nmessages: {syntaxError: err, ambiguousCommand: err, incompleteCommand: err, unknownHost: err}',
+      ),
     ).toThrow();
   });
 
@@ -58,6 +62,13 @@ describe('default profile set loads and validates', () => {
   it('an OLT vendor profile validates independently of a switch vendor profile', () => {
     const olt = loadVendorProfile(oltCalixE72);
     expect(olt.kind).toBe('olt');
+  });
+
+  it('the host shell profile validates as kind host with all five mode prompts', () => {
+    const host = loadVendorProfile(hostWindows);
+    expect(host.kind).toBe('host');
+    expect(host.modePrompts['user-exec']).toContain('C:\\Users\\tech>');
+    expect(host.commandSet.some((c) => c.handler === 'host-ipconfig')).toBe(true);
   });
 
   it('the OTDR instrument profile carries a real pulse-width range and out-of-band live-test wavelengths', () => {

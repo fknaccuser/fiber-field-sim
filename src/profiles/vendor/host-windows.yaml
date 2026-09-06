@@ -1,0 +1,26 @@
+id: host-windows
+kind: host
+displayName: Windows customer laptop
+modePrompts:
+  user-exec: "C:\\Users\\tech>"
+  priv-exec: "C:\\Users\\tech>"
+  global-config: "C:\\Users\\tech>"
+  interface-config: "C:\\Users\\tech>"
+  vlan-config: "C:\\Users\\tech>"
+messages:
+  syntaxError: "'{input}' is not recognized as an internal or external command,\noperable program or batch file."
+  ambiguousCommand: "'{input}' is not recognized as an internal or external command,\noperable program or batch file."
+  incompleteCommand: "'{input}' is not recognized as an internal or external command,\noperable program or batch file."
+  unknownHost: "Ping request could not find host {input}. Please check the name and try again."
+interfaceFamilies: []
+commandSet:
+  - { pattern: "ipconfig",              handler: host-ipconfig,     modes: [user-exec], description: Show IP configuration }
+  - { pattern: "ipconfig /all",         handler: host-ipconfig-all, modes: [user-exec], description: Show detailed IP configuration }
+  - { pattern: "ping {target}",         handler: host-ping,         modes: [user-exec], description: Send ICMP echoes }
+  - { pattern: "nslookup {target}",     handler: host-nslookup,     modes: [user-exec], description: Query DNS }
+  - { pattern: "tracert {target}",      handler: host-tracert,      modes: [user-exec], description: Trace the route }
+notes: >
+  Default assumed shell for a customer-premise laptop: Windows (ipconfig, tracert,
+  "Request timed out."). If a crew's customer base skews macOS/Linux, add a sibling
+  profiles/vendor/host-unix.yaml with the equivalent commands (ifconfig, traceroute) —
+  the CLI handlers are shared and vendor-neutral, only this profile's syntax differs.

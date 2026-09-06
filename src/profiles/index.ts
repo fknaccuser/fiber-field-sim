@@ -4,6 +4,7 @@ export * from './loader';
 import networkXgsPon from './network/xgs-pon.yaml?raw';
 import oltCalixE72 from './vendor/olt-calix-e7-2.yaml?raw';
 import switchCiscoIos from './vendor/switch-cisco-ios.yaml?raw';
+import hostWindows from './vendor/host-windows.yaml?raw';
 import equipmentHexatronicCommscope from './equipment/hexatronic-commscope.yaml?raw';
 import otdrExfoMaxTester730c from './instrument/otdr-exfo-maxtester-730c.yaml?raw';
 import regionCaSouthOcDigalert from './region/ca-south-oc-digalert.yaml?raw';
@@ -30,6 +31,7 @@ export function loadDefaultProfileSet(): ProfileSet {
     switchVendor: loadVendorProfile(switchCiscoIos),
     equipment: loadEquipmentProfile(equipmentHexatronicCommscope),
     otdrInstrument: loadInstrumentProfile(otdrExfoMaxTester730c),
+    hostShell: loadVendorProfile(hostWindows),
     region: loadRegionProfile(regionCaSouthOcDigalert),
   };
 }

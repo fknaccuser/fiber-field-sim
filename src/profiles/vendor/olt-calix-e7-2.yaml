@@ -1,27 +1,35 @@
 id: olt-calix-e7-2
 kind: olt
 displayName: Calix E7-2 (AXOS)
-promptFormat: "{hostname}>"
+modePrompts:
+  user-exec: "{hostname}>"
+  priv-exec: "{hostname}#"
+  global-config: "{hostname}(config)#"
+  interface-config: "{hostname}(config-if)#"
+  vlan-config: "{hostname}(config-vlan)#"
+messages:
+  syntaxError: "% Invalid command."
+  ambiguousCommand: "% Ambiguous command: \"{input}\""
+  incompleteCommand: "% Incomplete command."
+  unknownHost: "% Unknown host {input}"
+cdpCapable: false
 commandSet:
-  - pattern: "show ont status"
-    description: "ONT status per PON port"
-  - pattern: "show pon port"
-    description: "PON port stats and alarms"
-  - pattern: "show interface pon"
-    description: "PON interface detail including optical levels"
-  - pattern: "show alarms"
-    description: "active chassis/line-card/PON alarms"
-syntaxErrorTemplate: "% Invalid command."
+  - { pattern: "enable",                  handler: enter-priv-exec,        modes: [user-exec], transitionsTo: priv-exec, description: Enter privileged EXEC }
+  - { pattern: "exit",                    handler: exit-mode,              modes: [priv-exec], description: Exit current mode }
+  - { pattern: "show ont status",         handler: olt-show-ont-status,    modes: [user-exec, priv-exec], description: ONT status across all PON ports }
+  - { pattern: "show ont status {ontId}", handler: olt-show-ont-detail,    modes: [user-exec, priv-exec], description: Detail for one ONT }
+  - { pattern: "show pon port",           handler: olt-show-pon-port,      modes: [user-exec, priv-exec], description: PON port summary }
+  - { pattern: "show interface pon {id}", handler: olt-show-pon-interface, modes: [user-exec, priv-exec], description: PON interface detail including optical levels }
+  - { pattern: "show alarms",             handler: olt-show-alarms,        modes: [user-exec, priv-exec], description: Active chassis/line-card/PON alarms }
+  - { pattern: "show logging",            handler: show-logging,           modes: [user-exec, priv-exec], description: Log buffer }
+  - { pattern: "ping {target}",           handler: ping,                   modes: [user-exec, priv-exec], description: Send ICMP echoes }
 notes: >
-  Confirmed by the crew: OLT chassis is the Calix E7-2 running AXOS. Published
-  line-card specs for this chassis (checked during Stage 1 kickoff): the XG1601
-  16-port XGS-PON line card supports up to 32 XGS-PON ports per E7-2 chassis,
-  and the XG801 8-port card supports up to 2,048 ONT connections per chassis via
-  128-way splits. Note 32 ports/chassis times 6 chassis equals 192 — a plausible
-  (not yet confirmed) explanation for the "~192 at the POP" figure recorded in
-  the equipment profile's pop-capacity-192 entry, if that POP runs six E7-2
-  chassis. Still flagged needsConfirmation there pending an actual chassis count.
-  Full command parsing/execution logic is implemented in the CLI/device-state
-  module (build item 3), not here — this file only declares which commands this
-  vendor's dialect supports. Fully swappable: point activeProfiles.oltVendor at
-  a different profiles/vendor/olt-*.yaml to change chassis, with zero engine change.
+  Seeded as the default OLT vendor profile per team confirmation: the crew said all
+  their OLT-side gear "looks similar" and asked for whichever is most common and
+  cheapest, guessing Calix. This profile is a placeholder budget-tier XGS-PON OLT
+  dialect, not a verified match to a specific chassis/firmware. Fully swappable —
+  add a sibling profiles/vendor/olt-*.yaml and repoint activeProfiles.oltVendor to
+  correct it later without touching engine code. Full command parsing logic is
+  implemented in the CLI/device-state module (build item 3), not here — this file
+  only declares which commands this vendor's dialect supports.
+  Command layouts unverified against a live E7-2 session.

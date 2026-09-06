@@ -2,7 +2,9 @@ import type {
   ActiveProfileSet,
   FiberEvent,
   FiberSpan,
+  HostConfig,
   NetworkDeviceConfig,
+  NetworkLink,
   SpliceMapEntry,
   TopologyNode,
   WorldState,
@@ -32,6 +34,8 @@ export function createEmptyWorld(seed: number, activeProfiles: ActiveProfileSet)
     activeProfiles,
     topology: { nodes: [], spans: [] },
     devices: [],
+    links: [],
+    hosts: [],
     customerReports: [],
     environment: { weather: 'clear', timeOfDay: 'day' },
     truckInventory: [],
@@ -85,4 +89,24 @@ export function getSplitRatio(node: TopologyNode): string {
 /** All fiber spans with an end at this node (either `fromNodeId` or `toNodeId`). */
 export function spansAtNode(world: WorldState, nodeId: string): FiberSpan[] {
   return world.topology.spans.filter((s) => s.fromNodeId === nodeId || s.toNodeId === nodeId);
+}
+
+export function findHost(world: WorldState, hostId: string): HostConfig {
+  const host = world.hosts.find((h) => h.id === hostId);
+  if (!host) throw new Error(`Unknown host: ${hostId}`);
+  return host;
+}
+
+/** All links touching a given device+interface (normally at most one). */
+export function linksAtInterface(world: WorldState, deviceId: string, interfaceId: string): NetworkLink[] {
+  return world.links.filter(
+    (l) =>
+      (l.a.deviceId === deviceId && l.a.interfaceId === interfaceId) ||
+      ('deviceId' in l.b && l.b.deviceId === deviceId && l.b.interfaceId === interfaceId),
+  );
+}
+
+/** The link (if any) that attaches a host to a switch port. */
+export function linkForHost(world: WorldState, hostId: string): NetworkLink | null {
+  return world.links.find((l) => 'hostId' in l.b && l.b.hostId === hostId) ?? null;
 }

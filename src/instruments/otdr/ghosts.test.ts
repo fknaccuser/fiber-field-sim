@@ -12,6 +12,7 @@ const activeProfiles: ActiveProfileSet = {
   switchVendor: 'switch-cisco-ios',
   equipment: 'hexatronic-commscope-default',
   otdrInstrument: 'otdr-exfo-maxtester-730c',
+  hostShell: 'host-windows',
   region: 'ca-south-oc-digalert',
 };
 

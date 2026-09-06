@@ -9,6 +9,7 @@ const profiles: ActiveProfileSet = {
   switchVendor: 'switch-cisco-ios',
   equipment: 'hexatronic-commscope-default',
   otdrInstrument: 'otdr-exfo-maxtester-730c',
+  hostShell: 'host-windows',
   region: 'ca-south-oc-digalert',
 };
 
@@ -62,7 +63,7 @@ describe('fault taxonomy registry', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('covers the network fault list minimum from the spec (15 kinds)', () => {
+  it('covers the network fault list minimum from the spec (>= 15 kinds)', () => {
     const networkIds = FAULT_TAXONOMY.filter((f) => f.domain === 'network').map((f) => f.id);
     expect(networkIds).toEqual(
       expect.arrayContaining([
@@ -83,7 +84,7 @@ describe('fault taxonomy registry', () => {
         'transceiver-rx-power-low',
       ]),
     );
-    expect(networkIds.length).toBe(15);
+    expect(networkIds.length).toBeGreaterThanOrEqual(15);
   });
 
   it('includes the tube/fiber continuity-rolling fault as a first-class optical fault', () => {
@@ -320,5 +321,132 @@ describe('compliance faults', () => {
       params: { ticketOpenedDaysAgo: 40, validityDays: 28 },
     });
     expect((findNode(next, 'closure-1').attributes as any).locateTicket.expired).toBe(true);
+  });
+});
+
+describe('cpe faults', () => {
+  it('ont-unpowered marks the ONT node as unpowered', () => {
+    const world = worldWithSpan();
+    const next = applyFault(world, {
+      instanceId: 'f1',
+      kind: 'ont-unpowered',
+      target: { type: 'site', nodeId: 'closure-1' },
+      params: {},
+    });
+    expect((findNode(next, 'closure-1').attributes as any).powered).toBe(false);
+  });
+});
+
+function worldWithOnt(): WorldState {
+  const world = worldWithDevice();
+  const device = findDevice(world, 'sw-1');
+  device.ponPorts = [
+    {
+      id: '1/1/xp1',
+      adminStatus: 'up',
+      spanId: 'span-1',
+      onts: [
+        { ontId: '1/1/xp1/1', serial: 'CXNK00A1B2C3', ontNodeId: 'ont-1' },
+        { ontId: '1/1/xp1/2', serial: 'CXNK00A1B2C4', ontNodeId: 'ont-2' },
+      ],
+    },
+  ];
+  return world;
+}
+
+describe('ont faults', () => {
+  it('ont-serial-mismatch sets the provisioned serial on the matching ONT record', () => {
+    const world = worldWithOnt();
+    const next = applyFault(world, {
+      instanceId: 'f1',
+      kind: 'ont-serial-mismatch',
+      target: { type: 'device-global', deviceId: 'sw-1' },
+      params: { ontId: '1/1/xp1/1', provisionedSerial: 'CXNK00ZZZZZZ' },
+    });
+    const ont = findDevice(next, 'sw-1').ponPorts![0].onts.find((o) => o.ontId === '1/1/xp1/1')!;
+    expect(ont.provisionedSerial).toBe('CXNK00ZZZZZZ');
+  });
+
+  it('rogue-ont flags the ONT as misbehaving', () => {
+    const world = worldWithOnt();
+    const next = applyFault(world, {
+      instanceId: 'f1',
+      kind: 'rogue-ont',
+      target: { type: 'device-global', deviceId: 'sw-1' },
+      params: { ontId: '1/1/xp1/2' },
+    });
+    const ont = findDevice(next, 'sw-1').ponPorts![0].onts.find((o) => o.ontId === '1/1/xp1/2')!;
+    expect(ont.misbehaving).toBe('rogue-tx');
+  });
+});
+
+describe('dns-server-unresponsive fault', () => {
+  it('sets the device dnsServerHealth', () => {
+    const world = worldWithDevice();
+    const next = applyFault(world, {
+      instanceId: 'f1',
+      kind: 'dns-server-unresponsive',
+      target: { type: 'device-global', deviceId: 'sw-1' },
+      params: { health: 'down' },
+    });
+    expect(findDevice(next, 'sw-1').dnsServerHealth).toBe('down');
+  });
+});
+
+describe('amended fault behavior', () => {
+  it('subnet-mask-typo-overlap also sets the interface prefixLength from the wrong CIDR', () => {
+    const world = worldWithDevice();
+    const device = findDevice(world, 'sw-1');
+    device.interfaces[0].ipAddress = '10.0.0.5';
+    const next = applyFault(world, {
+      instanceId: 'f1',
+      kind: 'subnet-mask-typo-overlap',
+      target: { type: 'device-global', deviceId: 'sw-1' },
+      params: { interfaceId: 'GigabitEthernet0/1', wrongCidr: '10.0.0.0/8' },
+    });
+    const iface = findInterface(findDevice(next, 'sw-1'), 'GigabitEthernet0/1');
+    expect(iface.prefixLength).toBe(8);
+  });
+
+  it('acl-silent-drop accepts a structured match and appliedTo', () => {
+    const world = worldWithDevice();
+    const next = applyFault(world, {
+      instanceId: 'f1',
+      kind: 'acl-silent-drop',
+      target: { type: 'device-global', deviceId: 'sw-1' },
+      params: {
+        matchDescription: 'ICMP from customers to anywhere',
+        match: { protocol: 'icmp', srcCidr: '10.0.0.0/24', dstCidr: '0.0.0.0/0' },
+        appliedTo: [{ interfaceId: 'Vlan10', direction: 'in' }],
+      },
+    });
+    const acl = findDevice(next, 'sw-1').acls![0];
+    expect(acl.match).toEqual({ protocol: 'icmp', srcCidr: '10.0.0.0/24', dstCidr: '0.0.0.0/0' });
+    expect(acl.appliedTo).toEqual([{ interfaceId: 'Vlan10', direction: 'in' }]);
+  });
+
+  it('ospf-exstart-mtu-mismatch sets the interface MTU and logs the ADJCHG line', () => {
+    const world = worldWithDevice();
+    const next = applyFault(world, {
+      instanceId: 'f1',
+      kind: 'ospf-exstart-mtu-mismatch',
+      target: { type: 'device-interface', deviceId: 'sw-1', interfaceId: 'GigabitEthernet0/1' },
+      params: { neighborId: '10.0.0.2', localMtu: 1400 },
+    });
+    const device = findDevice(next, 'sw-1');
+    expect(findInterface(device, 'GigabitEthernet0/1').mtu).toBe(1400);
+    expect(device.logLines!.some((l) => l.includes('EXCHANGE to EXSTART'))).toBe(true);
+  });
+
+  it('transceiver-rx-power-low also logs an SFF8472 threshold violation', () => {
+    const world = worldWithDevice();
+    const next = applyFault(world, {
+      instanceId: 'f1',
+      kind: 'transceiver-rx-power-low',
+      target: { type: 'device-interface', deviceId: 'sw-1', interfaceId: 'GigabitEthernet0/1' },
+      params: { rxPowerDbm: -27 },
+    });
+    const device = findDevice(next, 'sw-1');
+    expect(device.logLines!.some((l) => l.includes('THRESHOLD_VIOLATION'))).toBe(true);
   });
 });

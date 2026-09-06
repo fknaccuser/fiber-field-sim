@@ -101,6 +101,7 @@ export function resolveProfileSet(active: ActiveProfileSet): ProfileSet {
     switchVendor: getFrom(idx.vendor, 'vendor', active.switchVendor),
     equipment: getFrom(idx.equipment, 'equipment', active.equipment),
     otdrInstrument: getFrom(idx.instrument, 'instrument', active.otdrInstrument),
+    hostShell: getFrom(idx.vendor, 'vendor', active.hostShell),
     region: getFrom(idx.region, 'region', active.region),
   };
 }
@@ -120,6 +121,7 @@ export function listProfiles(kind: keyof ProfileSet): Array<{ id: string; displa
       return toEntries(Array.from(idx.network.values()));
     case 'oltVendor':
     case 'switchVendor':
+    case 'hostShell':
       return toEntries(Array.from(idx.vendor.values()));
     case 'equipment':
       return toEntries(Array.from(idx.equipment.values()));
