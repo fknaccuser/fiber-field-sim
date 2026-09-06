@@ -1,0 +1,203 @@
+id: t1-dark-ont-vista-court
+title: Dark ONT on Vista Court
+tier: 1
+description: >
+  A single residential customer at 114 Vista Court is completely dark. Guided,
+  single-fault scenario: the ONT lost power, the fiber itself is fine.
+today: "2026-09-05"
+profiles:
+  network: xgs-pon-default
+  oltVendor: olt-calix-e7-2
+  switchVendor: switch-cisco-ios
+  hostShell: host-windows
+  equipment: hexatronic-commscope-default
+  otdrInstrument: otdr-exfo-maxtester-730c
+  region: ca-south-oc-digalert
+environment:
+  weather: clear
+  timeOfDay: "10:30"
+truckInventory: [otdr, power-meter, vfl, inspection-scope, launch-cable-500m, laptop]
+startLocationNodeId: ont-vista-114
+remoteCliAccess: true
+remoteHostAccess: false
+hints:
+  - "Before you test anything: what do the ONT's status LEDs tell you about power versus light?"
+  - "Ask the OLT. `show ont status` tells you whether the ONT is reporting loss of signal or simply went dark."
+  - "If the OLT says the ONT went dark and your power meter still sees healthy light at the ONT's input, the fiber isn't the problem."
+
+topology:
+  nodes:
+    - id: olt-1
+      kind: olt
+      label: "POP 1 — OLT rack"
+    - id: fdh-a
+      kind: fdh
+      label: "FDH A — Vista Ct & Calle Sol"
+      equipmentRef: fdh-cabinet-450-series
+    - id: fdh-a-spl1
+      kind: splitter
+      label: "FDH A Splitter 1"
+      attributes: { splitRatio: "1x32" }
+    - id: term-a-12
+      kind: terminal
+      label: "NAP A-12, 114 Vista Ct pedestal"
+      equipmentRef: distribution-terminal-32
+    - id: ont-vista-114
+      kind: ont
+      label: "ONT — 114 Vista Court"
+      attributes: { powered: true }
+    - id: prem-vista-114
+      kind: customer-premise
+      label: "114 Vista Court"
+  spans:
+    - id: sp-feeder-a
+      fromNodeId: olt-1
+      toNodeId: fdh-a-spl1
+      lengthMeters: 2100
+      events:
+        - id: ev-olt-panel
+          kind: connector-apc
+          positionMeters: 0
+          lossDb: 0.25
+          reflectanceDb: -60
+        - id: ev-f1
+          kind: fusion-splice
+          positionMeters: 1200
+          lossDb: 0.05
+    - id: sp-dist-a-12
+      fromNodeId: fdh-a-spl1
+      toNodeId: term-a-12
+      lengthMeters: 850
+      events:
+        - id: ev-spl-out-12
+          kind: connector-apc
+          positionMeters: 0
+          lossDb: 0.3
+          reflectanceDb: -60
+        - id: ev-f2
+          kind: fusion-splice
+          positionMeters: 400
+          lossDb: 0.04
+    - id: sp-drop-114
+      fromNodeId: term-a-12
+      toNodeId: ont-vista-114
+      lengthMeters: 65
+      events:
+        - id: ev-nap-port
+          kind: connector-apc
+          positionMeters: 0
+          lossDb: 0.3
+          reflectanceDb: -60
+        - id: ev-ont-jack
+          kind: connector-apc
+          positionMeters: 65
+          lossDb: 0.3
+          reflectanceDb: -60
+
+devices:
+  - id: olt-1-dev
+    hostname: OLT-POP1-E72-1
+    vendorProfileId: olt-calix-e7-2
+    role: olt
+    platform: Calix E7-2
+    topologyNodeId: olt-1
+    interfaces:
+      - id: TenGigabitEthernet1/1
+        adminStatus: up
+        lineStatus: up
+        speedMbps: 10000
+        duplex: full
+        mode: trunk
+        allowedVlans: [100]
+        nativeVlan: 1
+        transceiver: { present: true, rxPowerDbm: -8.2, txPowerDbm: 2.1, temperatureC: 38 }
+    vlans: []
+    macTable: []
+    routeTable: []
+    ponPorts:
+      - id: "1/1/xp1"
+        adminStatus: up
+        spanId: sp-feeder-a
+        onts:
+          - ontId: "1/1/xp1/14"
+            serial: CXNK00A1B2C3
+            provisionedSerial: CXNK00A1B2C3
+            ontNodeId: ont-vista-114
+  - id: dist-rtr-1
+    hostname: DIST-RTR-1
+    vendorProfileId: switch-cisco-ios
+    role: l3-switch
+    platform: C9300-24T
+    interfaces:
+      - id: TenGigabitEthernet1/0/1
+        adminStatus: up
+        lineStatus: up
+        speedMbps: 10000
+        duplex: full
+        mode: trunk
+        allowedVlans: [100]
+        nativeVlan: 1
+        transceiver: { present: true, rxPowerDbm: -7.9, txPowerDbm: 1.8, temperatureC: 41 }
+      - id: Vlan100
+        adminStatus: up
+        lineStatus: up
+        speedMbps: 1000
+        duplex: auto
+        mode: access
+        ipAddress: 10.100.0.1
+        prefixLength: 24
+    vlans: [{ id: 100, name: PON-VLAN }]
+    macTable: []
+    routeTable: []
+    dhcp:
+      - vlan: 100
+        helperAddresses: ["10.0.0.50"]
+        scope: { network: 10.100.0.0/24, poolSize: 200, leased: 37 }
+        dnsServerIp: 10.0.0.53
+    dnsResolverIp: 10.0.0.53
+
+links:
+  - id: l-olt-dist
+    a: { deviceId: olt-1-dev, interfaceId: TenGigabitEthernet1/1 }
+    b: { deviceId: dist-rtr-1, interfaceId: TenGigabitEthernet1/0/1 }
+
+hosts:
+  - id: laptop-114
+    label: Customer laptop
+    premiseNodeId: prem-vista-114
+    macAddress: "02:11:4a:00:01:14"
+    attachedOntNodeId: ont-vista-114
+    vlan: 100
+    addressing: { mode: dhcp }
+
+customerReports:
+  - customerId: cust-114
+    premiseNodeId: prem-vista-114
+    reportedSymptom: "All the lights on the fiber box are off and the internet's out."
+    phrasingVariants:
+      - "The internet's down and that little box on the wall is completely dark."
+      - "No internet since this morning; the box has no lights at all."
+
+faults:
+  - instanceId: f-ont-114-unpowered
+    kind: ont-unpowered
+    target: { type: site, nodeId: ont-vista-114 }
+    params: {}
+
+referenceSolution:
+  steps:
+    - type: cli
+      endpoint: { kind: device, deviceId: olt-1-dev }
+      command: "show ont status"
+    - type: power-meter
+      nodeId: ont-vista-114
+      wavelengthNm: 1577
+    - type: diagnosis
+      diagnosis:
+        claims:
+          - faultKind: ont-unpowered
+            target: { type: site, nodeId: ont-vista-114 }
+            evidenceActionIds: ["$0", "$1"]
+  expectedClaims:
+    - faultKind: ont-unpowered
+      target: { type: site, nodeId: ont-vista-114 }

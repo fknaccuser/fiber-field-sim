@@ -1,5 +1,5 @@
 /** Presence rules (must you physically be somewhere to do this?) and travel time between nodes. */
-import { findDevice, findHost, findSpan } from '../world';
+import { deviceIdAt, findDevice, findHost, findSpan } from '../world';
 import type { WorldState } from '../world';
 import type { Intent, ScenarioMeta } from './types';
 
@@ -7,7 +7,7 @@ import type { Intent, ScenarioMeta } from './types';
 export function deviceLocationNodeId(world: WorldState, deviceId: string): string | null {
   const device = findDevice(world, deviceId);
   if (device.topologyNodeId) return device.topologyNodeId;
-  const node = world.topology.nodes.find((n) => n.kind === 'network-device' && n.attributes?.deviceId === deviceId);
+  const node = world.topology.nodes.find((n) => n.kind === 'network-device' && deviceIdAt(n) === deviceId);
   return node?.id ?? null;
 }
 

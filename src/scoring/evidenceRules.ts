@@ -28,22 +28,21 @@ function spanTouchesNode(world: WorldState, spanId: string, nodeId: string): boo
   return !!span && (span.fromNodeId === nodeId || span.toNodeId === nodeId);
 }
 
-/** ONT nodes reachable downstream of a span's customer-facing end, by walking the plain span graph (no physics -- just "is there a path"). */
-function downstreamOntNodeIds(world: WorldState, spanId: string): string[] {
+/** Every node reachable downstream of a span's customer-facing end, by walking the plain span graph (no physics -- just "is there a path"). Includes intermediate splitters/FDHs, not just ONTs: a power-meter reading anywhere downstream of a break is valid evidence. */
+function downstreamNodeIds(world: WorldState, spanId: string): string[] {
   const span = world.topology.spans.find((s) => s.id === spanId);
   if (!span) return [];
   const visited = new Set<string>([span.toNodeId]);
   const queue = [span.toNodeId];
-  const found: string[] = [];
+  const found: string[] = [span.toNodeId];
   while (queue.length > 0) {
     const current = queue.shift()!;
-    const node = world.topology.nodes.find((n) => n.id === current);
-    if (node?.kind === 'ont') found.push(current);
     for (const s of world.topology.spans) {
       const next = s.fromNodeId === current ? s.toNodeId : s.toNodeId === current ? s.fromNodeId : null;
       if (next && !visited.has(next)) {
         visited.add(next);
         queue.push(next);
+        found.push(next);
       }
     }
   }
@@ -99,18 +98,32 @@ export function otdrBidirectional(ctx: EvidenceContext): boolean {
   return false;
 }
 
+/** True if this shot's detected trace shows an unterminated fiber end at all (the thing a trainee actually sees on screen -- not the internal ground truth, which may attribute the same physical point to a different, co-located event). */
+function detectsEndOfFiber(action: Extract<ActionEvent, { type: 'otdr-shot' }>): boolean {
+  return action.events.some((e) => e.kind === 'end-of-fiber');
+}
+
 export function otdrUnterminatedEndAt(nodeId: string): EvidencePredicate {
   return (ctx) =>
     otdrShots(ctx).some((a) => {
       const lastSpan = a.pathSpanIds[a.pathSpanIds.length - 1];
-      return !!lastSpan && spanTouchesNode(ctx.world, lastSpan, nodeId) && a.groundTruth.some((g) => g.kind === 'unterminated-end' && g.resolved);
+      return !!lastSpan && spanTouchesNode(ctx.world, lastSpan, nodeId) && detectsEndOfFiber(a);
     });
 }
 
+/**
+ * An otdr-shot whose path passes the closure and shows an unterminated end -- not
+ * necessarily *at* the closure itself. A shot launched from the far (distribution) side
+ * of a wrong roll rides the mis-spliced strand straight through the closure and out the
+ * other side, so the unterminated end it finds sits wherever that strand actually goes
+ * (here, back at the OLT panel via the dark fiber it got spliced into) rather than at
+ * the closure.
+ */
 export function otdrUnterminatedEndAtClosure(): EvidencePredicate {
   return (ctx) => {
     const closure = faultClosureNodeId(ctx.world, ctx.fault);
-    return closure !== null && otdrUnterminatedEndAt(closure)(ctx);
+    if (closure === null) return false;
+    return otdrShots(ctx).some((a) => a.pathSpanIds.some((spanId) => spanTouchesNode(ctx.world, spanId, closure)) && detectsEndOfFiber(a));
   };
 }
 
@@ -136,7 +149,7 @@ export function powerMeterDownstream(pred: (dbm: number | null) => boolean): Evi
   return (ctx) => {
     if (ctx.fault.target.type !== 'fiber-span') return false;
     const { spanId } = ctx.fault.target;
-    const nodes = downstreamOntNodeIds(ctx.world, spanId);
+    const nodes = downstreamNodeIds(ctx.world, spanId);
     return nodes.some((nodeId) => powerMeterAt(nodeId, pred)(ctx));
   };
 }
@@ -381,8 +394,8 @@ export const EVIDENCE_RULES: Record<string, EvidenceSet[]> = {
   ],
   'fat-power-out-of-spec': [[fatPowerOutOfSpec()]],
   'ont-unpowered': [
-    [ontStatusIs('offline'), powerMeterAtSite((dbm) => dbm !== null && dbm >= 0)],
-    [hostApipa(undefined, 'no-link'), powerMeterAtSite((dbm) => dbm !== null && dbm >= 0)],
+    [ontStatusIs('offline'), powerMeterAtSite((dbm) => dbm !== null)],
+    [hostApipa(undefined, 'no-link'), powerMeterAtSite((dbm) => dbm !== null)],
   ],
   'ont-serial-mismatch': [[ontStatusIs('serial-mismatch')]],
   'rogue-ont': [[ontStatusIs('rogue')], [ontStatusLosCountAtLeast(2), logObservedOnFaultDevice()]],

@@ -3,7 +3,7 @@
  * fault happened, it just sees a path loss and receive power computed the same way the
  * OTDR and power meter see them (via the shared optical path resolver).
  */
-import { findNode } from '../../../world';
+import { findNode, isPowered } from '../../../world';
 import type { NetworkDeviceConfig, OntRecord, PonPortState, WorldState } from '../../../world';
 import type { NetworkProfile } from '../../../profiles';
 import { pathLossDb } from '../../shared/opticalPath';
@@ -36,7 +36,7 @@ export function deriveOntStatus(
   }
 
   const ontNode = findNode(world, ont.ontNodeId);
-  if (ontNode.attributes?.powered === false) {
+  if (!isPowered(ontNode)) {
     return { status: 'offline', rxAtOntDbm: null, rxAtOltDbm: null };
   }
 

@@ -149,15 +149,29 @@ function buildSegment(
     return { spanId, reversed, startMeters, strand, children: [buildSegment(world, network, only.id, nextNodeId, undefined, nextCum, nextVisited)] };
   }
 
+  // A splice-map entry is authored in one direction (fromSpanId/fromStrand ->
+  // toSpanId/toStrand) but must resolve a walk arriving from *either* side -- an OTDR
+  // shot launched from the far end of the map (e.g. testing upstream from a distribution
+  // splitter back toward the feeder) arrives via what the entry calls its "to" side.
   const spliceMap = getSpliceMap(nextNode);
-  const entry = spliceMap.find((e) => e.fromSpanId === spanId && (!hasStrands || strandEquals(e.fromStrand, strand)));
-  if (entry) {
+  const forwardEntry = spliceMap.find((e) => e.fromSpanId === spanId && (!hasStrands || strandEquals(e.fromStrand, strand)));
+  const reverseEntry = !forwardEntry ? spliceMap.find((e) => e.toSpanId === spanId && (!hasStrands || strandEquals(e.toStrand, strand))) : undefined;
+  if (forwardEntry) {
     return {
       spanId,
       reversed,
       startMeters,
       strand,
-      children: [buildSegment(world, network, entry.toSpanId, nextNodeId, entry.toStrand, nextCum, nextVisited)],
+      children: [buildSegment(world, network, forwardEntry.toSpanId, nextNodeId, forwardEntry.toStrand, nextCum, nextVisited)],
+    };
+  }
+  if (reverseEntry) {
+    return {
+      spanId,
+      reversed,
+      startMeters,
+      strand,
+      children: [buildSegment(world, network, reverseEntry.fromSpanId, nextNodeId, reverseEntry.fromStrand, nextCum, nextVisited)],
     };
   }
 
@@ -200,22 +214,51 @@ export function pathLossDb(world: WorldState, network: NetworkProfile, fromNodeI
   const key = wavelengthKey(wavelengthNm);
   const visitedNodes = new Set<string>();
 
-  function search(nodeId: string, arrivingSpanId: string | null): { lossDb: number; spanIds: string[] } | null {
+  /**
+   * `arrivingStrand` is the specific fiber we're already on, once one has been chosen
+   * (undefined at the very start, before any stranded span has been entered). At a node
+   * with more than one continuation and a splice map, only the map's entry for that exact
+   * strand may continue the search -- matching only by span id (ignoring which strand)
+   * would let the search "leak" onto a physically disconnected fiber via an unrelated
+   * splice-map row for the same pair of spans.
+   */
+  function search(nodeId: string, arrivingSpanId: string | null, arrivingStrand: StrandRef | undefined): { lossDb: number; spanIds: string[] } | null {
     if (nodeId === toNodeId) return { lossDb: 0, spanIds: [] };
     if (visitedNodes.has(nodeId)) return null;
     visitedNodes.add(nodeId);
 
     const node: TopologyNode = findNode(world, nodeId);
     const candidates = spansAtNode(world, nodeId).filter((s) => s.id !== arrivingSpanId);
+    const spliceMap = node.kind !== 'splitter' ? getSpliceMap(node) : [];
 
     for (const span of candidates) {
       const hasStrands = !!span.strands && span.strands.length > 0;
-      const strandsToTry: (StrandRef | undefined)[] = hasStrands
-        ? span.strands!.filter((s) => !s.continuityBroken).map((s) => ({ tubeColor: s.tubeColor, fiberColor: s.fiberColor }))
-        : [undefined];
+      let strandsToTry: (StrandRef | undefined)[];
+
+      if (arrivingSpanId !== null && spliceMap.length > 0) {
+        // A splice map is authoritative once we know which specific fiber we arrived on:
+        // only the entry naming both this span pair AND the arriving strand continues it.
+        const continuations = spliceMap
+          .map((e) => {
+            if (e.fromSpanId === arrivingSpanId && e.toSpanId === span.id && strandEquals(e.fromStrand, arrivingStrand)) return e.toStrand;
+            if (e.toSpanId === arrivingSpanId && e.fromSpanId === span.id && strandEquals(e.toStrand, arrivingStrand)) return e.fromStrand;
+            return undefined;
+          })
+          .filter((s): s is StrandRef => s !== undefined);
+        if (continuations.length === 0) continue;
+        strandsToTry = hasStrands
+          ? continuations.filter((s) => !span.strands!.some((st) => st.tubeColor === s.tubeColor && st.fiberColor === s.fiberColor && st.continuityBroken))
+          : [undefined];
+        if (hasStrands && strandsToTry.length === 0) continue;
+      } else if (hasStrands) {
+        // No splice-map context to disambiguate (the search root, or a node without one):
+        // try every strand that hasn't had its continuity broken.
+        strandsToTry = span.strands!.filter((s) => !s.continuityBroken).map((s) => ({ tubeColor: s.tubeColor, fiberColor: s.fiberColor }));
+      } else {
+        strandsToTry = [undefined];
+      }
 
       for (const strand of strandsToTry) {
-        void strand; // selects which non-broken strand to attempt; no per-strand event data to branch on yet
         const reversed = span.toNodeId === nodeId;
         const farNodeId = reversed ? span.fromNodeId : span.toNodeId;
 
@@ -241,23 +284,12 @@ export function pathLossDb(world: WorldState, network: NetworkProfile, fromNodeI
         }
         if (!ok) continue;
 
-        // If we're leaving a splitter/closure via a spliceMap-governed fork, honor it:
-        // when there is more than one candidate and the node is not a splitter, only a
-        // spliceMap-listed continuation (or the single unambiguous continuation) counts.
-        const nonSplitterFanOut = node.kind !== 'splitter' && candidates.length > 1;
-        if (nonSplitterFanOut) {
-          const spliceMap = getSpliceMap(node);
-          const matches = arrivingSpanId
-            ? spliceMap.some(
-                (e) =>
-                  (e.fromSpanId === arrivingSpanId && e.toSpanId === span.id) ||
-                  (e.toSpanId === arrivingSpanId && e.fromSpanId === span.id),
-              )
-            : true; // starting node: no incoming span to match against yet.
-          if (!matches && spliceMap.length > 0) continue;
-        }
+        // An unstranded fan-out (no splice map at all) with more than one candidate is
+        // ambiguous beyond the search root -- only a single unambiguous continuation is
+        // safe there (matches resolveTestPath's AmbiguousPathError case).
+        if (node.kind !== 'splitter' && spliceMap.length === 0 && candidates.length > 1 && arrivingSpanId !== null) continue;
 
-        const downstream = search(farNodeId, span.id);
+        const downstream = search(farNodeId, span.id, strand);
         if (downstream) {
           return {
             lossDb: eventLoss + fiberLoss + splitterLoss + downstream.lossDb,
@@ -269,7 +301,7 @@ export function pathLossDb(world: WorldState, network: NetworkProfile, fromNodeI
     return null;
   }
 
-  const result = search(fromNodeId, null);
+  const result = search(fromNodeId, null, undefined);
   if (!result) return { lossDb: NaN, broken: true, spanIds: [] };
   return { lossDb: result.lossDb, broken: false, spanIds: result.spanIds };
 }

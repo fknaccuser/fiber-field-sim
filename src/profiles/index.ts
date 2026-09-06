@@ -1,5 +1,6 @@
 export * from './schema';
 export * from './loader';
+export * from './registry';
 
 import networkXgsPon from './network/xgs-pon.yaml?raw';
 import oltCalixE72 from './vendor/olt-calix-e7-2.yaml?raw';

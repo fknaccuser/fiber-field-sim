@@ -19,7 +19,9 @@ export type NodeKind =
   | 'fat' // flexible/field access terminal, a test point
   | 'ont'
   | 'customer-premise'
-  | 'network-device'; // anchors a NetworkDeviceConfig (see `devices`) in the topology
+  | 'network-device' // anchors a NetworkDeviceConfig (see `devices`) in the topology
+  | 'yard' // truck yard / dispatch start location, no optical or network role
+  | 'pop'; // point-of-presence building/rack site, no optical or network role of its own
 
 /**
  * Topology conventions (enforced by the scenario validator, item 5):
@@ -35,6 +37,16 @@ export type NodeKind =
  * - A node with more than one incident/continuing span that is not a splitter (e.g. a
  *   splice closure) must have `attributes.spliceMap` (see SpliceMapEntry) describing how
  *   fibers continue through it — see worldState.ts's `getSpliceMap`.
+ *
+ * Documented `attributes` keys a scenario (item 5) may set, read via the typed accessors
+ * in worldState.ts where one exists:
+ * - `splitRatio: string` (splitter nodes; `getSplitRatio`)
+ * - `spliceMap: SpliceMapEntry[]` (multi-span non-splitter nodes; `getSpliceMap`)
+ * - `powered: boolean` (ont nodes; the `ont-unpowered` fault flips it; `isPowered`)
+ * - `requiresProvisioning: boolean` (ont nodes not yet provisioned at the OLT)
+ * - `deviceId: string` ('network-device' nodes; the device this node anchors; `deviceIdAt`)
+ * - `opticalPowerDbm: number`, `powerFaultDirection: 'high' | 'low'` (site faults at a FAT)
+ * - `locateTicket: { openedDaysAgo: number; validityDays: number; expired: boolean }`
  */
 export interface TopologyNode {
   id: string;
@@ -260,6 +272,8 @@ export interface PonPortState {
   adminStatus: AdminStatus;
   /** The feeder span leaving the OLT node for this port. */
   spanId: string;
+  /** Which strand of `spanId` this port is patched to, when the feeder is a stranded cable shared by more than one PON port. Omit for an unstranded feeder. */
+  strand?: { tubeColor: FiberTubeColor; fiberColor: FiberTubeColor };
   onts: OntRecord[];
 }
 

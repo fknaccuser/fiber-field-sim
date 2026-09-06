@@ -35,11 +35,18 @@ function hostIndexOnVlan(world: WorldState, network: NetworkProfile, host: HostC
   return Math.max(0, sameVlan.findIndex((h) => h.id === host.id));
 }
 
-export function resolveHostAddressing(world: WorldState, network: NetworkProfile, host: HostConfig): HostAddressingState {
+export function resolveHostAddressing(world: WorldState, network: NetworkProfile, host: HostConfig, visiting: Set<string> = new Set()): HostAddressingState {
   if (host.addressing.mode === 'static') {
     const a = host.addressing;
     return { state: 'static', ip: a.ip, prefixLength: a.prefixLength, gateway: a.gateway, dns: a.dns };
   }
+
+  // Resolving this host can, via a DHCP helper-address ownership check, ask "who owns
+  // this IP" -- which checks every other DHCP host's resolved address, including this
+  // one's if re-entered. Mark it as in-progress so that check skips back over it instead
+  // of recursing forever.
+  if (visiting.has(host.id)) return { state: 'apipa', ip: apipaIp(world.seed, 0), reason: 'no-link' };
+  visiting.add(host.id);
 
   const attachment = attachmentForHost(world, network, host);
   if (!attachment || !attachment.usable) {
@@ -60,7 +67,7 @@ export function resolveHostAddressing(world: WorldState, network: NetworkProfile
   let dhcpServerIp: string | undefined;
   if (hasHelpers) {
     const helper = entry.helperAddresses[0];
-    const owner = ownerOfIp(world, network, helper);
+    const owner = ownerOfIp(world, network, helper, visiting);
     if (!owner) return { state: 'apipa', ip: apipaIp(world.seed, hostIndex), reason: 'server-unreachable' };
     const gatewayEndpoint: Endpoint = { kind: 'device', deviceId: gateway.id };
     const fwd = forward(world, network, gatewayEndpoint, helper, 'icmp');

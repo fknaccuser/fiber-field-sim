@@ -98,7 +98,9 @@ describe('14. wrong-tube-continuity evidence', () => {
     return { faultKind: 'wrong-tube-continuity', target: { type: 'fiber-span' as const, spanId: 's1' }, strand: { tubeColor: 'blue' as const, fiberColor: 'orange' as const }, evidenceActionIds };
   }
   const otdrUnterminated = action('o0', 0, {
-    type: 'otdr-shot', access: { accessNodeId: 'n0', launchSpanId: 's1' }, settings: otdrSettings(1550), events: [], violations: [],
+    type: 'otdr-shot', access: { accessNodeId: 'n0', launchSpanId: 's1' }, settings: otdrSettings(1550),
+    events: [{ index: 1, kind: 'end-of-fiber', distanceMeters: 500, lossDb: null, reflectanceDb: -14, cumulativeLossDb: 0.3, sectionAttenuationDbPerKm: null, quality: 'ok' }],
+    violations: [],
     groundTruth: [{ eventId: null, spanId: 's1', kind: 'unterminated-end', trueDistanceMeters: 500, displayDistanceMeters: 500, trueLossDb: 60, reflectanceDb: null, resolved: true, branchPath: [] }],
     pathSpanIds: ['s1'], traceRef: 'trace:0', durationSeconds: 35,
   });

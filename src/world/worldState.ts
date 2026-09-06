@@ -87,6 +87,17 @@ export function getSplitRatio(node: TopologyNode): string {
   return ratio;
 }
 
+/** Reads an `ont` node's `attributes.powered`. Defaults to true (present and energized) when unset. */
+export function isPowered(node: TopologyNode): boolean {
+  return node.attributes?.powered !== false;
+}
+
+/** Reads a `'network-device'` node's `attributes.deviceId` -- the NetworkDeviceConfig it anchors in the topology. */
+export function deviceIdAt(node: TopologyNode): string | null {
+  const id = node.attributes?.deviceId;
+  return typeof id === 'string' ? id : null;
+}
+
 /** All fiber spans with an end at this node (either `fromNodeId` or `toNodeId`). */
 export function spansAtNode(world: WorldState, nodeId: string): FiberSpan[] {
   return world.topology.spans.filter((s) => s.fromNodeId === nodeId || s.toNodeId === nodeId);

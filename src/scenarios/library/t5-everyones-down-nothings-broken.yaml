@@ -1,0 +1,446 @@
+id: t5-everyones-down-nothings-broken
+title: Everyone's Down, Nothing's Broken
+tier: 5
+description: >
+  Every customer on two different PON ports reports the internet as dead at
+  once, but every ONT is online and every fiber path checks out. The DNS
+  server itself is down -- outside a field tech's authority, but recognizing
+  that (and escalating instead of rolling a truck) is the whole test.
+today: "2026-09-05"
+profiles:
+  network: xgs-pon-default
+  oltVendor: olt-calix-e7-2
+  switchVendor: switch-cisco-ios
+  hostShell: host-windows
+  equipment: hexatronic-commscope-default
+  otdrInstrument: otdr-exfo-maxtester-730c
+  region: ca-south-oc-digalert
+environment:
+  weather: clear
+  timeOfDay: "19:45"
+truckInventory: [otdr, power-meter, vfl, inspection-scope, launch-cable-500m, laptop]
+timeBudgetMinutes: 60
+startLocationNodeId: yard-1
+remoteCliAccess: true
+remoteHostAccess: true
+travelSeconds:
+  default: 900
+  pairs: []
+hints: []
+
+topology:
+  nodes:
+    - id: olt-1
+      kind: olt
+      label: "POP 1 — OLT rack"
+    - id: yard-1
+      kind: yard
+      label: "Truck yard"
+    - id: fdh-a-spl1
+      kind: splitter
+      label: "FDH A Splitter 1"
+      attributes: { splitRatio: "1x32" }
+    - id: fdh-b-spl1
+      kind: splitter
+      label: "FDH B Splitter 1"
+      attributes: { splitRatio: "1x32" }
+    - id: term-a-201
+      kind: terminal
+      label: "NAP, port to 201 unit"
+    - id: term-a-209
+      kind: terminal
+      label: "NAP, port to 209 unit"
+    - id: term-a-716
+      kind: terminal
+      label: "NAP, port to 716 unit"
+    - id: term-b-402
+      kind: terminal
+      label: "NAP, port to 402 unit"
+    - id: term-b-411
+      kind: terminal
+      label: "NAP, port to 411 unit"
+    - id: term-b-433
+      kind: terminal
+      label: "NAP, port to 433 unit"
+    - id: ont-a-201
+      kind: ont
+      label: "ONT — Unit 201"
+    - id: ont-a-209
+      kind: ont
+      label: "ONT — Unit 209"
+    - id: ont-a-716
+      kind: ont
+      label: "ONT — Unit 716"
+    - id: ont-b-402
+      kind: ont
+      label: "ONT — Unit 402"
+    - id: ont-b-411
+      kind: ont
+      label: "ONT — Unit 411"
+    - id: ont-b-433
+      kind: ont
+      label: "ONT — Unit 433"
+    - id: prem-a-201
+      kind: customer-premise
+      label: "Unit 201"
+    - id: prem-a-716
+      kind: customer-premise
+      label: "Unit 716"
+    - id: prem-b-402
+      kind: customer-premise
+      label: "Unit 402"
+    - id: prem-b-433
+      kind: customer-premise
+      label: "Unit 433"
+
+  spans:
+    - id: sp-feeder-a
+      fromNodeId: olt-1
+      toNodeId: fdh-a-spl1
+      lengthMeters: 2100
+      events:
+        - { id: ev-panel-a, kind: connector-apc, positionMeters: 0, lossDb: 0.25, reflectanceDb: -60 }
+    - id: sp-feeder-b
+      fromNodeId: olt-1
+      toNodeId: fdh-b-spl1
+      lengthMeters: 2620
+      events:
+        - { id: ev-panel-b, kind: connector-apc, positionMeters: 0, lossDb: 0.25, reflectanceDb: -60 }
+        - { id: ev-splice-b, kind: fusion-splice, positionMeters: 1980, lossDb: 0.05 }
+    - id: sp-dist-a-201
+      fromNodeId: fdh-a-spl1
+      toNodeId: term-a-201
+      lengthMeters: 600
+      events:
+        - { id: ev-a201-out, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+    - id: sp-dist-a-209
+      fromNodeId: fdh-a-spl1
+      toNodeId: term-a-209
+      lengthMeters: 620
+      events:
+        - { id: ev-a209-out, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+    - id: sp-dist-a-716
+      fromNodeId: fdh-a-spl1
+      toNodeId: term-a-716
+      lengthMeters: 1150
+      events:
+        - { id: ev-a716-out, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+    - id: sp-dist-b-402
+      fromNodeId: fdh-b-spl1
+      toNodeId: term-b-402
+      lengthMeters: 880
+      events:
+        - { id: ev-b402-out, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+    - id: sp-dist-b-411
+      fromNodeId: fdh-b-spl1
+      toNodeId: term-b-411
+      lengthMeters: 900
+      events:
+        - { id: ev-b411-out, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+    - id: sp-dist-b-433
+      fromNodeId: fdh-b-spl1
+      toNodeId: term-b-433
+      lengthMeters: 860
+      events:
+        - { id: ev-b433-out, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+    - id: sp-drop-a-201
+      fromNodeId: term-a-201
+      toNodeId: ont-a-201
+      lengthMeters: 40
+      events:
+        - { id: ev-a201-a, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+        - { id: ev-a201-b, kind: connector-apc, positionMeters: 40, lossDb: 0.3, reflectanceDb: -60 }
+    - id: sp-drop-a-209
+      fromNodeId: term-a-209
+      toNodeId: ont-a-209
+      lengthMeters: 55
+      events:
+        - { id: ev-a209-a, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+        - { id: ev-a209-b, kind: connector-apc, positionMeters: 55, lossDb: 0.3, reflectanceDb: -60 }
+    - id: sp-drop-a-716
+      fromNodeId: term-a-716
+      toNodeId: ont-a-716
+      lengthMeters: 70
+      events:
+        - { id: ev-a716-a, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+        - { id: ev-a716-b, kind: connector-apc, positionMeters: 70, lossDb: 0.3, reflectanceDb: -60 }
+    - id: sp-drop-b-402
+      fromNodeId: term-b-402
+      toNodeId: ont-b-402
+      lengthMeters: 60
+      events:
+        - { id: ev-b402-a, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+        - { id: ev-b402-b, kind: connector-apc, positionMeters: 60, lossDb: 0.3, reflectanceDb: -60 }
+    - id: sp-drop-b-411
+      fromNodeId: term-b-411
+      toNodeId: ont-b-411
+      lengthMeters: 80
+      events:
+        - { id: ev-b411-a, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+        - { id: ev-b411-b, kind: connector-apc, positionMeters: 80, lossDb: 0.3, reflectanceDb: -60 }
+    - id: sp-drop-b-433
+      fromNodeId: term-b-433
+      toNodeId: ont-b-433
+      lengthMeters: 95
+      events:
+        - { id: ev-b433-a, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+        - { id: ev-b433-mid, kind: connector-apc, positionMeters: 40, lossDb: 0.35, reflectanceDb: -58 }
+        - { id: ev-b433-b, kind: connector-apc, positionMeters: 95, lossDb: 0.3, reflectanceDb: -60 }
+
+devices:
+  - id: olt-1-dev
+    hostname: OLT-POP1-E72-1
+    vendorProfileId: olt-calix-e7-2
+    role: olt
+    platform: Calix E7-2
+    topologyNodeId: olt-1
+    interfaces:
+      - id: TenGigabitEthernet1/1
+        adminStatus: up
+        lineStatus: up
+        speedMbps: 10000
+        duplex: full
+        mode: trunk
+        allowedVlans: [100]
+        nativeVlan: 1
+        transceiver: { present: true, rxPowerDbm: -8.2, txPowerDbm: 2.1, temperatureC: 38 }
+      - id: TenGigabitEthernet1/2
+        adminStatus: administratively-down
+        lineStatus: down
+        speedMbps: 10000
+        duplex: full
+        mode: trunk
+        allowedVlans: [100]
+        nativeVlan: 1
+        transceiver: { present: true, rxPowerDbm: -31, txPowerDbm: 2.1, temperatureC: 30 }
+        description: "spare uplink, unpatched"
+    vlans: []
+    macTable: []
+    routeTable: []
+    ponPorts:
+      - id: "1/1/xp1"
+        adminStatus: up
+        spanId: sp-feeder-a
+        onts:
+          - { ontId: "1/1/xp1/1", serial: CXNK00A20100, provisionedSerial: CXNK00A20100, ontNodeId: ont-a-201 }
+          - { ontId: "1/1/xp1/2", serial: CXNK00A20900, provisionedSerial: CXNK00A20900, ontNodeId: ont-a-209 }
+          - { ontId: "1/1/xp1/3", serial: CXNK00A71600, provisionedSerial: CXNK00A71600, ontNodeId: ont-a-716 }
+      - id: "1/1/xp2"
+        adminStatus: up
+        spanId: sp-feeder-b
+        onts:
+          - { ontId: "1/1/xp2/1", serial: CXNK00B40200, provisionedSerial: CXNK00B40200, ontNodeId: ont-b-402 }
+          - { ontId: "1/1/xp2/2", serial: CXNK00B41100, provisionedSerial: CXNK00B41100, ontNodeId: ont-b-411 }
+          - { ontId: "1/1/xp2/3", serial: CXNK00B43300, provisionedSerial: CXNK00B43300, ontNodeId: ont-b-433 }
+  - id: dist-rtr-1
+    hostname: DIST-RTR-1
+    vendorProfileId: switch-cisco-ios
+    role: l3-switch
+    platform: C9300-24T
+    interfaces:
+      - id: TenGigabitEthernet1/0/1
+        adminStatus: up
+        lineStatus: up
+        speedMbps: 10000
+        duplex: full
+        mode: trunk
+        allowedVlans: [100]
+        nativeVlan: 1
+        transceiver: { present: true, rxPowerDbm: -7.9, txPowerDbm: 1.8, temperatureC: 41 }
+      - id: Vlan100
+        adminStatus: up
+        lineStatus: up
+        speedMbps: 1000
+        duplex: auto
+        mode: access
+        ipAddress: 10.100.0.1
+        prefixLength: 24
+      - id: GigabitEthernet1/0/48
+        adminStatus: up
+        lineStatus: up
+        speedMbps: 1000
+        duplex: full
+        mode: trunk
+        allowedVlans: [10]
+        nativeVlan: 1
+      - id: Vlan10
+        adminStatus: up
+        lineStatus: up
+        speedMbps: 1000
+        duplex: auto
+        mode: access
+        ipAddress: 10.0.0.1
+        prefixLength: 24
+      - id: GigabitEthernet1/0/47
+        adminStatus: up
+        lineStatus: up
+        speedMbps: 1000
+        duplex: full
+        mode: access
+        accessVlan: 30
+        ipAddress: 203.0.113.1
+        prefixLength: 24
+    vlans: [{ id: 100, name: PON-VLAN }, { id: 10, name: INFRA }]
+    macTable: []
+    routeTable: []
+    dhcp:
+      - vlan: 100
+        helperAddresses: ["10.0.0.50"]
+        scope: { network: 10.100.0.0/24, poolSize: 200, leased: 51 }
+        dnsServerIp: 10.0.0.53
+    dnsResolverIp: 10.0.0.53
+  - id: srv-sw-1
+    hostname: SRV-SW-1
+    vendorProfileId: switch-cisco-ios
+    role: switch
+    interfaces:
+      - { id: GigabitEthernet0/1, adminStatus: up, lineStatus: up, speedMbps: 1000, duplex: full, mode: access, accessVlan: 10 }
+      - { id: GigabitEthernet0/2, adminStatus: up, lineStatus: up, speedMbps: 1000, duplex: full, mode: access, accessVlan: 10 }
+      - { id: GigabitEthernet0/24, adminStatus: up, lineStatus: up, speedMbps: 1000, duplex: full, mode: trunk, allowedVlans: [10], nativeVlan: 1 }
+    vlans: [{ id: 10, name: INFRA }]
+    macTable: []
+    routeTable: []
+  - id: dhcp-1
+    hostname: DHCP-1
+    vendorProfileId: switch-cisco-ios
+    role: server
+    interfaces:
+      - { id: GigabitEthernet0/0, adminStatus: up, lineStatus: up, speedMbps: 1000, duplex: full, mode: access, accessVlan: 10, ipAddress: 10.0.0.50, prefixLength: 24 }
+    vlans: []
+    macTable: []
+    routeTable: [{ network: "0.0.0.0/0", nextHop: "10.0.0.1", source: static }]
+  - id: dns-1
+    hostname: DNS-1
+    vendorProfileId: switch-cisco-ios
+    role: dns-server
+    interfaces:
+      - { id: GigabitEthernet0/0, adminStatus: up, lineStatus: up, speedMbps: 1000, duplex: full, mode: access, accessVlan: 10, ipAddress: 10.0.0.53, prefixLength: 24 }
+    vlans: []
+    macTable: []
+    routeTable: [{ network: "0.0.0.0/0", nextHop: "10.0.0.1", source: static }]
+    dnsRecords:
+      - { hostname: portal.isp.net, actualIp: 203.0.113.10 }
+      - { hostname: speedtest.isp.net, actualIp: 203.0.113.20 }
+    dnsServerHealth: down
+  - id: web-1
+    hostname: WEB-1
+    vendorProfileId: switch-cisco-ios
+    role: server
+    interfaces:
+      - { id: GigabitEthernet0/0, adminStatus: up, lineStatus: up, speedMbps: 1000, duplex: full, mode: access, accessVlan: 30, ipAddress: 203.0.113.10, prefixLength: 24 }
+    vlans: []
+    macTable: []
+    routeTable: [{ network: "0.0.0.0/0", nextHop: "203.0.113.1", source: static }]
+
+links:
+  - id: l-olt-dist
+    a: { deviceId: olt-1-dev, interfaceId: TenGigabitEthernet1/1 }
+    b: { deviceId: dist-rtr-1, interfaceId: TenGigabitEthernet1/0/1 }
+  - id: l-dist-srvsw
+    a: { deviceId: dist-rtr-1, interfaceId: GigabitEthernet1/0/48 }
+    b: { deviceId: srv-sw-1, interfaceId: GigabitEthernet0/24 }
+  - id: l-srvsw-dhcp
+    a: { deviceId: srv-sw-1, interfaceId: GigabitEthernet0/1 }
+    b: { deviceId: dhcp-1, interfaceId: GigabitEthernet0/0 }
+  - id: l-srvsw-dns
+    a: { deviceId: srv-sw-1, interfaceId: GigabitEthernet0/2 }
+    b: { deviceId: dns-1, interfaceId: GigabitEthernet0/0 }
+  - id: l-dist-web
+    a: { deviceId: dist-rtr-1, interfaceId: GigabitEthernet1/0/47 }
+    b: { deviceId: web-1, interfaceId: GigabitEthernet0/0 }
+
+hosts:
+  - { id: laptop-a-201, label: Customer laptop, premiseNodeId: prem-a-201, macAddress: "02:11:4a:00:02:01", attachedOntNodeId: ont-a-201, vlan: 100, addressing: { mode: dhcp } }
+  - { id: laptop-a-716, label: Customer laptop, premiseNodeId: prem-a-716, macAddress: "02:11:4a:00:07:16", attachedOntNodeId: ont-a-716, vlan: 100, addressing: { mode: dhcp } }
+  - { id: laptop-b-402, label: Customer laptop, premiseNodeId: prem-b-402, macAddress: "02:11:4a:00:04:02", attachedOntNodeId: ont-b-402, vlan: 100, addressing: { mode: dhcp } }
+  - { id: laptop-b-433, label: Customer laptop, premiseNodeId: prem-b-433, macAddress: "02:11:4a:00:04:33", attachedOntNodeId: ont-b-433, vlan: 100, addressing: { mode: dhcp } }
+
+plantRecords:
+  - id: rec-pop1-uplinks
+    kind: as-built
+    title: "OLT-POP1-E72-1 uplinks"
+    date: "2026-01-10"
+    nodeId: olt-1
+    lines:
+      - "OLT-POP1-E72-1 uplinks: Te1/1 active -> DIST-RTR-1 Te1/0/1; Te1/2 spare (unpatched, admin down)."
+
+customerReports:
+  - customerId: cust-a-201
+    premiseNodeId: prem-a-201
+    reportedSymptom: "Internet says connected but nothing loads."
+    phrasingVariants:
+      - "Wi-Fi's connected, pages just spin."
+      - "Netflix says 'no internet' but the box lights are all green."
+  - customerId: cust-a-716
+    premiseNodeId: prem-a-716
+    reportedSymptom: "Can't get to any websites since about 7:30."
+  - customerId: cust-b-402
+    premiseNodeId: prem-b-402
+    reportedSymptom: "Work VPN won't connect, browser won't load anything."
+  - customerId: cust-b-433
+    premiseNodeId: prem-b-433
+    reportedSymptom: "Internet's been flaky since the storm last week and now it's dead."
+
+faults:
+  - instanceId: f-dns-down
+    kind: dns-server-unresponsive
+    outOfScope: true
+    target: { type: device-global, deviceId: dns-1 }
+    params: { health: down }
+  - instanceId: rh-olt-te12-rx
+    kind: transceiver-rx-power-low
+    isRedHerring: true
+    target: { type: device-interface, deviceId: olt-1-dev, interfaceId: TenGigabitEthernet1/2 }
+    params: { rxPowerDbm: -31 }
+
+redHerringPool:
+  pick: 1
+  from:
+    - instanceId: rh-macrobend-a209
+      kind: macrobend
+      target: { type: fiber-span, spanId: sp-drop-a-209 }
+      params: { positionMeters: 20, severity: light }
+    - instanceId: rh-fusion-a716
+      kind: fusion-splice-degraded
+      target: { type: fiber-span, spanId: sp-dist-a-716 }
+      params: { positionMeters: 600, lossDb: 0.15 }
+
+referenceSolution:
+  steps:
+    - type: customer-contact
+      customerId: cust-a-201
+    - type: customer-contact
+      customerId: cust-b-402
+    - type: cli
+      endpoint: { kind: device, deviceId: olt-1-dev }
+      command: "show ont status"
+    - type: cli
+      endpoint: { kind: host, hostId: laptop-a-201 }
+      command: "ipconfig"
+    - type: cli
+      endpoint: { kind: host, hostId: laptop-a-201 }
+      command: "ping 10.100.0.1"
+    - type: cli
+      endpoint: { kind: host, hostId: laptop-a-201 }
+      command: "ping 203.0.113.10"
+    - type: cli
+      endpoint: { kind: host, hostId: laptop-a-201 }
+      command: "ping portal.isp.net"
+    - type: cli
+      endpoint: { kind: host, hostId: laptop-a-201 }
+      command: "nslookup portal.isp.net"
+    - type: cli
+      endpoint: { kind: device, deviceId: dist-rtr-1 }
+      command: "ping 10.0.0.53"
+    - type: diagnosis
+      diagnosis:
+        claims:
+          - faultKind: dns-server-unresponsive
+            target: { type: device-global, deviceId: dns-1 }
+            evidenceActionIds: ["$7", "$5"]
+        escalate:
+          reason: "DNS service down on DNS-1; hosts resolve nothing, IP connectivity intact, all ONTs online. Needs NOC/IT."
+          evidenceActionIds: ["$2", "$5", "$7", "$8"]
+  expectedClaims:
+    - faultKind: dns-server-unresponsive
+      target: { type: device-global, deviceId: dns-1 }

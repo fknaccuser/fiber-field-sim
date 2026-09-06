@@ -1,0 +1,493 @@
+id: t4-wrong-roll-closure-7
+title: Wrong Roll at Closure 7
+tier: 4
+description: >
+  Four customers behind FDH-B are all down at once. A splice tech rolled the
+  wrong tube at Closure 7 weeks ago; the paperwork says otherwise.
+today: "2026-09-05"
+profiles:
+  network: xgs-pon-default
+  oltVendor: olt-calix-e7-2
+  switchVendor: switch-cisco-ios
+  hostShell: host-windows
+  equipment: hexatronic-commscope-default
+  otdrInstrument: otdr-exfo-maxtester-730c
+  region: ca-south-oc-digalert
+environment:
+  weather: overcast
+  timeOfDay: "14:10"
+truckInventory: [otdr, power-meter, vfl, inspection-scope, launch-cable-500m, laptop]
+timeBudgetMinutes: 90
+startLocationNodeId: yard-1
+remoteCliAccess: true
+remoteHostAccess: false
+travelSeconds:
+  default: 900
+  pairs:
+    - { from: yard-1, to: fdh-b-spl1, seconds: 1200 }
+    - { from: fdh-b-spl1, to: cl-7, seconds: 480 }
+    - { from: yard-1, to: cl-7, seconds: 1080 }
+    - { from: fdh-b-spl1, to: fdh-c-spl1, seconds: 420 }
+hints:
+  - "What do the four affected addresses have in common? Check the port assignments."
+
+topology:
+  nodes:
+    - id: olt-1
+      kind: olt
+      label: "POP 1 — OLT rack"
+    - id: yard-1
+      kind: yard
+      label: "Truck yard"
+    - id: cl-7
+      kind: splice-closure
+      label: "Closure 7 — Antonio Pkwy @ Cow Camp"
+      attributes:
+        spliceMap:
+          - { fromSpanId: sp-feeder-main, fromStrand: { tubeColor: blue, fiberColor: blue }, toSpanId: sp-cl7-fdhc, toStrand: { tubeColor: blue, fiberColor: blue } }
+          - { fromSpanId: sp-feeder-main, fromStrand: { tubeColor: blue, fiberColor: green }, toSpanId: sp-cl7-fdhb, toStrand: { tubeColor: blue, fiberColor: orange } }
+    - id: fdh-b-spl1
+      kind: splitter
+      label: "FDH B Splitter 1"
+      attributes: { splitRatio: "1x32" }
+    - id: fdh-c-spl1
+      kind: splitter
+      label: "FDH C Splitter 1"
+      attributes: { splitRatio: "1x32" }
+    - id: term-b-301
+      kind: terminal
+      label: "NAP B-3, port to 301 Paseo Vista"
+    - id: term-b-305
+      kind: terminal
+      label: "NAP B-3, port to 305 Paseo Vista"
+    - id: term-b-812
+      kind: terminal
+      label: "NAP B-8, port to 812 Camino Alto"
+    - id: term-b-819
+      kind: terminal
+      label: "NAP B-8, port to 819 Camino Alto"
+    - id: term-c-2
+      kind: terminal
+      label: "NAP C-2"
+    - id: ont-b-301
+      kind: ont
+      label: "ONT — 301 Paseo Vista"
+    - id: ont-b-305
+      kind: ont
+      label: "ONT — 305 Paseo Vista"
+    - id: ont-b-812
+      kind: ont
+      label: "ONT — 812 Camino Alto"
+    - id: ont-b-819
+      kind: ont
+      label: "ONT — 819 Camino Alto"
+    - id: ont-c-204
+      kind: ont
+      label: "ONT — 204 Via Ladera"
+    - id: prem-b-301
+      kind: customer-premise
+      label: "301 Paseo Vista"
+    - id: prem-b-305
+      kind: customer-premise
+      label: "305 Paseo Vista"
+    - id: prem-b-812
+      kind: customer-premise
+      label: "812 Camino Alto"
+    - id: prem-b-819
+      kind: customer-premise
+      label: "819 Camino Alto"
+    - id: prem-c-204
+      kind: customer-premise
+      label: "204 Via Ladera"
+
+  spans:
+    - id: sp-feeder-main
+      fromNodeId: olt-1
+      toNodeId: cl-7
+      lengthMeters: 1980
+      randomize: { lengthMeters: { min: 1900, max: 2100 } }
+      strands:
+        - { tubeColor: blue, fiberColor: blue, role: feeder }
+        - { tubeColor: blue, fiberColor: orange, role: distribution }
+        - { tubeColor: blue, fiberColor: green, role: dark }
+        - { tubeColor: blue, fiberColor: brown, role: spare }
+      events:
+        - id: ev-panel-main
+          kind: connector-apc
+          positionMeters: 0
+          lossDb: 0.25
+          reflectanceDb: -60
+    - id: sp-cl7-fdhc
+      fromNodeId: cl-7
+      toNodeId: fdh-c-spl1
+      lengthMeters: 410
+      strands:
+        - { tubeColor: blue, fiberColor: blue, role: feeder }
+      events:
+        - id: ev-fdhc-in
+          kind: connector-apc
+          positionMeters: 410
+          lossDb: 0.3
+          reflectanceDb: -60
+    - id: sp-cl7-fdhb
+      fromNodeId: cl-7
+      toNodeId: fdh-b-spl1
+      lengthMeters: 640
+      strands:
+        - { tubeColor: blue, fiberColor: orange, role: distribution }
+      events:
+        - id: ev-fdhb-in
+          kind: connector-apc
+          positionMeters: 640
+          lossDb: 0.3
+          reflectanceDb: -60
+    - id: sp-dist-b-301
+      fromNodeId: fdh-b-spl1
+      toNodeId: term-b-301
+      lengthMeters: 520
+      events:
+        - id: ev-b301-out
+          kind: connector-upc
+          positionMeters: 0
+          lossDb: 0.65
+          reflectanceDb: -48
+    - id: sp-dist-b-305
+      fromNodeId: fdh-b-spl1
+      toNodeId: term-b-305
+      lengthMeters: 540
+      events:
+        - id: ev-b305-out
+          kind: connector-apc
+          positionMeters: 0
+          lossDb: 0.3
+          reflectanceDb: -60
+    - id: sp-dist-b-812
+      fromNodeId: fdh-b-spl1
+      toNodeId: term-b-812
+      lengthMeters: 910
+      events:
+        - id: ev-b812-out
+          kind: connector-apc
+          positionMeters: 0
+          lossDb: 0.3
+          reflectanceDb: -60
+        - id: ev-b812-splice
+          kind: fusion-splice
+          positionMeters: 450
+          lossDb: 0.06
+    - id: sp-dist-b-819
+      fromNodeId: fdh-b-spl1
+      toNodeId: term-b-819
+      lengthMeters: 930
+      events:
+        - id: ev-b819-out
+          kind: connector-apc
+          positionMeters: 0
+          lossDb: 0.3
+          reflectanceDb: -60
+    - id: sp-dist-c-2
+      fromNodeId: fdh-c-spl1
+      toNodeId: term-c-2
+      lengthMeters: 730
+      events:
+        - id: ev-c2-out
+          kind: connector-apc
+          positionMeters: 0
+          lossDb: 0.3
+          reflectanceDb: -60
+    - id: sp-drop-b-301
+      fromNodeId: term-b-301
+      toNodeId: ont-b-301
+      lengthMeters: 48
+      events:
+        - { id: ev-301-a, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+        - { id: ev-301-b, kind: connector-apc, positionMeters: 48, lossDb: 0.3, reflectanceDb: -60 }
+    - id: sp-drop-b-305
+      fromNodeId: term-b-305
+      toNodeId: ont-b-305
+      lengthMeters: 71
+      events:
+        - { id: ev-305-a, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+        - { id: ev-305-b, kind: connector-apc, positionMeters: 71, lossDb: 0.3, reflectanceDb: -60 }
+    - id: sp-drop-b-812
+      fromNodeId: term-b-812
+      toNodeId: ont-b-812
+      lengthMeters: 55
+      events:
+        - { id: ev-812-a, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+        - { id: ev-812-b, kind: connector-apc, positionMeters: 55, lossDb: 0.3, reflectanceDb: -60 }
+    - id: sp-drop-b-819
+      fromNodeId: term-b-819
+      toNodeId: ont-b-819
+      lengthMeters: 92
+      events:
+        - { id: ev-819-a, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+        - { id: ev-819-b, kind: connector-apc, positionMeters: 92, lossDb: 0.3, reflectanceDb: -60 }
+    - id: sp-drop-c-204
+      fromNodeId: term-c-2
+      toNodeId: ont-c-204
+      lengthMeters: 60
+      events:
+        - { id: ev-204-a, kind: connector-apc, positionMeters: 0, lossDb: 0.3, reflectanceDb: -60 }
+        - { id: ev-204-b, kind: connector-apc, positionMeters: 60, lossDb: 0.3, reflectanceDb: -60 }
+
+devices:
+  - id: olt-1-dev
+    hostname: OLT-POP1-E72-1
+    vendorProfileId: olt-calix-e7-2
+    role: olt
+    platform: Calix E7-2
+    topologyNodeId: olt-1
+    interfaces:
+      - id: TenGigabitEthernet1/1
+        adminStatus: up
+        lineStatus: up
+        speedMbps: 10000
+        duplex: full
+        mode: trunk
+        allowedVlans: [100]
+        nativeVlan: 1
+        transceiver: { present: true, rxPowerDbm: -8.2, txPowerDbm: 2.1, temperatureC: 38 }
+    vlans: []
+    macTable: []
+    routeTable: []
+    ponPorts:
+      - id: "1/1/xp1"
+        adminStatus: up
+        spanId: sp-feeder-main
+        strand: { tubeColor: blue, fiberColor: orange }
+        onts:
+          - { ontId: "1/1/xp1/1", serial: CXNK00B30100, provisionedSerial: CXNK00B30100, ontNodeId: ont-b-301 }
+          - { ontId: "1/1/xp1/2", serial: CXNK00B30500, provisionedSerial: CXNK00B30500, ontNodeId: ont-b-305 }
+          - { ontId: "1/1/xp1/3", serial: CXNK00B81200, provisionedSerial: CXNK00B81200, ontNodeId: ont-b-812 }
+          - { ontId: "1/1/xp1/4", serial: CXNK00B81900, provisionedSerial: CXNK00B81900, ontNodeId: ont-b-819 }
+      - id: "1/1/xp2"
+        adminStatus: up
+        spanId: sp-feeder-main
+        strand: { tubeColor: blue, fiberColor: blue }
+        onts:
+          - { ontId: "1/1/xp2/1", serial: CXNK00C20400, provisionedSerial: CXNK00C20400, ontNodeId: ont-c-204 }
+  - id: dist-rtr-1
+    hostname: DIST-RTR-1
+    vendorProfileId: switch-cisco-ios
+    role: l3-switch
+    platform: C9300-24T
+    interfaces:
+      - id: TenGigabitEthernet1/0/1
+        adminStatus: up
+        lineStatus: up
+        speedMbps: 10000
+        duplex: full
+        mode: trunk
+        allowedVlans: [100]
+        nativeVlan: 1
+        transceiver: { present: true, rxPowerDbm: -7.9, txPowerDbm: 1.8, temperatureC: 41 }
+      - id: Vlan100
+        adminStatus: up
+        lineStatus: up
+        speedMbps: 1000
+        duplex: auto
+        mode: access
+        ipAddress: 10.100.0.1
+        prefixLength: 24
+      - id: GigabitEthernet1/0/20
+        adminStatus: up
+        lineStatus: down
+        speedMbps: 1000
+        duplex: auto
+        mode: access
+        accessVlan: 100
+        description: "spare, unpatched"
+      - id: GigabitEthernet1/0/48
+        adminStatus: up
+        lineStatus: up
+        speedMbps: 1000
+        duplex: full
+        mode: trunk
+        allowedVlans: [10]
+        nativeVlan: 1
+      - id: Vlan10
+        adminStatus: up
+        lineStatus: up
+        speedMbps: 1000
+        duplex: auto
+        mode: access
+        ipAddress: 10.0.0.1
+        prefixLength: 24
+    vlans: [{ id: 100, name: PON-VLAN }, { id: 10, name: INFRA }]
+    macTable: []
+    routeTable: []
+    dhcp:
+      - vlan: 100
+        helperAddresses: ["10.0.0.50"]
+        scope: { network: 10.100.0.0/24, poolSize: 200, leased: 41 }
+        dnsServerIp: 10.0.0.53
+    dnsResolverIp: 10.0.0.53
+  - id: srv-sw-1
+    hostname: SRV-SW-1
+    vendorProfileId: switch-cisco-ios
+    role: switch
+    interfaces:
+      - { id: GigabitEthernet0/1, adminStatus: up, lineStatus: up, speedMbps: 1000, duplex: full, mode: access, accessVlan: 10 }
+      - { id: GigabitEthernet0/2, adminStatus: up, lineStatus: up, speedMbps: 1000, duplex: full, mode: access, accessVlan: 10 }
+      - { id: GigabitEthernet0/24, adminStatus: up, lineStatus: up, speedMbps: 1000, duplex: full, mode: trunk, allowedVlans: [10], nativeVlan: 1 }
+    vlans: [{ id: 10, name: INFRA }]
+    macTable: []
+    routeTable: []
+  - id: dhcp-1
+    hostname: DHCP-1
+    vendorProfileId: switch-cisco-ios
+    role: server
+    interfaces:
+      - { id: GigabitEthernet0/0, adminStatus: up, lineStatus: up, speedMbps: 1000, duplex: full, mode: access, accessVlan: 10, ipAddress: 10.0.0.50, prefixLength: 24 }
+    vlans: []
+    macTable: []
+    routeTable: [{ network: "0.0.0.0/0", nextHop: "10.0.0.1", source: static }]
+  - id: dns-1
+    hostname: DNS-1
+    vendorProfileId: switch-cisco-ios
+    role: dns-server
+    interfaces:
+      - { id: GigabitEthernet0/0, adminStatus: up, lineStatus: up, speedMbps: 1000, duplex: full, mode: access, accessVlan: 10, ipAddress: 10.0.0.53, prefixLength: 24 }
+    vlans: []
+    macTable: []
+    routeTable: [{ network: "0.0.0.0/0", nextHop: "10.0.0.1", source: static }]
+    dnsRecords:
+      - { hostname: portal.isp.net, actualIp: 203.0.113.10 }
+      - { hostname: speedtest.isp.net, actualIp: 203.0.113.20 }
+    dnsServerHealth: ok
+
+links:
+  - id: l-olt-dist
+    a: { deviceId: olt-1-dev, interfaceId: TenGigabitEthernet1/1 }
+    b: { deviceId: dist-rtr-1, interfaceId: TenGigabitEthernet1/0/1 }
+  - id: l-dist-srvsw
+    a: { deviceId: dist-rtr-1, interfaceId: GigabitEthernet1/0/48 }
+    b: { deviceId: srv-sw-1, interfaceId: GigabitEthernet0/24 }
+  - id: l-srvsw-dhcp
+    a: { deviceId: srv-sw-1, interfaceId: GigabitEthernet0/1 }
+    b: { deviceId: dhcp-1, interfaceId: GigabitEthernet0/0 }
+  - id: l-srvsw-dns
+    a: { deviceId: srv-sw-1, interfaceId: GigabitEthernet0/2 }
+    b: { deviceId: dns-1, interfaceId: GigabitEthernet0/0 }
+
+hosts:
+  - { id: laptop-b-301, label: Customer laptop, premiseNodeId: prem-b-301, macAddress: "02:11:4a:00:03:01", attachedOntNodeId: ont-b-301, vlan: 100, addressing: { mode: dhcp } }
+  - { id: laptop-b-305, label: Customer laptop, premiseNodeId: prem-b-305, macAddress: "02:11:4a:00:03:05", attachedOntNodeId: ont-b-305, vlan: 100, addressing: { mode: dhcp } }
+  - { id: laptop-b-812, label: Customer laptop, premiseNodeId: prem-b-812, macAddress: "02:11:4a:00:08:12", attachedOntNodeId: ont-b-812, vlan: 100, addressing: { mode: dhcp } }
+  - { id: laptop-b-819, label: Customer laptop, premiseNodeId: prem-b-819, macAddress: "02:11:4a:00:08:19", attachedOntNodeId: ont-b-819, vlan: 100, addressing: { mode: dhcp } }
+  - { id: laptop-c-204, label: Customer laptop, premiseNodeId: prem-c-204, macAddress: "02:11:4a:00:02:04", attachedOntNodeId: ont-c-204, vlan: 100, addressing: { mode: dhcp } }
+
+plantRecords:
+  - id: rec-fdhb-ports
+    kind: port-assignment
+    title: "FDH B port assignments"
+    date: "2026-03-14"
+    nodeId: fdh-b-spl1
+    lines:
+      - "FDH B fed from CL-7 splice, feeder cable 144f, TUBE BLUE / FIBER ORANGE -> FDH-B splitter input"
+      - "Splitter 1x32 SPL1X32-B, ports 1-32 -> NAP B-1..B-8"
+  - id: rec-cl7-wo
+    kind: work-order
+    title: "WO 44812"
+    date: "2026-09-03"
+    nodeId: cl-7
+    lines:
+      - "WO 44812: Roll FDH-B distribution to new 96f cable (sp-cl7-fdhb)."
+      - "Splice feeder BLUE/ORANGE -> new cable BLUE/ORANGE. Tech: [redacted]. Closed 09-03 16:40."
+  - id: rec-cl7-sheet
+    kind: splice-sheet
+    title: "Closure 7 splice sheet, Tray 1"
+    date: "2026-09-03"
+    nodeId: cl-7
+    lines:
+      - "Tray 1: BLUE tube."
+      - "Blue -> Blue (FDH-C feed) OK."
+      - "Orange -> Orange (FDH-B feed) OK."
+      - "Green: dark. Brown: spare."
+
+customerReports:
+  - customerId: cust-b-301
+    premiseNodeId: prem-b-301
+    reportedSymptom: "Internet dead since yesterday evening, box light is red."
+    phrasingVariants:
+      - "No service since about 5 last night."
+      - "The fiber box has a red light and nothing works."
+  - customerId: cust-b-305
+    premiseNodeId: prem-b-305
+    reportedSymptom: "Everything went out around dinner time."
+  - customerId: cust-b-812
+    premiseNodeId: prem-b-812
+    reportedSymptom: "TV and internet down. Neighbor's out too."
+  - customerId: cust-b-819
+    premiseNodeId: prem-b-819
+    reportedSymptom: "Red alarm light on the ONT, no internet."
+  - customerId: cust-c-204
+    premiseNodeId: prem-c-204
+    isRedHerring: true
+    reportedSymptom: "Internet gets slow every night around 8."
+    phrasingVariants:
+      - "Wi-Fi drops in the evenings."
+      - "Streaming buffers at night."
+
+faults:
+  - instanceId: f-cl7-wrong-roll
+    kind: wrong-tube-continuity
+    target: { type: fiber-span, spanId: sp-feeder-main }
+    params: { tubeColor: blue, fiberColor: orange, rollType: spliced-into-dark-spare, actualTubeColor: blue, actualFiberColor: green }
+  - instanceId: rh-stp-unused-port
+    kind: stp-unexpected-blocking
+    isRedHerring: true
+    target: { type: device-interface, deviceId: dist-rtr-1, interfaceId: GigabitEthernet1/0/20 }
+    params: {}
+
+redHerringPool:
+  pick: 1
+  from:
+    - instanceId: rh-fusion-b812
+      kind: fusion-splice-degraded
+      target: { type: fiber-span, spanId: sp-dist-b-812 }
+      params: { positionMeters: 300, lossDb: 0.18 }
+    - instanceId: rh-macrobend-c
+      kind: macrobend
+      target: { type: fiber-span, spanId: sp-drop-c-204 }
+      params: { positionMeters: 30, severity: light }
+
+referenceSolution:
+  steps:
+    - type: customer-contact
+      customerId: cust-b-301
+    - type: customer-contact
+      customerId: cust-b-812
+    - type: records
+      nodeId: fdh-b-spl1
+    - type: records
+      nodeId: cl-7
+    - type: cli
+      endpoint: { kind: device, deviceId: olt-1-dev }
+      command: "show ont status"
+    - type: truck-roll
+      toNodeId: fdh-b-spl1
+    - type: power-meter
+      nodeId: fdh-b-spl1
+      wavelengthNm: 1577
+    - type: otdr-shot
+      access: { accessNodeId: fdh-b-spl1, launchSpanId: sp-cl7-fdhb, strand: { tubeColor: blue, fiberColor: orange } }
+      settings: { wavelengthNm: 1550, pulseWidthNs: 100, rangeMeters: 5000, iorSetting: 1.4682, averagingSeconds: 30, launchCableMeters: 500, receiveCableMeters: 0 }
+    - type: truck-roll
+      toNodeId: cl-7
+    - type: power-meter
+      nodeId: cl-7
+      wavelengthNm: 1577
+      strand: { tubeColor: blue, fiberColor: orange }
+    - type: diagnosis
+      diagnosis:
+        claims:
+          - faultKind: wrong-tube-continuity
+            target: { type: fiber-span, spanId: sp-feeder-main }
+            strand: { tubeColor: blue, fiberColor: orange }
+            evidenceActionIds: ["$3", "$6", "$9"]
+  expectedClaims:
+    - faultKind: wrong-tube-continuity
+      target: { type: fiber-span, spanId: sp-feeder-main }
+      strand: { tubeColor: blue, fiberColor: orange }

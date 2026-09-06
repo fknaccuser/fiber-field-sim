@@ -45,15 +45,22 @@ export function longestPrefixMatch(routes: readonly RouteEntry[], ip: string): R
 
 export type IpOwner = { kind: 'device-interface'; deviceId: string; interfaceId: string } | { kind: 'host'; hostId: string };
 
-/** Finds whichever device interface or host currently holds `ip`. Hosts are checked via their *resolved* addressing (DHCP-assigned or APIPA), not just static config. */
-export function ownerOfIp(world: WorldState, network: NetworkProfile, ip: string): IpOwner | null {
+/**
+ * Finds whichever device interface or host currently holds `ip`. Hosts are checked via
+ * their *resolved* addressing (DHCP-assigned or APIPA), not just static config -- which
+ * means resolving one DHCP host can call back into this function (checking a helper
+ * address's owner) for every other host on the same VLAN. `visiting` breaks that cycle:
+ * a host already in the middle of being resolved is skipped rather than re-entered.
+ */
+export function ownerOfIp(world: WorldState, network: NetworkProfile, ip: string, visiting: Set<string> = new Set()): IpOwner | null {
   for (const device of world.devices) {
     for (const iface of device.interfaces) {
       if (iface.ipAddress === ip) return { kind: 'device-interface', deviceId: device.id, interfaceId: iface.id };
     }
   }
   for (const host of world.hosts) {
-    const addressing = resolveHostAddressing(world, network, host);
+    if (visiting.has(host.id)) continue;
+    const addressing = resolveHostAddressing(world, network, host, visiting);
     if ('ip' in addressing && addressing.ip === ip) return { kind: 'host', hostId: host.id };
   }
   return null;
