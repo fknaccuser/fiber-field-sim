@@ -17,7 +17,7 @@ function macWithDashes(mac: string): string {
     .toUpperCase();
 }
 
-function ipconfigBody(ctx: Parameters<Handler>[0]): { lines: string[]; addressingState: string } {
+function ipconfigBody(ctx: Parameters<Handler>[0]): { lines: string[]; addressingState: string; reason?: string } {
   const host = ctx.host!;
   const addressing = resolveHostAddressing(ctx.world, ctx.profiles.network, host);
   const lines: string[] = ['', 'Windows IP Configuration', '', '', 'Ethernet adapter Ethernet:', '', '   Connection-specific DNS Suffix  . : '];
@@ -30,18 +30,19 @@ function ipconfigBody(ctx: Parameters<Handler>[0]): { lines: string[]; addressin
     lines.push(`   Subnet Mask . . . . . . . . . . . : ${prefixToMask(addressing.prefixLength)}`);
     lines.push(`   Default Gateway . . . . . . . . . : ${addressing.gateway}`);
   }
-  return { lines, addressingState: addressing.state };
+  const reason = addressing.state === 'apipa' ? addressing.reason : undefined;
+  return { lines, addressingState: addressing.state, reason };
 }
 
 export const hostIpconfig: Handler = (ctx) => {
-  const { lines, addressingState } = ipconfigBody(ctx);
-  return { output: lines, facts: [{ kind: 'host-addressing-observed', hostId: ctx.host!.id, state: addressingState }] };
+  const { lines, addressingState, reason } = ipconfigBody(ctx);
+  return { output: lines, facts: [{ kind: 'host-addressing-observed', hostId: ctx.host!.id, state: addressingState, reason }] };
 };
 
 export const hostIpconfigAll: Handler = (ctx) => {
   const host = ctx.host!;
   const addressing = resolveHostAddressing(ctx.world, ctx.profiles.network, host);
-  const { lines, addressingState } = ipconfigBody(ctx);
+  const { lines, addressingState, reason } = ipconfigBody(ctx);
   const dhcpEnabled = host.addressing.mode === 'dhcp';
   const dns = addressing.state === 'apipa' ? '' : addressing.dns;
   const extended = [
@@ -51,7 +52,7 @@ export const hostIpconfigAll: Handler = (ctx) => {
     ...lines.slice(6),
     `   DNS Servers . . . . . . . . . . . : ${dns}`,
   ];
-  return { output: extended, facts: [{ kind: 'host-addressing-observed', hostId: host.id, state: addressingState }] };
+  return { output: extended, facts: [{ kind: 'host-addressing-observed', hostId: host.id, state: addressingState, reason }] };
 };
 
 export const hostPing: Handler = (ctx, params) => {

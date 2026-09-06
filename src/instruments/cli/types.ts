@@ -22,7 +22,7 @@ export type CliFact =
   | { kind: 'transceiver-observed'; deviceId: string; interfaceId: string; rxPowerDbm: number | null }
   | { kind: 'log-observed'; deviceId: string }
   | { kind: 'ont-status-observed'; deviceId: string; ontId: string; status: string }
-  | { kind: 'host-addressing-observed'; hostId: string; state: string }
+  | { kind: 'host-addressing-observed'; hostId: string; state: string; reason?: string }
   | { kind: 'config-changed'; deviceId: string; summary: string };
 
 export interface CliResult {

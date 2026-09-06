@@ -330,6 +330,10 @@ export interface FaultInstance {
   kind: string;
   target: FaultTarget;
   params: Record<string, unknown>;
+  /** Applied to the world and visible to instruments, but not the answer -- claiming it is a false positive. */
+  isRedHerring?: boolean;
+  /** Real cause, but outside the field tech's authority (NOC/IT). Correct answer: claim it AND escalate. */
+  outOfScope?: boolean;
 }
 
 // --- World state ----------------------------------------------------------------
@@ -339,6 +343,18 @@ export interface CustomerReport {
   premiseNodeId: string;
   reportedSymptom: string;
   isRedHerring?: boolean;
+}
+
+export interface PlantRecord {
+  id: string;
+  kind: 'splice-sheet' | 'work-order' | 'port-assignment' | 'as-built';
+  title: string;
+  /** ISO date, relative to the scenario's authored "today" (item 5). */
+  date: string;
+  nodeId?: string;
+  spanId?: string;
+  /** Rendered verbatim by the records viewer. */
+  lines: string[];
 }
 
 export interface ActiveProfileSet {
@@ -362,6 +378,7 @@ export interface WorldState {
   devices: NetworkDeviceConfig[];
   links: NetworkLink[];
   hosts: HostConfig[];
+  plantRecords: PlantRecord[];
   customerReports: CustomerReport[];
   environment: {
     weather: string;
