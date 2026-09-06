@@ -1,0 +1,33 @@
+# Stage 1 architecture — build items 2 through 6
+
+Item 1 (world model, fault taxonomy, profiles layer) is implemented and tested in `src/world` and `src/profiles`. These documents specify the remaining five build items. Implement them **in order**, one at a time, stopping for review after each. Each document is written so the implementer needs no unstated judgment calls; where a product decision is genuinely open, it is listed under "Open questions" at the top of the file with a default that unblocks the work.
+
+| Item | Document | Delivers |
+|---|---|---|
+| 2 | [item-2-otdr.md](item-2-otdr.md) | Seeded PRNG, profile registry, shared optical-path resolver, OTDR physics + event table + ghosts + bidirectional averaging, power meter / VFL / inspection scope, canvas trace renderer, dev preview |
+| 3 | [item-3-cli.md](item-3-cli.md) | Vendor-profile-driven command matcher, Cisco IOS handlers, Calix OLT handlers with derived ONT status, Windows host shell, L2/L3 forwarding, DNS and DHCP derivation |
+| 4 | [item-4-scoring.md](item-4-scoring.md) | Session runner (intents → action log, presence/inventory/time rules), five-axis scorer, evidence rules for every fault kind, decision replay |
+| 5 | [item-5-scenarios.md](item-5-scenarios.md) | Scenario YAML schema, seeded instantiation, validator (incl. reference-solution proof), three fully specified reference scenarios (tiers 1, 4, 5) |
+| 6 | [item-6-ui.md](item-6-ui.md) | PWA shell, Dexie persistence, field session screen, MaxTester-style OTDR panel, tap-token terminal, replay and progress views |
+
+## Cross-item amendments to item 1 (all additive)
+
+Each document opens with an "Amendments to item 1" section. Collected here so the implementer can see the whole surface; apply each in the item that introduces it.
+
+- **Item 2:** `src/world/random.ts` (mulberry32 + FNV-1a `deriveSeed`); `src/profiles/registry.ts` (`resolveProfileSet`); network-profile defaults for backscatter coefficient, water peak, OLT/ONT Tx power; instrument-profile defaults for dead-zone factor, spec conditions, averaging options, front-panel reflectance, saturation, live-traffic penalty, ghost thresholds, sample count; `FiberSpan.liveService/fiberGeneration/backscatterOffsetDb`; `FiberEvent.trueLossDb`; `FiberStrand.live`; `SpliceMapEntry` at `TopologyNode.attributes.spliceMap`; splitter-node convention (`attributes.splitRatio`, one upstream span).
+- **Item 3:** `InterfaceState.ipAddress/prefixLength/description/macAddress/mtu`; `DhcpConfig.dnsServerIp`; structured `AclRule.match/appliedTo`; `PonPortState`/`OntRecord` (+ `PonPortState.strand`, added in item 5); `NetworkDeviceConfig.role/platform/topologyNodeId/ponPorts/dnsResolverIp/dnsServerHealth`; `WorldState.links` and `hosts`; new faults `ont-unpowered` (domain `cpe`), `ont-serial-mismatch`, `rogue-ont`, `dns-server-unresponsive`; param extensions on four existing faults; `VendorProfileSchema` rewritten (mode prompts, handlers, messages, interface families, thresholds) with all three vendor YAMLs; `ProfileSet.hostShell`.
+- **Item 4:** `FaultInstance.isRedHerring/outOfScope`; `PlantRecord` and `WorldState.plantRecords`.
+- **Item 5:** `NodeKind` gains `'yard'` and `'pop'`; documented `TopologyNode.attributes` keys with typed accessors.
+- **Item 6:** `redactForUi` in the runner; `fake-indexeddb` dev dependency.
+
+## Invariants every item must keep
+
+1. Instruments are pure functions of `WorldState` + settings + profiles. No canned output anywhere.
+2. Anything vendor-, model-, or region-specific lives in `src/profiles/*.yaml`. Engine code may not contain such constants.
+3. `hidden`/ground-truth data (`OtdrTraceResult.hidden`, `ActionEvent.groundTruth`, `WorldState.appliedFaults`) never reaches `src/ui/**`. A source-grep test enforces it.
+4. Same seed ⇒ identical world, identical trace, identical score.
+5. Item 1's existing tests keep passing with only the adjustments each document explicitly names.
+
+## Confirmed facts baked into the profiles (do not re-derive)
+
+XGS-PON only (1577/1270 nm service; 1310/1550/1625 nm OTDR test; 1625/1650 nm out-of-band live test; N1/N2/E1/E2 budgets; 1x2–1x64 splitters). OLT: Calix E7-2 (AXOS). Hexatronic splitters/splice hardware; CommScope ~450-series cabinet; 32-port distribution terminals (confirmed); 192 at the POP (needs confirmation — plausibly six E7-2 chassis × 32 ports). OTDR: EXFO MaxTester 730C (exact model needs confirmation). Region: South Orange County, DigAlert (USA South) under Cal. Gov. Code §4216. Cisco IOS dialect for switches/routers, access/distribution layer only; backbone routing deferred. Tube/fiber rolling and continuity tracing is a first-class scenario type.
