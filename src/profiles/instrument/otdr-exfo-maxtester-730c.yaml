@@ -8,6 +8,7 @@ pulseWidthsNsRange:
 dynamicRangeDb:
   '1310': 36
   '1550': 39
+  '1625': 37
 liveTestOutOfBandNm: [1625, 1650]
 maxSplitterSupported: "1x128"
 powerMeterMaxDbm: 27
@@ -36,7 +37,10 @@ notes: >
   not a button-and-knob legacy OTDR. Correct the id/displayName/specs here once
   the exact model is confirmed; the OTDR physics and renderer modules (build
   item 2) read pulse widths, dynamic range, and the live-test wavelengths from
-  this profile rather than hardcoding them.
+  this profile rather than hardcoding them. dynamicRangeDb['1625'] (37 dB) is
+  an estimated placeholder, not from a published spec sheet — the 1310/1550
+  values above came from the 730C spec sheet, which did not break out a 1625
+  nm figure; correct it once confirmed.
 citation: >
   EXFO MaxTester 730C PON/Metro OTDR spec sheet (dynamic range, splitter
   support); EXFO MaxTester 700D-series spec sheet (pulse width range, live
