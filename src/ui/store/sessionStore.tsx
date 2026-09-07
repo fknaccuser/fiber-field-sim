@@ -7,6 +7,7 @@
 import { createContext, useCallback, useContext, useMemo, useReducer, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getScenario, instantiateScenario } from '../../scenarios';
+import { DEFAULT_ROLE, ROLE_POLICY, type Role } from '../../session/roles';
 import { resolveProfileSet } from '../../profiles';
 import { perform as runnerPerform, redactForUi, startSession } from '../../session/runner';
 import type { PerformResult, UiActionEvent, UiSessionState } from '../../session/runner';
@@ -97,7 +98,7 @@ export interface SessionStore {
   lastResult: PerformResult | null;
   sessionId: string | null;
   dispatch(intent: Intent): void;
-  start(scenarioId: string, seed: number): void;
+  start(scenarioId: string, seed: number, role?: Role): void;
   restore(session: SessionState, identity: SessionIdentity): void;
   abandon(): void;
 }
@@ -121,9 +122,16 @@ function useSessionStoreInternal(): SessionStore {
   }, []);
 
   const start = useCallback(
-    (scenarioId: string, seed: number) => {
+    (scenarioId: string, seed: number, role: Role = DEFAULT_ROLE) => {
       const def = getScenario(scenarioId, seed);
-      const { world, meta } = instantiateScenario(def, seed);
+      const { world, meta: baseMeta } = instantiateScenario(def, seed);
+      const policy = ROLE_POLICY[role];
+      // Role shapes the day: it carries onto the meta and scales the clock the scenario asked for.
+      const meta = {
+        ...baseMeta,
+        role,
+        timeBudgetMinutes: baseMeta.timeBudgetMinutes === undefined ? undefined : Math.round(baseMeta.timeBudgetMinutes * policy.timeBudgetMultiplier),
+      };
       const profiles = resolveProfileSet(def.profiles);
       const session = startSession(world, profiles, meta);
       void (async () => {

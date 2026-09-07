@@ -10,10 +10,12 @@ import { listSessions, loadUnfinished, type StoredSession } from '../store/persi
 import { competencyMap, computeStreak } from '../store/progress';
 import { Panel, Readout } from '../components/Panel';
 import { SoftKey } from '../components/SoftKey';
+import { DEFAULT_ROLE, isRole, ROLE_ORDER, ROLE_POLICY, unlockedRoles, type Role } from '../../session/roles';
 import { buildDay, committedMinutes, networkStability, SHIFT_MINUTES, type Priority, type WorkKind, type WorkOrder } from './day';
 
 const DAY_SEED_KEY = 'fiberops.daySeed';
 const STARTED_KEY = 'fiberops.dayStarted';
+const ROLE_KEY = 'fiberops.role';
 
 function todayLabel(): string {
   return new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
@@ -120,6 +122,10 @@ export function Dispatch() {
     localStorage.setItem(DAY_SEED_KEY, String(fresh));
     return fresh;
   });
+  const [role, setRole] = useState<Role>(() => {
+    const stored = localStorage.getItem(ROLE_KEY);
+    return isRole(stored) ? stored : DEFAULT_ROLE;
+  });
   const [started, setStarted] = useState(() => localStorage.getItem(STARTED_KEY) === String(localStorage.getItem(DAY_SEED_KEY)));
 
   useEffect(() => {
@@ -136,6 +142,7 @@ export function Dispatch() {
   const { currentStreak, bestStreak } = computeStreak(sessions);
   const competency = competencyMap(sessions);
   const weakest = competency[0] ?? null;
+  const unlocked_ = unlockedRoles(sessions.filter((x) => x.endedAt).length);
   const stability = networkStability(day, closed);
   const committed = committedMinutes(day);
   const leadTicket = day.orders.find((o) => !closed.includes(o.ticket))?.ticket ?? null;
@@ -201,10 +208,48 @@ export function Dispatch() {
                 <div className="mono" style={{ fontSize: 12, color: 'var(--ink)' }}>{unfinished.scenarioId}</div>
                 <div className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', marginTop: 3 }}>SEED {unfinished.seed} · {unfinished.actionCount} ACTIONS LOGGED</div>
               </div>
-              <SoftKey label="Resume →" onClick={() => navigate(`/run/${unfinished.scenarioId}?seed=${unfinished.seed}`)} />
+              <SoftKey label="Resume →" onClick={() => navigate(`/run/${unfinished.scenarioId}?seed=${unfinished.seed}&role=${role}`)} />
             </div>
           </Panel>
         )}
+
+        {/* ---- Who you are today ---- */}
+        <Panel title="Role for the shift" badge={ROLE_POLICY[role].displayName.toUpperCase()}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {ROLE_ORDER.map((r) => {
+              const unlocked = unlocked_[r];
+              return (
+                <button
+                  key={r}
+                  type="button"
+                  className={`hud-chip${role === r ? ' is-on hud-chip--orange' : ''}`}
+                  title={unlocked ? ROLE_POLICY[r].blurb : `Suggested after ${ROLE_POLICY[r].unlockAfterSessions} completed work orders`}
+                  onClick={() => {
+                    setRole(r);
+                    localStorage.setItem(ROLE_KEY, r);
+                  }}
+                  style={unlocked ? undefined : { opacity: 0.5 }}
+                >
+                  {ROLE_POLICY[r].displayName.replace(' Technician', '').replace(' / NOC Lead', '')}
+                  {!unlocked && ' ·'}
+                </button>
+              );
+            })}
+          </div>
+          <p style={{ margin: '10px 0 0', fontSize: 12.5, lineHeight: 1.6, color: 'var(--ink-soft)' }}>{ROLE_POLICY[role].blurb}</p>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 10 }}>
+            {([
+              ['HINTS', ROLE_POLICY[role].hints.max === Infinity ? 'unlimited' : String(ROLE_POLICY[role].hints.max)],
+              ['TRUCK ROLLS', ROLE_POLICY[role].truckRollBudget === Infinity ? 'unlimited' : `${ROLE_POLICY[role].truckRollBudget}${ROLE_POLICY[role].truckRollHardCap ? ' hard cap' : ''}`],
+              ['CLOCK', `${Math.round(ROLE_POLICY[role].timeBudgetMultiplier * 100)}%`],
+              ['COMMS', ['quiet', 'light', 'busy', 'relentless'][ROLE_POLICY[role].commsIntensity]],
+            ] as const).map(([k, v]) => (
+              <span key={k} className="mono" style={{ fontSize: 9.5, letterSpacing: 1.2, color: 'var(--ink-faint)' }}>
+                {k} <span style={{ color: 'var(--cyan)' }}>{v}</span>
+              </span>
+            ))}
+          </div>
+        </Panel>
 
         {/* ---- Shift card ---- */}
         <Panel
@@ -249,7 +294,7 @@ export function Dispatch() {
                 order={order}
                 lead={order.ticket === leadTicket}
                 done={closed.includes(order.ticket)}
-                onEnter={() => navigate(`/run/${order.scenarioId}?seed=${order.seed}`)}
+                onEnter={() => navigate(`/run/${order.scenarioId}?seed=${order.seed}&role=${role}`)}
               />
             ))}
           </div>

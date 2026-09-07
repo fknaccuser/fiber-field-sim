@@ -7,6 +7,7 @@
  */
 import type { FaultTarget, FiberTubeColor, WorldState } from '../world';
 import type { ProfileSet } from '../profiles';
+import type { Role } from './roles';
 import type { CliFact, CliSession, Endpoint } from '../instruments/cli';
 import type { DetectedEvent, GroundTruthEvent, OtdrAccess, OtdrSettings, OtdrViolation } from '../instruments/otdr';
 import type { VflLeakKind } from '../instruments/vfl/vfl';
@@ -31,6 +32,8 @@ export interface ScenarioMeta {
   referenceSolution: { steps: Intent[]; rationales: string[]; stepSeconds?: number[]; totalSeconds: number; affectedCustomerMinutes: number };
   /** ISO date, for plant-record ages. */
   today: string;
+  /** Who the trainee is working as today. Absent means the default (L1). */
+  role?: Role;
 }
 
 export type StrandRef = { tubeColor: FiberTubeColor; fiberColor: FiberTubeColor };

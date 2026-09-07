@@ -18,6 +18,7 @@ import type { CliResult, CliSession } from '../instruments/cli';
 import { scoreSession } from '../scoring/score';
 import type { ScoreReport } from '../scoring/types';
 import { CUSTOMER_CONTACT_SECONDS, EXCAVATE_SECONDS, HINT_POLICY, HINT_SECONDS, RECORDS_SECONDS } from './costs';
+import { DEFAULT_ROLE, effectiveHintPolicy, ROLE_POLICY } from './roles';
 import { checkPresence, travelTimeSeconds } from './location';
 import { lookupRecords } from './records';
 import type { ActionEvent, Intent, ScenarioMeta, SessionState } from './types';
@@ -205,6 +206,14 @@ function performCli(state: SessionState, intent: Extract<Intent, { type: 'cli' }
 
 function performTruckRoll(state: SessionState, intent: Extract<Intent, { type: 'truck-roll' }>) {
   if (intent.toNodeId === state.locationNodeId) return refuse(state, intent, 'already there');
+  // Senior grades cannot justify unlimited rolls; junior grades are only scored on it.
+  const role = ROLE_POLICY[state.meta.role ?? DEFAULT_ROLE];
+  if (role.truckRollHardCap) {
+    const rolled = state.log.filter((a) => a.type === 'truck-roll').length;
+    if (rolled >= role.truckRollBudget) {
+      return refuse(state, intent, `you cannot justify another truck roll today (${role.truckRollBudget} used)`);
+    }
+  }
   const duration = travelTimeSeconds(state.meta, state.locationNodeId, intent.toNodeId);
   const action: ActionEvent = { ...nextActionBase(state), durationSeconds: duration, type: 'truck-roll', fromNodeId: state.locationNodeId, toNodeId: intent.toNodeId };
   const nextState: SessionState = { ...appendAction(state, action), locationNodeId: intent.toNodeId };
@@ -225,7 +234,9 @@ function performCustomerContact(state: SessionState, intent: Extract<Intent, { t
 }
 
 function performHint(state: SessionState, _intent: Extract<Intent, { type: 'hint' }>) {
-  const policy = HINT_POLICY[state.meta.tier];
+  // The stricter of the scenario's tier policy and the role's, so a junior role can
+  // never soften a hard tier and a senior role always tightens it.
+  const policy = effectiveHintPolicy(state.meta.role ?? DEFAULT_ROLE, HINT_POLICY[state.meta.tier]);
   const level = state.hintsUsed;
   const text = dispatchAdvice(state.meta, state.initialWorld, state.log, level);
   const refused = level >= policy.max || text === null;
