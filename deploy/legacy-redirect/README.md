@@ -2,6 +2,20 @@
 
 ## What this is
 
+There are **three** deployments in the Cloudflare account, and two of them are stale:
+
+| URL | What it is | Repo | State |
+| --- | --- | --- | --- |
+| `fiber-field-sim.pages.dev` | Pages project `fiber-field-sim` | `fknaccuser/fiber-field-sim` | **Current.** Rebuilds on every push to `main`. |
+| `fiber-sim.okimrollin.workers.dev` | Worker `fiber-sim` (Static Assets) | `fknaccuser/fiber-sim` | Stale — predates the redesign. |
+| `fiber-sim.pages.dev` | Pages project `fiber-sim` | `fknaccuser/fiber-sim` | Stale — serves the identical old bundle. |
+
+Both stale deployments serve the same old bundle (`index-D1JACAzR.js`, verified 2026-09-07)
+and are wired to the superseded `fknaccuser/fiber-sim` repository, so neither updates when
+you push here. This directory deals with the Worker. The stale Pages project is a separate
+thing and has to be deleted or disconnected in the dashboard — a Worker script cannot
+affect it.
+
 `fiber-sim.okimrollin.workers.dev` is a **second, separate deployment** that predates the
 redesign. It is not built from this repo's current `main` and does not update when you push:
 verified on 2026-09-07, its bundle contained none of the pre-trip, probe-tip, laptop or
@@ -28,17 +42,24 @@ script at `/sw.js` that unregisters the old worker, clears its caches and reload
 It also preserves path and query, because a run is identified by its URL
 (`/run/<scenario>?seed=&role=&prep=`).
 
-## Deploying it — dashboard (no CLI, no tokens)
+## Deploying it — CLI only. The dashboard paste does NOT work.
 
-1. Cloudflare dashboard → **Workers & Pages** → open the Worker serving
-   `fiber-sim.okimrollin.workers.dev` (the name is most likely `fiber-sim`).
-2. **Edit code** / Quick Edit.
-3. Replace the entire contents with `worker.js` from this directory.
-4. **Deploy**.
+`fiber-sim` is a **Workers Static Assets** deployment, and that changes everything about how
+to replace it. From Cloudflare's docs:
 
-## Deploying it — CLI
+> By default, if a requested URL matches a file in the static assets directory, that file
+> will be served — without invoking Worker code.
 
-Requires being logged in as yourself; no config file is needed.
+and, since the `assets_navigation_prefers_asset_serving` default of 2025-04-01, navigation
+requests prefer asset serving *even when an exact asset match cannot be found*, so an SPA's
+`index.html` is returned ahead of invoking any Worker script.
+
+So editing the code in the dashboard's Quick Edit would appear to succeed and change
+nothing: `/` would still match the old `index.html`, `/sw.js` would still match the real
+Workbox service worker, and this Worker would never run.
+
+The deploy below replaces the Worker with a **plain script and no assets**, so every request
+reaches it.
 
 ```bash
 npx wrangler login
@@ -48,8 +69,13 @@ npx wrangler login
 npx wrangler deploy deploy/legacy-redirect/worker.js --name fiber-sim --compatibility-date 2026-09-07
 ```
 
-Replace `fiber-sim` if the Worker is named something else — the dashboard shows the real
-name above its `*.workers.dev` URL.
+Run it from the repo root. No config file is involved, and nothing is added to the repo root
+that Cloudflare Pages could mistake for build configuration.
+
+If you would rather keep the old assets in place, the documented alternative is to redeploy
+with `assets.run_worker_first = true`, which forces the script to run ahead of asset
+serving. That needs an `[assets]` directory in a Wrangler config and is more moving parts
+for no benefit here — the whole point is that this hostname stops serving its own copy.
 
 ## Checking it worked
 
