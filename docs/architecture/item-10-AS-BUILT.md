@@ -121,6 +121,40 @@ same value, so the screen in your hand agrees with the sky.
 Pure and tested, including that the sun never drops below the horizon and an unknown
 weather string falls back to clear rather than producing a black scene.
 
+### The pre-trip (spec §5, §9)
+
+`src/ui/prep/prepChecklist.ts` + `PreTrip.tsx`, on the route between accepting a work order
+and arriving. Readiness used to be decided by seed alone, which made the coaching line
+("run the pre-trip before you leave the yard") advice about a thing that did not exist.
+
+It is a squeeze by design: five things worth checking, and `RolePolicy.prepChecks` is always
+fewer — four for an L1, one for a manager — so the question is never *will* you prepare but
+*what can you least afford to be wrong about*, decided before you know what the job needs.
+Skipping is one tap, offered without judgement, because that is what happens when you are
+late. Choices ride in the URL, and `parsePrep` caps them at the grade's allowance so a
+hand-edited link cannot buy a perfect morning.
+
+### Tool condition, with consequences (spec §6)
+
+`dirty-scope-tip` is back, and earns it. `inspect()` now takes a `ProbeState`, and a
+contaminated tip adds a **fixed** contamination pattern to every endface — fixed, not
+seeded per connector, because the identical defect count on two different connectors is
+precisely the tell that the fault is in your hand and not in the plant. Cleaning it costs
+thirty seconds and a cleaning stick, so `no-cleaning-kit` and `dirty-scope-tip` can strand
+you together. The shelf shows the pip and offers the stick.
+
+*(Found while wiring this: no truck in the game stocked a cleaning kit. The item was in the
+readiness table and on the shelf display, but no scenario or generated world ever carried
+one, so cleaning would have been refused every time.)*
+
+### The laptop on the tailgate (spec §5)
+
+`src/ui/field/LaptopShell.tsx` — console, plant records and the work order are three apps
+on one machine, so they share its shell rather than being three unrelated tabs. The lid
+opens on arrival, the deck lies away from you under a single CSS perspective, and the truck
+bed shows around it. No GL context, so it sits behind the keep-alive viewports without
+competing with the world scene.
+
 ### Compass (spec §6, last bullet)
 
 `src/ui/scene/compass.ts` + `CompassRose.tsx`. Derived from the camera pose, which was
@@ -132,17 +166,13 @@ already pure, so it needs no render loop.
 
 Stated plainly so the next session does not have to discover it.
 
-- **The laptop on the tailgate (spec §5).** Still a tab. The phone is now a held slab
-  (`src/ui/field/PhoneSlab.tsx`) and instruments have `raised`/`stowed`/`enlarged`, but the
-  console does not open on a lid with a sliver of truck bed around it.
-- **Tool condition shown physically (spec §6).** No battery pip, no smudged tip. Related:
-  `dirty-scope-tip` was **removed** from the readiness table rather than displayed. It took
-  nothing off the truck, no instrument read differently because of it, and there was no
-  action to clean a tip with — so it announced a consequence that never arrived. A pip
-  saying `TIP DIRTY` above an instrument that reads normally is a lie to the trainee. Put
-  it back when `scopeInspect` can be told about it and the shelf can offer a cleaning stick.
-- **Prep phase.** The night-before / morning pre-trip screens, and the drive back to the
-  yard, are not built. Readiness is decided by seed rather than by anything you did.
+- **The drive back to the yard.** A job ends at the diagnosis; there is no recovery leg, no
+  putting the kit away, and nothing carries from one work order to the next within a shift.
+  The pre-trip is per-job rather than per-day for the same reason.
+- **Weather that does more than light the scene.** `marine-layer` closes the fog, but it
+  does not make a locate harder to read or a splice enclosure wetter. The hook is there.
+- **A battery pip on the OTDR.** `flat-otdr-battery` removes the instrument outright, so
+  there is no partial-charge state to display. Showing a level would mean modelling one.
 
 ---
 

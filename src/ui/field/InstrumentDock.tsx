@@ -16,6 +16,7 @@ import { useViewportState, writeViewportState } from '../viewport/viewportStore'
 import { TeachingRail } from './TeachingRail';
 import { Phone } from './Phone';
 import { PhoneSlab } from './PhoneSlab';
+import { LaptopShell } from './LaptopShell';
 import { Records } from './Records';
 import { Diagnose, type DiagnosePrefill } from './Diagnose';
 import { Excavate, excavateAvailable } from './Excavate';
@@ -99,7 +100,18 @@ export function InstrumentDock({ ui, dispatch, initialTab = 'world' }: { ui: UiS
     { id: 'power-meter', label: 'Power', policy: 'unmount', render: () => <PowerMeter ui={ui} dispatch={dispatch} /> },
     { id: 'vfl', label: 'VFL', policy: 'unmount', render: () => <Vfl ui={ui} dispatch={dispatch} /> },
     { id: 'scope', label: 'Scope', policy: 'unmount', render: () => <Scope ui={ui} dispatch={dispatch} /> },
-    { id: 'terminal', label: 'Terminal', policy: 'keep-alive', render: () => <Terminal ui={ui} dispatch={dispatch} /> },
+    // Console, records and the work order are three apps on one machine, so they share its
+    // shell — open on the tailgate, rather than three unrelated tabs.
+    {
+      id: 'terminal',
+      label: 'Terminal',
+      policy: 'keep-alive',
+      render: () => (
+        <LaptopShell title="Console">
+          <Terminal ui={ui} dispatch={dispatch} />
+        </LaptopShell>
+      ),
+    },
     {
       id: 'phone',
       label: 'Phone',
@@ -111,8 +123,26 @@ export function InstrumentDock({ ui, dispatch, initialTab = 'world' }: { ui: UiS
         </PhoneSlab>
       ),
     },
-    { id: 'records', label: 'Records', policy: 'keep-alive', render: () => <Records ui={ui} dispatch={dispatch} /> },
-    { id: 'diagnose', label: 'Diagnose', policy: 'keep-alive', render: () => <Diagnose ui={ui} dispatch={dispatch} prefill={prefill} /> },
+    {
+      id: 'records',
+      label: 'Records',
+      policy: 'keep-alive',
+      render: () => (
+        <LaptopShell title="Plant records">
+          <Records ui={ui} dispatch={dispatch} />
+        </LaptopShell>
+      ),
+    },
+    {
+      id: 'diagnose',
+      label: 'Diagnose',
+      policy: 'keep-alive',
+      render: () => (
+        <LaptopShell title="Work order">
+          <Diagnose ui={ui} dispatch={dispatch} prefill={prefill} />
+        </LaptopShell>
+      ),
+    },
   ];
   if (excavateAvailable(ui)) viewports.push({ id: 'excavate', label: 'Excavate', policy: 'keep-alive', render: () => <Excavate ui={ui} dispatch={dispatch} /> });
 
