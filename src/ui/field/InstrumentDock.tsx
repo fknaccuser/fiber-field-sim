@@ -63,10 +63,12 @@ export function InstrumentDock({ ui, dispatch, initialTab = 'world' }: { ui: UiS
     },
     {
       id: 'map',
-      label: 'Map',
-      policy: 'unmount',
+      // The print is SVG, not WebGL. It holds no GL context, so it can stay mounted and
+      // keep its sheet, pan and selection while you go and take a reading.
+      label: 'Print',
+      policy: 'keep-alive',
       render: () => (
-        <Suspense fallback={<div style={{ padding: 16, color: 'var(--muted)' }}>Loading map…</div>}>
+        <Suspense fallback={<div style={{ padding: 16, color: 'var(--muted)' }}>Loading print…</div>}>
           <MapViewport ui={ui} dispatch={dispatch} />
         </Suspense>
       ),
