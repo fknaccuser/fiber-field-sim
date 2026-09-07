@@ -1,14 +1,21 @@
-# Stage 1 architecture — build items 2 through 6
+# Architecture — build items 2 through 9
 
-Item 1 (world model, fault taxonomy, profiles layer) is implemented and tested in `src/world` and `src/profiles`. These documents specify the remaining five build items. Implement them **in order**, one at a time, stopping for review after each. Each document is written so the implementer needs no unstated judgment calls; where a product decision is genuinely open, it is listed under "Open questions" at the top of the file with a default that unblocks the work.
+Item 1 (world model, fault taxonomy, profiles layer) is implemented and tested in `src/world` and `src/profiles`. Items 2–8 are **implemented**; item 9 is **partially implemented**: [stow/raise and Back](item-9-stow-raise.md) are complete, with the truck/tool shelf next.
 
-| Item | Document | Delivers |
-|---|---|---|
-| 2 | [item-2-otdr.md](item-2-otdr.md) | Seeded PRNG, profile registry, shared optical-path resolver, OTDR physics + event table + ghosts + bidirectional averaging, power meter / VFL / inspection scope, canvas trace renderer, dev preview |
-| 3 | [item-3-cli.md](item-3-cli.md) | Vendor-profile-driven command matcher, Cisco IOS handlers, Calix OLT handlers with derived ONT status, Windows host shell, L2/L3 forwarding, DNS and DHCP derivation |
-| 4 | [item-4-scoring.md](item-4-scoring.md) | Session runner (intents → action log, presence/inventory/time rules), five-axis scorer, evidence rules for every fault kind, decision replay |
-| 5 | [item-5-scenarios.md](item-5-scenarios.md) | Scenario YAML schema, seeded instantiation, validator (incl. reference-solution proof), three fully specified reference scenarios (tiers 1, 4, 5) |
-| 6 | [item-6-ui.md](item-6-ui.md) | PWA shell, Dexie persistence, field session screen, MaxTester-style OTDR panel, tap-token terminal, replay and progress views |
+Items 2–6 were written as forward specs and implemented in order. Items 7–8 are written after the fact: what was built, how it works, and an honest list of what was not finished. Item 9 is a work order for a fresh session.
+
+| Item | Document | Status | Delivers |
+|---|---|---|---|
+| 2 | [item-2-otdr.md](item-2-otdr.md) | built | Seeded PRNG, profile registry, shared optical-path resolver, OTDR physics + event table + ghosts + bidirectional averaging, power meter / VFL / inspection scope, canvas trace renderer, dev preview |
+| 3 | [item-3-cli.md](item-3-cli.md) | built | Vendor-profile-driven command matcher, Cisco IOS handlers, Calix OLT handlers with derived ONT status, Windows host shell, L2/L3 forwarding, DNS and DHCP derivation |
+| 4 | [item-4-scoring.md](item-4-scoring.md) | built | Session runner (intents → action log, presence/inventory/time rules), five-axis scorer, evidence rules for every fault kind, decision replay |
+| 5 | [item-5-scenarios.md](item-5-scenarios.md) | built | Scenario YAML schema, seeded instantiation, validator (incl. reference-solution proof), three fully specified reference scenarios (tiers 1, 4, 5) |
+| 6 | [item-6-ui.md](item-6-ui.md) | built | PWA shell, Dexie persistence, field session screen, MaxTester-style OTDR panel, tap-token terminal, replay and progress views |
+| 7 | [item-7-viewports.md](item-7-viewports.md) | built | Viewport architecture (mount policy, state that survives unmounting), 3D topology map bound to the action log, procedural fiber-scope end-face |
+| 8 | [item-8-generator-and-world.md](item-8-generator-and-world.md) | built | Unlimited procedural scenarios from parameters + seed, and the physical 3D outside-plant world (street, houses, NID, ONT, handhole, splice closure, FDH, POP) with instruments you hold |
+| 9 | [item-9-SPEC-simulator-shell.md](item-9-SPEC-simulator-shell.md) | **partial: stow/raise + Back** | Truck-and-tool-shelf navigation, stow/raise, the real cabinet modelled from photographs, blueprint map, role-based difficulty, prep phase, live comms and interruptions |
+
+**Starting work?** Read item 7 and item 8 first — they describe the current state of the UI and world layers — then item 9, which is the work order. `docs/reference/*.jpg` are photographs of the real cabinet the world must emulate.
 
 ## Cross-item amendments to item 1 (all additive)
 

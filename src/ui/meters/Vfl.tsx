@@ -1,36 +1,97 @@
 import type { UiActionEvent, UiSessionState } from '../../session/runner';
 import type { Intent } from '../../session/types';
-import { Chip } from '../components/Chip';
+import { SoftKey } from '../components/SoftKey';
+import { HeldDevice } from '../instrument/HeldDevice';
+import { blocker, INITIAL_HELD, type HeldState } from '../instrument/deviceState';
+import { useViewportState } from '../viewport/viewportStore';
 
 export function Vfl({ ui, dispatch }: { ui: UiSessionState; dispatch(intent: Intent): void }) {
   const incident = ui.world.topology.spans.filter((s) => s.fromNodeId === ui.locationNodeId || s.toNodeId === ui.locationNodeId);
-  const runs = ui.log.filter((a): a is Extract<UiActionEvent, { type: 'vfl' }> => a.type === 'vfl' && a.fromNodeId === ui.locationNodeId);
+  const runs = ui.log.filter((a): a is Extract<UiActionEvent, { type: 'vfl' }> => a.type === 'vfl');
   const last = runs[runs.length - 1] ?? null;
+  const [mode, setMode] = useViewportState<'continuous' | 'pulse'>('vfl.mode', 'continuous');
+  const [selected, setSelected] = useViewportState<string | null>('vfl.span', null);
+  const [held, setHeld] = useViewportState<HeldState>('device.vfl', INITIAL_HELD);
+
+  const block = blocker(held, true);
+  const spanId = selected && incident.some((s) => s.id === selected) ? selected : incident[0]?.id ?? null;
+  const lit = block === null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 8 }}>
-      <div style={{ fontSize: 12, color: 'var(--muted)' }}>Visual fault locator -- launches a bright red laser down each fiber.</div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {incident.map((span) => (
-          <Chip key={span.id} onClick={() => dispatch({ type: 'vfl', spanId: span.id, fromNodeId: ui.locationNodeId })}>
-            Test {span.id}
-          </Chip>
-        ))}
-      </div>
-      {last && (
-        <div className="bezel" style={{ padding: 12 }}>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>{last.spanId}</div>
-          {last.leaks.length === 0 ? (
-            <div style={{ color: 'var(--led-ok)' }}>No visible leak along the fiber.</div>
-          ) : (
-            last.leaks.map((leak, i) => (
-              <div key={i} style={{ color: 'var(--led-alarm)' }}>
-                ⚠ Leak visible at ≈{leak.positionMeters.toFixed(0)} m ({leak.kind})
-              </div>
-            ))
-          )}
+    <HeldDevice
+      ui={ui}
+      dispatch={dispatch}
+      state={held}
+      name="VFL"
+      status={lit ? `650 nm · ${mode === 'pulse' ? '2 Hz' : 'continuous'}` : undefined}
+      model="VL-7"
+      form="pen"
+      leadLabel="pigtail"
+      onStateChange={setHeld}
+      bootLines={['FiberOps VL-7', '650 nm visual fault locator', 'class 2 laser — do not view directly']}
+      softKeys={[
+        { label: 'CW', active: mode === 'continuous', onClick: () => setMode('continuous') },
+        { label: '2 Hz', active: mode === 'pulse', onClick: () => setMode('pulse') },
+      ]}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span
+            aria-hidden
+            style={{
+              width: 14,
+              height: 14,
+              borderRadius: '50%',
+              background: lit ? '#ff2d2d' : '#3a2020',
+              boxShadow: lit ? '0 0 14px 4px rgba(255,45,45,0.75)' : 'none',
+              animation: lit && mode === 'pulse' ? 'vflBlink 0.5s steps(1) infinite' : undefined,
+            }}
+          />
+          <span style={{ fontSize: 11, color: 'var(--muted)' }}>{lit ? `emitting 650 nm · ${mode === 'pulse' ? '2 Hz' : 'continuous'}` : 'laser off'}</span>
         </div>
-      )}
-    </div>
+        <style>{'@keyframes vflBlink{50%{opacity:0.15}}'}</style>
+
+        <div style={{ fontSize: 11, color: 'var(--muted)' }}>Fibers you can reach from here:</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {incident.map((span) => (
+            <button
+              key={span.id}
+              type="button"
+              onClick={() => setSelected(span.id)}
+              style={{
+                minHeight: 38,
+                textAlign: 'left',
+                padding: '6px 10px',
+                borderRadius: 6,
+                border: `1px solid ${spanId === span.id ? 'var(--cursor-b)' : 'var(--bezel)'}`,
+                background: spanId === span.id ? 'var(--panel-2)' : 'transparent',
+                color: 'var(--text)',
+                fontSize: 12,
+              }}
+            >
+              {span.id} · {span.lengthMeters} m
+            </button>
+          ))}
+          {incident.length === 0 && <div style={{ fontSize: 12, color: 'var(--muted)' }}>No fiber at this location.</div>}
+        </div>
+
+        <SoftKey label="Trace this fiber" disabled={block !== null || spanId === null} onClick={() => spanId && dispatch({ type: 'vfl', spanId, fromNodeId: ui.locationNodeId })} />
+
+        {last && (
+          <div className="bezel" style={{ padding: 10 }}>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>{last.spanId}</div>
+            {last.leaks.length === 0 ? (
+              <div style={{ color: 'var(--led-ok)', fontSize: 12 }}>No red glow anywhere along the jacket.</div>
+            ) : (
+              last.leaks.map((leak, i) => (
+                <div key={i} style={{ color: 'var(--led-alarm)', fontSize: 12 }}>
+                  Red light bleeding through at ≈{leak.positionMeters.toFixed(0)} m ({leak.kind})
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </HeldDevice>
   );
 }

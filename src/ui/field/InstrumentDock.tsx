@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { DockNavigation } from './dockNavigation';
+import { presentTool, pushPlace, type DockPlace, type TabId, type ToolPresentation } from './navigation';
 import type { UiSessionState } from '../../session/runner';
 import type { Intent } from '../../session/types';
 import { OtdrPanel } from '../otdr/OtdrPanel';
@@ -6,82 +9,98 @@ import { PowerMeter } from '../meters/PowerMeter';
 import { Vfl } from '../meters/Vfl';
 import { Scope } from '../meters/Scope';
 import { Terminal } from '../terminal/Terminal';
+import { ViewportHost, type ViewportDef } from '../viewport/ViewportHost';
+import { useViewportState } from '../viewport/viewportStore';
 import { Phone } from './Phone';
 import { Records } from './Records';
 import { Diagnose, type DiagnosePrefill } from './Diagnose';
 import { Excavate, excavateAvailable } from './Excavate';
 
-type TabId = 'otdr' | 'power-meter' | 'vfl' | 'scope' | 'terminal' | 'phone' | 'records' | 'diagnose' | 'excavate';
+export type { TabId } from './navigation';
 
-const BASE_TABS: Array<{ id: TabId; label: string }> = [
-  { id: 'otdr', label: 'OTDR' },
-  { id: 'power-meter', label: 'Power' },
-  { id: 'vfl', label: 'VFL' },
-  { id: 'scope', label: 'Scope' },
-  { id: 'terminal', label: 'Terminal' },
-  { id: 'phone', label: 'Phone' },
-  { id: 'records', label: 'Records' },
-  { id: 'diagnose', label: 'Diagnose' },
-];
+// three + R3F + drei are only ever needed by these two; keep them out of the main chunk.
+const WorldViewport = lazy(() => import('../scene/WorldViewport').then((m) => ({ default: m.WorldViewport })));
+const MapViewport = lazy(() => import('../map/MapViewport').then((m) => ({ default: m.MapViewport })));
 
-export function InstrumentDock({
-  ui,
-  dispatch,
-  initialTab = 'phone',
-}: {
-  ui: UiSessionState;
-  dispatch(intent: Intent): void;
-  initialTab?: TabId;
-}) {
-  const [tab, setTab] = useState<TabId>(initialTab);
-  const [prefill, setPrefill] = useState<DiagnosePrefill | null>(null);
+export function InstrumentDock({ ui, dispatch, initialTab = 'phone' }: { ui: UiSessionState; dispatch(intent: Intent): void; initialTab?: TabId }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const runKey = `${ui.meta.scenarioId}:${ui.meta.seed}`;
+  const entry = location.state?.fiberDock as { runKey: string; stack: DockPlace[] } | undefined;
+  const stack = entry?.runKey === runKey && entry.stack.length ? entry.stack : [{ tab: initialTab, presentation: 'raised' } satisfies DockPlace];
+  const place = stack[stack.length - 1]!;
+  const tab = place.tab;
+  const [, saveStack] = useViewportState<DockPlace[]>('dock.stack', stack);
+  useEffect(() => saveStack(stack), [location.key]);
+  const go = (next: DockPlace) => {
+    const nextStack = pushPlace(stack, next);
+    if (nextStack === stack) return;
+    navigate(`${location.pathname}${location.search}`, { state: { ...location.state, fiberDock: { runKey, stack: nextStack } } });
+  };
+  const setTab = (id: TabId) => go({ tab: id, presentation: 'raised' });
+  const present = (presentation: ToolPresentation) => {
+    if (presentation === 'enlarged') { go({ tab, presentation }); return; }
+    // Lowering/raising is a view change, so repeated gestures never lengthen Back.
+    const nextStack = presentTool(stack, presentation);
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: { ...location.state, fiberDock: { runKey, stack: nextStack } } });
+  };
+  const back = () => stack.length > 1 ? navigate(-1) : setTab('world');
+  const [prefill, setPrefill] = useViewportState<DiagnosePrefill | null>('diagnose.prefill', null);
 
-  const tabs = excavateAvailable(ui) ? [...BASE_TABS, { id: 'excavate' as const, label: 'Excavate' }] : BASE_TABS;
+  const viewports: Array<ViewportDef<TabId>> = [
+    {
+      id: 'world',
+      label: 'World',
+      policy: 'unmount',
+      render: () => (
+        <Suspense fallback={<div style={{ padding: 16, color: 'var(--muted)' }}>Loading the plant…</div>}>
+          <WorldViewport ui={ui} dispatch={dispatch} />
+        </Suspense>
+      ),
+    },
+    {
+      id: 'map',
+      label: 'Map',
+      policy: 'unmount',
+      render: () => (
+        <Suspense fallback={<div style={{ padding: 16, color: 'var(--muted)' }}>Loading map…</div>}>
+          <MapViewport ui={ui} dispatch={dispatch} />
+        </Suspense>
+      ),
+    },
+    {
+      id: 'otdr',
+      label: 'OTDR',
+      policy: 'unmount',
+      render: () => (
+        <OtdrPanel
+          ui={ui}
+          dispatch={dispatch}
+          onSendToDiagnosis={(p) => {
+            setPrefill(p);
+            setTab('diagnose');
+          }}
+        />
+      ),
+    },
+    // Power, VFL and Scope each render the equipment behind the held device, so each owns a
+    // WebGL context while active and must release it on the way out.
+    { id: 'power-meter', label: 'Power', policy: 'unmount', render: () => <PowerMeter ui={ui} dispatch={dispatch} /> },
+    { id: 'vfl', label: 'VFL', policy: 'unmount', render: () => <Vfl ui={ui} dispatch={dispatch} /> },
+    { id: 'scope', label: 'Scope', policy: 'unmount', render: () => <Scope ui={ui} dispatch={dispatch} /> },
+    { id: 'terminal', label: 'Terminal', policy: 'keep-alive', render: () => <Terminal ui={ui} dispatch={dispatch} /> },
+    { id: 'phone', label: 'Phone', policy: 'keep-alive', render: () => <Phone ui={ui} dispatch={dispatch} /> },
+    { id: 'records', label: 'Records', policy: 'keep-alive', render: () => <Records ui={ui} dispatch={dispatch} /> },
+    { id: 'diagnose', label: 'Diagnose', policy: 'keep-alive', render: () => <Diagnose ui={ui} dispatch={dispatch} prefill={prefill} /> },
+  ];
+  if (excavateAvailable(ui)) viewports.push({ id: 'excavate', label: 'Excavate', policy: 'keep-alive', render: () => <Excavate ui={ui} dispatch={dispatch} /> });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-        {tab === 'otdr' && (
-          <OtdrPanel
-            ui={ui}
-            dispatch={dispatch}
-            onSendToDiagnosis={(p) => {
-              setPrefill(p);
-              setTab('diagnose');
-            }}
-          />
-        )}
-        {tab === 'power-meter' && <PowerMeter ui={ui} dispatch={dispatch} />}
-        {tab === 'vfl' && <Vfl ui={ui} dispatch={dispatch} />}
-        {tab === 'scope' && <Scope ui={ui} dispatch={dispatch} />}
-        {tab === 'terminal' && <Terminal ui={ui} dispatch={dispatch} />}
-        {tab === 'phone' && <Phone ui={ui} dispatch={dispatch} />}
-        {tab === 'records' && <Records ui={ui} dispatch={dispatch} />}
-        {tab === 'diagnose' && <Diagnose ui={ui} dispatch={dispatch} prefill={prefill} />}
-        {tab === 'excavate' && <Excavate ui={ui} dispatch={dispatch} />}
-      </div>
-      <div className="bezel" style={{ display: 'flex', overflowX: 'auto', flexShrink: 0 }}>
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            style={{
-              flex: '1 0 auto',
-              minHeight: 48,
-              minWidth: 64,
-              background: tab === t.id ? 'var(--panel-2)' : 'transparent',
-              color: tab === t.id ? 'var(--text)' : 'var(--muted)',
-              border: 'none',
-              borderTop: tab === t.id ? '2px solid var(--cursor-b)' : '2px solid transparent',
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-    </div>
+    <DockNavigation.Provider value={{ presentation: place.presentation, present, back }}>
+      {(stack.length > 1 || tab !== 'world') && (
+        <div className="dock-back"><button type="button" onClick={back}>← Back</button><span>{viewports.find((v) => v.id === tab)?.label}{place.presentation !== 'raised' ? ` · ${place.presentation}` : ''}</span></div>
+      )}
+      <ViewportHost<TabId> viewports={viewports} active={tab} onActivate={setTab} />
+    </DockNavigation.Provider>
   );
 }

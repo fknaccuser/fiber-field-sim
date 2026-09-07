@@ -173,7 +173,7 @@ function performVfl(state: SessionState, intent: Extract<Intent, { type: 'vfl' }
 
 function performScope(state: SessionState, intent: Extract<Intent, { type: 'scope' }>) {
   const result = scopeInspect(state.world, intent.spanId, intent.eventId);
-  const action: ActionEvent = { ...nextActionBase(state), durationSeconds: result.simulatedSeconds, type: 'scope', spanId: intent.spanId, eventId: intent.eventId, grade: result.grade };
+  const action: ActionEvent = { ...nextActionBase(state), durationSeconds: result.simulatedSeconds, type: 'scope', spanId: intent.spanId, eventId: intent.eventId, grade: result.grade, zones: result.zones };
   return { state: appendAction(state, action), result: { type: 'scope' as const, grade: result.grade, zones: result.zones } };
 }
 

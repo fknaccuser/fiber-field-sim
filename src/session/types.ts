@@ -85,7 +85,7 @@ export type ActionEvent = ActionEventBase &
     | { type: 'otdr-shot'; access: OtdrAccess; settings: OtdrSettings; events: DetectedEvent[]; violations: OtdrViolation[]; groundTruth: GroundTruthEvent[]; pathSpanIds: string[]; traceRef: string }
     | { type: 'power-meter'; nodeId: string; wavelengthNm: number; strand?: StrandRef; dbm: number | null }
     | { type: 'vfl'; spanId: string; fromNodeId: string; leaks: Array<{ positionMeters: number; kind: VflLeakKind }> }
-    | { type: 'scope'; spanId: string; eventId: string; grade: 'pass' | 'fail' }
+    | { type: 'scope'; spanId: string; eventId: string; grade: 'pass' | 'fail'; zones: { core: number; cladding: number; adhesive: number; contact: number } }
     | { type: 'cli'; endpoint: Endpoint; command: string; recognized: boolean; handlerId: string | null; facts: CliFact[]; outputRef: string }
     | { type: 'truck-roll'; fromNodeId: string; toNodeId: string }
     | { type: 'records'; nodeId?: string; spanId?: string; recordIds: string[] }

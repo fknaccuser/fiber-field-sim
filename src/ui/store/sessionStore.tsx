@@ -46,7 +46,7 @@ function intentFromActionEvent(action: UiActionEvent): Intent {
 
 /** Rebuilds a live `SessionState` from a stored row: instantiate the same scenario+seed, then replay every logged action's original intent. Same seed -> same RNG streams -> byte-identical result. */
 export function resumeSession(stored: StoredSession): SessionState {
-  const def = getScenario(stored.scenarioId);
+  const def = getScenario(stored.scenarioId, stored.seed);
   const { world, meta } = instantiateScenario(def, stored.seed);
   const profiles = resolveProfileSet(def.profiles);
   let state = startSession(world, profiles, meta);
@@ -110,7 +110,7 @@ function useSessionStoreInternal(): SessionStore {
 
   const start = useCallback(
     (scenarioId: string, seed: number) => {
-      const def = getScenario(scenarioId);
+      const def = getScenario(scenarioId, seed);
       const { world, meta } = instantiateScenario(def, seed);
       const profiles = resolveProfileSet(def.profiles);
       const session = startSession(world, profiles, meta);

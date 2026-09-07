@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { listScenarios } from '../../scenarios';
 import { Chip } from '../components/Chip';
 import { SoftKey } from '../components/SoftKey';
+import { RandomDispatch } from './RandomDispatch';
 
 function randomSeed(): number {
   return 1 + Math.floor(Math.random() * 999_999);
@@ -30,6 +31,10 @@ export function ScenarioPicker() {
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto', height: '100%' }}>
       <h1 style={{ fontSize: 18, margin: 0 }}>Scenarios</h1>
       {routeError && <div style={{ color: 'var(--led-alarm)', fontSize: 13 }}>{routeError}</div>}
+
+      <RandomDispatch />
+
+      <div style={{ fontSize: 13, fontWeight: 600 }}>Authored scenarios</div>
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <Chip active={tier === null} onClick={() => setTier(null)}>

@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Field photographs of real plant — kept locally, never published.
+docs/reference/*.jpg
+docs/reference/*.png

@@ -6,6 +6,10 @@ import type { WorldState } from '../../world';
 import type { UiActionEvent, UiSessionState } from '../../session/runner';
 import type { Intent } from '../../session/types';
 import { SoftKey } from '../components/SoftKey';
+import { HeldDevice } from '../instrument/HeldDevice';
+import { useDockNavigation } from '../field/dockNavigation';
+import { blocker, INITIAL_HELD, type HeldState } from '../instrument/deviceState';
+import { useViewportState } from '../viewport/viewportStore';
 import { AccessPicker, type AccessSelection } from './AccessPicker';
 import { EventTable } from './EventTable';
 import { OtdrControls } from './OtdrControls';
@@ -45,13 +49,20 @@ export function OtdrPanel({
   onSendToDiagnosis(prefill: { spanId: string; positionMeters: number }): void;
 }) {
   const { network, otdrInstrument } = ui.profiles;
-  const [settings, setSettings] = useState<OtdrSettings>(() => defaultSettings(network, otdrInstrument));
-  const [access, setAccess] = useState<AccessSelection | null>(null);
-  const [cursors, setCursors] = useState({ a: 0, b: 100 });
-  const [activeCursor, setActiveCursor] = useState<'a' | 'b'>('a');
+  const [settings, setSettings] = useViewportState<OtdrSettings>('otdr.settings', () => defaultSettings(network, otdrInstrument));
+  const [access, setAccess] = useViewportState<AccessSelection | null>('otdr.access', null);
+  const [cursors, setCursors] = useViewportState<{ a: number; b: number }>('otdr.cursors', { a: 0, b: 100 });
+  const [activeCursor, setActiveCursor] = useViewportState<'a' | 'b'>('otdr.activeCursor', 'a');
   const [selectedEvent, setSelectedEvent] = useState<DetectedEvent | null>(null);
-  const [viewport, setViewport] = useState<Viewport | null>(null);
+  const [viewport, setViewport] = useViewportState<Viewport | null>('otdr.viewport', null);
   const [acquiring, setAcquiring] = useState(false);
+  // The trace can be blown up to the full viewport for analysis, then folded back into the
+  // held device -- the same screen either way, so cursors and zoom survive the switch.
+  const navigation = useDockNavigation();
+  const expanded = navigation.presentation === 'enlarged';
+  const setExpanded = (value: boolean) => value ? navigation.present('enlarged') : navigation.back();
+  const [held, setHeld] = useViewportState<HeldState>('device.otdr', INITIAL_HELD);
+  const block = blocker(held, true);
 
   const otdrActions = ui.log.filter((a): a is Extract<UiActionEvent, { type: 'otdr-shot' }> => a.type === 'otdr-shot');
   const lastAction = otdrActions[otdrActions.length - 1] ?? null;
@@ -64,7 +75,7 @@ export function OtdrPanel({
     setViewport(null);
   }, [lastAction?.id]);
 
-  const canStart = access !== null && !acquiring;
+  const canStart = access !== null && !acquiring && block === null;
 
   const start = () => {
     if (!access) return;
@@ -91,8 +102,8 @@ export function OtdrPanel({
     if (found) onSendToDiagnosis(found);
   };
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%', minHeight: 0 }}>
+  const screen = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%', minHeight: 0, padding: expanded ? 0 : 8 }}>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <AccessPicker locationNodeId={ui.locationNodeId} spans={ui.world.topology.spans} selection={access} onChange={setAccess} />
         <OtdrControls network={network} instrument={otdrInstrument} truckInventory={ui.world.truckInventory} settings={settings} onChange={setSettings} />
@@ -121,7 +132,7 @@ export function OtdrPanel({
           <SoftKey label="Start" onClick={start} disabled={!canStart} />
           <SoftKey label={`Cursor ${activeCursor.toUpperCase()}`} onClick={() => setActiveCursor((c) => (c === 'a' ? 'b' : 'a'))} />
           <SoftKey label="Zoom out" onClick={() => setViewport(null)} />
-          <SoftKey label="Events" onClick={() => {}} />
+          <SoftKey label={expanded ? 'Back to device' : 'Enlarge'} active={expanded} onClick={() => setExpanded(!expanded)} />
         </div>
       </div>
 
@@ -151,5 +162,27 @@ export function OtdrPanel({
         </div>
       )}
     </div>
+  );
+
+  return (
+    <HeldDevice
+      ui={ui}
+      dispatch={dispatch}
+      state={held}
+      name="OTDR"
+      status={acquiring ? 'Acquiring…' : lastAction ? 'Trace stored' : undefined}
+      model="MX-730"
+      form="tablet"
+      leadLabel="launch cable"
+      onStateChange={setHeld}
+      bootLines={['FiberOps MX-730', 'OTDR / PON metro tester', 'laser class 1M', 'self-test ... pass']}
+      softKeys={[
+        { label: 'Start', onClick: start, disabled: !canStart },
+        { label: `Cursor ${activeCursor.toUpperCase()}`, onClick: () => setActiveCursor((c) => (c === 'a' ? 'b' : 'a')) },
+        { label: 'Enlarge', onClick: () => setExpanded(true) },
+      ]}
+    >
+      {screen}
+    </HeldDevice>
   );
 }

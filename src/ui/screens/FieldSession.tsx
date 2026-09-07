@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { resolveRunRoute } from '../app/routeResolution';
-import { listScenarios } from '../../scenarios';
+import { scenarioExists } from '../../scenarios';
 import type { PerformResult } from '../../session/runner';
 import { loadUnfinished } from '../store/persistence';
 import { resumeSession, useSessionStore } from '../store/sessionStore';
+import { clearViewportState } from '../viewport/viewportStore';
 import { LocationBar } from '../field/LocationBar';
 import { InstrumentDock } from '../field/InstrumentDock';
 
@@ -53,7 +54,7 @@ export function FieldSession() {
   const seedParam = searchParams.get('seed');
   const needsSeedRedirect = seedParam === null && !!scenarioId;
 
-  const resolution = resolveRunRoute(scenarioId, seedParam ?? String(pinnedSeedRef.current), (id) => listScenarios().some((s) => s.id === id));
+  const resolution = resolveRunRoute(scenarioId, seedParam ?? String(pinnedSeedRef.current), scenarioExists);
   const resolvedScenarioId = !needsSeedRedirect && resolution.ok ? resolution.params.scenarioId : null;
   const resolvedSeed = !needsSeedRedirect && resolution.ok ? resolution.params.seed : null;
 
@@ -62,6 +63,7 @@ export function FieldSession() {
     const key = `${resolvedScenarioId}:${resolvedSeed}`;
     if (startedKeyRef.current === key) return;
     startedKeyRef.current = key;
+    clearViewportState();
     void (async () => {
       const existing = await loadUnfinished();
       if (existing && existing.scenarioId === resolvedScenarioId && existing.seed === resolvedSeed) {

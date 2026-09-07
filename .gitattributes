@@ -1,0 +1,12 @@
+# Normalize every text file to LF in the repository. Without this, checking out on Windows
+# with core.autocrlf=true and then copying files in from another machine or an archive makes
+# git report hundreds of files as modified when only the line endings differ.
+* text=auto eol=lf
+
+# Binary assets git must not touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.woff binary
+*.woff2 binary

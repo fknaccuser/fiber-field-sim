@@ -5,6 +5,7 @@ import type { UiSessionState } from '../../session/runner';
 import type { DiagnosisClaim, Intent } from '../../session/types';
 import { Chip } from '../components/Chip';
 import { SoftKey } from '../components/SoftKey';
+import { useViewportState } from '../viewport/viewportStore';
 
 export interface DiagnosePrefill {
   spanId: string;
@@ -92,7 +93,7 @@ export function Diagnose({ ui, dispatch, prefill }: { ui: UiSessionState; dispat
   const [positionMeters, setPositionMeters] = useState<number | undefined>(prefill?.positionMeters);
   const [strand, setStrand] = useState<{ tubeColor: FiberTubeColor; fiberColor: FiberTubeColor } | undefined>(undefined);
   const [evidenceIds, setEvidenceIds] = useState<string[]>([]);
-  const [claims, setClaims] = useState<DiagnosisClaim[]>([]);
+  const [claims, setClaims] = useViewportState<DiagnosisClaim[]>('diagnose.claims', []);
   const [escalate, setEscalate] = useState(false);
   const [escalateReason, setEscalateReason] = useState('');
   const [noFaultInScope, setNoFaultInScope] = useState(false);

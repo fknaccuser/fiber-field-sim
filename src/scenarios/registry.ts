@@ -1,6 +1,8 @@
 /** Bundles every scenario YAML shipped under ./library and indexes it by id. */
 import { loadScenarioYaml } from './loader';
 import type { ScenarioDefinition } from './schema';
+import { generateScenario } from './generate/generate';
+import { isGeneratedId, parseGeneratedId } from './generate/params';
 
 const rawModules = import.meta.glob('./library/*.yaml', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
@@ -40,8 +42,21 @@ export class ScenarioNotFoundError extends Error {
   }
 }
 
-export function getScenario(id: string): ScenarioDefinition {
+/**
+ * A bundled definition by id, or -- for a generated id (`t3-gen-plant-medium`) -- the
+ * definition procedurally built for that id and seed. Generated definitions depend on
+ * the seed (the plant itself varies), which is why the seed is a parameter here; for a
+ * bundled scenario it is ignored, since per-seed variation happens later in
+ * `instantiateScenario`.
+ */
+export function getScenario(id: string, seed = 1): ScenarioDefinition {
+  const params = parseGeneratedId(id);
+  if (params) return generateScenario(params, seed);
   const def = index().get(id);
   if (!def) throw new ScenarioNotFoundError(id);
   return def;
+}
+
+export function scenarioExists(id: string): boolean {
+  return isGeneratedId(id) || index().has(id);
 }

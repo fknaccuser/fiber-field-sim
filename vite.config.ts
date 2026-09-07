@@ -29,8 +29,9 @@ export default defineConfig({
       },
     }),
   ],
+  server: process.env.PORT ? { port: Number(process.env.PORT), strictPort: true } : undefined,
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   },
 })

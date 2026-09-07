@@ -5,6 +5,7 @@ import { listSessions, loadUnfinished, type StoredSession } from '../store/persi
 import { competencyMap, computeStreak } from '../store/progress';
 import { AxisGauge } from '../components/AxisGauge';
 import { SoftKey } from '../components/SoftKey';
+import { RandomDispatch } from './RandomDispatch';
 
 export function Home() {
   const [unfinished, setUnfinished] = useState<StoredSession | null | undefined>(undefined);
@@ -52,8 +53,10 @@ export function Home() {
         </div>
       )}
 
+      <RandomDispatch />
+
       <div>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Scenarios</div>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Authored scenarios</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {scenarios.map((s) => (
             <Link key={s.id} to={`/run/${s.id}`} style={{ textDecoration: 'none' }}>
