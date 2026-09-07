@@ -25,6 +25,15 @@ function clockLabel(): string {
   return new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
+/** The board said MORNING DISPATCH at nine in the evening. Name the actual shift. */
+function shiftLabel(now = new Date()): string {
+  const h = now.getHours();
+  if (h < 12) return 'MORNING DISPATCH';
+  if (h < 17) return 'DAY DISPATCH';
+  if (h < 22) return 'SWING DISPATCH';
+  return 'NIGHT DISPATCH';
+}
+
 const PRIORITY_TONE: Record<Priority, string> = { P1: 'var(--red)', P2: 'var(--orange)', P3: 'var(--cyan)' };
 
 function KindGlyph({ kind }: { kind: WorkKind }) {
@@ -187,7 +196,7 @@ export function Dispatch() {
               <path d="M8.5 16a3.5 3.5 0 0 1 7 0" fill="none" stroke="var(--cyan)" strokeWidth="1.8" />
               <circle cx="12" cy="18.5" r="1.6" fill="var(--cyan)" />
             </svg>
-            MORNING DISPATCH // {clockLabel()}
+            {shiftLabel()} // {clockLabel()}
           </div>
           <h1 className="hud-title" style={{ fontSize: 'clamp(26px, 6vw, 40px)', lineHeight: 1.08, margin: '12px 0 0', letterSpacing: 3 }}>
             Enter the field.
