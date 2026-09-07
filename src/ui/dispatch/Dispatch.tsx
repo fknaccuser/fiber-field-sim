@@ -303,7 +303,8 @@ export function Dispatch() {
                 order={order}
                 lead={order.ticket === leadTicket}
                 done={closed.includes(order.ticket)}
-                onEnter={() => navigate(`/run/${order.scenarioId}?seed=${order.seed}&role=${role}`)}
+                // Via the yard: you check the truck before you drive to the job.
+                onEnter={() => navigate(`/prep/${order.scenarioId}?seed=${order.seed}&role=${role}`)}
               />
             ))}
           </div>

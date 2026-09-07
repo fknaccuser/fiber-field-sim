@@ -3,6 +3,7 @@ import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { resolveRunRoute } from '../app/routeResolution';
 import { scenarioExists } from '../../scenarios';
 import { DEFAULT_ROLE, isRole } from '../../session/roles';
+import { parsePrep } from '../prep/prepChecklist';
 import type { PerformResult } from '../../session/runner';
 import { loadUnfinished } from '../store/persistence';
 import { resumeSession, useSessionStore } from '../store/sessionStore';
@@ -76,7 +77,8 @@ export function FieldSession() {
         store.restore(session, { id: existing.id, traineeId: existing.traineeId, startedAt: existing.startedAt });
       } else {
         const roleParam = searchParams.get('role');
-        store.start(resolvedScenarioId, resolvedSeed, isRole(roleParam) ? roleParam : DEFAULT_ROLE);
+        const role = isRole(roleParam) ? roleParam : DEFAULT_ROLE;
+        store.start(resolvedScenarioId, resolvedSeed, role, parsePrep(searchParams.get('prep'), role));
       }
     })();
   }, [resolvedScenarioId, resolvedSeed, store.start, store.restore]);

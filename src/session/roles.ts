@@ -31,6 +31,12 @@ export interface RolePolicy {
   commsIntensity: 0 | 1 | 2 | 3;
   /** Whether some incoming comms block until answered. */
   mustAnswerComms: boolean;
+  /**
+   * How many items you get to verify on the pre-trip. Fewer than the list, always, so it is
+   * a choice about what you can least afford to be wrong — and fewer as you rise, because
+   * a busier grade leaves the yard in more of a hurry.
+   */
+  prepChecks: number;
   /** Sessions at or above this many completed before the role is suggested. */
   unlockAfterSessions: number;
 }
@@ -49,6 +55,7 @@ export const ROLE_POLICY: Record<Role, RolePolicy> = {
     informationRichness: 'full',
     commsIntensity: 0,
     mustAnswerComms: false,
+    prepChecks: 4,
     unlockAfterSessions: 0,
   },
   l2: {
@@ -64,6 +71,7 @@ export const ROLE_POLICY: Record<Role, RolePolicy> = {
     informationRichness: 'full',
     commsIntensity: 1,
     mustAnswerComms: false,
+    prepChecks: 3,
     unlockAfterSessions: 3,
   },
   l3: {
@@ -79,6 +87,7 @@ export const ROLE_POLICY: Record<Role, RolePolicy> = {
     informationRichness: 'normal',
     commsIntensity: 2,
     mustAnswerComms: true,
+    prepChecks: 2,
     unlockAfterSessions: 8,
   },
   senior: {
@@ -94,6 +103,7 @@ export const ROLE_POLICY: Record<Role, RolePolicy> = {
     informationRichness: 'normal',
     commsIntensity: 3,
     mustAnswerComms: true,
+    prepChecks: 2,
     unlockAfterSessions: 15,
   },
   manager: {
@@ -109,6 +119,7 @@ export const ROLE_POLICY: Record<Role, RolePolicy> = {
     informationRichness: 'sparse',
     commsIntensity: 3,
     mustAnswerComms: true,
+    prepChecks: 1,
     unlockAfterSessions: 25,
   },
 };
