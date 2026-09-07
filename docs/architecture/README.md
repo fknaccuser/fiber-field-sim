@@ -1,6 +1,6 @@
 # Architecture — build items 2 through 9
 
-Item 1 (world model, fault taxonomy, profiles layer) is implemented and tested in `src/world` and `src/profiles`. Items 2–8 are **implemented**; item 9 is **partially implemented**: [stow/raise and Back](item-9-stow-raise.md) are complete, with the truck/tool shelf next.
+Item 1 (world model, fault taxonomy, profiles layer) is implemented and tested in `src/world` and `src/profiles`. Items 2–8 are **implemented**. Item 9 is **partially implemented**: [stow/raise and Back](item-9-stow-raise.md), the field-console theme and the truck/tool shelf are done; the cabinet, blueprint map, roles, prep and comms are not. **Item 10 is the active brief.**
 
 Items 2–6 were written as forward specs and implemented in order. Items 7–8 are written after the fact: what was built, how it works, and an honest list of what was not finished. Item 9 is a work order for a fresh session.
 
@@ -13,9 +13,12 @@ Items 2–6 were written as forward specs and implemented in order. Items 7–8 
 | 6 | [item-6-ui.md](item-6-ui.md) | built | PWA shell, Dexie persistence, field session screen, MaxTester-style OTDR panel, tap-token terminal, replay and progress views |
 | 7 | [item-7-viewports.md](item-7-viewports.md) | built | Viewport architecture (mount policy, state that survives unmounting), 3D topology map bound to the action log, procedural fiber-scope end-face |
 | 8 | [item-8-generator-and-world.md](item-8-generator-and-world.md) | built | Unlimited procedural scenarios from parameters + seed, and the physical 3D outside-plant world (street, houses, NID, ONT, handhole, splice closure, FDH, POP) with instruments you hold |
-| 9 | [item-9-SPEC-simulator-shell.md](item-9-SPEC-simulator-shell.md) | **partial: stow/raise + Back** | Truck-and-tool-shelf navigation, stow/raise, the real cabinet modelled from photographs, blueprint map, role-based difficulty, prep phase, live comms and interruptions |
+| 9 | [item-9-SPEC-simulator-shell.md](item-9-SPEC-simulator-shell.md) | partly built | Truck-and-tool-shelf navigation, stow/raise, the real cabinet modelled from photographs, blueprint map, role-based difficulty, prep phase, live comms. Built: [stow/raise](item-9-stow-raise.md), the console theme, the truck/tool shelf. |
+| 10 | [item-10-SPEC-the-experience.md](item-10-SPEC-the-experience.md) | **spec only — active brief** | The teaching layer (tiered step guidance + the post-diagnosis debrief), the loading screen and dispatch dashboard, first-person framing, the two visual registers |
 
-**Starting work?** Read item 7 and item 8 first — they describe the current state of the UI and world layers — then item 9, which is the work order. `docs/reference/*.jpg` are photographs of the real cabinet the world must emulate.
+**Starting work?** Read item 7 and item 8 for the current state of the UI and world layers, then **item 10 — it is the active brief and supersedes item 9**. Item 9 stays authoritative for the cabinet description and for roles/prep/comms.
+
+`docs/reference/*.jpg` are photographs of the real cabinet the world must emulate. They are deliberately **not committed** (they show a real operator's plant) — ask the project owner for them.
 
 ## Cross-item amendments to item 1 (all additive)
 
