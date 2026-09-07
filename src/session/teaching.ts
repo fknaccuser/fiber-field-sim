@@ -37,6 +37,7 @@ const METHOD: Record<Intent['type'], string> = {
   scope: 'Check the condition of the connector face.',
   vfl: 'Check continuity along the selected fiber.',
   cli: 'Compare network and service state with your observations.',
+  comms: 'Answer the message.',
   records: 'Establish the documented path and work history.',
   hint: 'Ask for help choosing the next check.',
   excavate: 'Verify the work area before exposing the cable.',

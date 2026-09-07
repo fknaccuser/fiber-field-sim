@@ -50,6 +50,9 @@ function intentFromActionEvent(action: UiActionEvent): Intent {
       return { type: 'hint' };
     case 'excavate':
       return { type: 'excavate', nodeId: action.nodeId, method: action.method, distanceFromMarksInches: action.distanceFromMarksInches };
+    case 'comms':
+      // Replay needs the same clock cost the original answer took.
+      return { type: 'comms', eventId: action.eventId, replyId: action.replyId, seconds: action.durationSeconds };
     case 'diagnosis':
       return { type: 'diagnosis', diagnosis: action.diagnosis };
     case 'refused':

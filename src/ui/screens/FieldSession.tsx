@@ -16,6 +16,8 @@ function describeResult(result: PerformResult): string {
       return `OTDR: ${result.result.events.length} event(s), ${result.result.simulatedSecondsElapsed}s`;
     case 'power-meter':
       return `Power meter: ${result.dbm === null ? 'no signal' : `${result.dbm.toFixed(1)} dBm`}`;
+    case 'comms':
+      return 'Replied';
     case 'vfl':
       return `VFL: ${result.leaks.length} leak(s) found`;
     case 'scope':

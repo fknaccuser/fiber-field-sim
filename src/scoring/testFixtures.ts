@@ -59,6 +59,8 @@ export function makeSession(opts: {
     blobs: {},
     hintsUsed: opts.log.filter((a) => a.type === 'hint' && !a.refused).length,
     cliSessions: {},
+    commsEvents: [],
+    commsHandled: [],
     ended: { by: opts.endedBy ?? 'diagnosis', atSimSeconds: opts.clockSeconds ?? 0 },
   };
 }

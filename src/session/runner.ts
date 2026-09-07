@@ -17,6 +17,7 @@ import { execute as cliExecute } from '../instruments/cli';
 import type { CliResult, CliSession } from '../instruments/cli';
 import { scoreSession } from '../scoring/score';
 import type { ScoreReport } from '../scoring/types';
+import { scheduleComms } from './comms';
 import { CUSTOMER_CONTACT_SECONDS, EXCAVATE_SECONDS, HINT_POLICY, HINT_SECONDS, RECORDS_SECONDS } from './costs';
 import { DEFAULT_ROLE, effectiveHintPolicy, ROLE_POLICY } from './roles';
 import { checkPresence, travelTimeSeconds } from './location';
@@ -34,6 +35,7 @@ export type PerformResult =
   | { type: 'customer-contact'; report: CustomerReport }
   | { type: 'hint'; text: string | null }
   | { type: 'excavate'; strike: boolean }
+  | { type: 'comms'; replyId: string }
   | { type: 'diagnosis'; report: ScoreReport }
   | { type: 'refused'; reason: string };
 
@@ -49,6 +51,8 @@ export function startSession(world: WorldState, profiles: SessionState['profiles
     blobs: {},
     hintsUsed: 0,
     cliSessions: {},
+    commsEvents: scheduleComms(meta.seed, meta.role ?? DEFAULT_ROLE, meta.timeBudgetMinutes, world),
+    commsHandled: [],
     ended: null,
   };
 }
@@ -128,6 +132,8 @@ export function perform(state: SessionState, intent: Intent): { state: SessionSt
       return performHint(state, intent);
     case 'excavate':
       return performExcavate(state, intent);
+    case 'comms':
+      return performComms(state, intent);
     case 'diagnosis':
       return performDiagnosis(state, intent);
   }
@@ -265,6 +271,26 @@ function performExcavate(state: SessionState, intent: Extract<Intent, { type: 'e
   return { state: nextState, result: { type: 'excavate' as const, strike } };
 }
 
+/** Answering the phone takes you off the job for as long as the answer deserves. */
+function performComms(state: SessionState, intent: Extract<Intent, { type: 'comms' }>) {
+  const event = state.commsEvents.find((e) => e.id === intent.eventId);
+  if (!event) return refuse(state, intent, 'no such message');
+  if (state.commsHandled.includes(intent.eventId)) return refuse(state, intent, 'already answered');
+  const reply = event.replies.find((r) => r.id === intent.replyId);
+  const action: ActionEvent = {
+    ...nextActionBase(state),
+    durationSeconds: intent.seconds,
+    type: 'comms',
+    eventId: intent.eventId,
+    replyId: intent.replyId,
+    from: event.fromName,
+    subject: event.subject,
+    reply: reply?.text ?? '',
+  };
+  const nextState: SessionState = { ...appendAction(state, action), commsHandled: [...state.commsHandled, intent.eventId] };
+  return { state: nextState, result: { type: 'comms' as const, replyId: intent.replyId } };
+}
+
 function performDiagnosis(state: SessionState, intent: Extract<Intent, { type: 'diagnosis' }>) {
   const action: ActionEvent = { ...nextActionBase(state), durationSeconds: 0, type: 'diagnosis', diagnosis: intent.diagnosis };
   const nextState: SessionState = { ...appendAction(state, action), ended: { by: 'diagnosis', atSimSeconds: state.clockSeconds } };
@@ -305,6 +331,8 @@ export interface UiSessionState {
   blobs: UiBlobs;
   hintsUsed: number;
   cliSessions: Record<string, CliSession>;
+  commsEvents: SessionState['commsEvents'];
+  commsHandled: string[];
   ended: SessionState['ended'];
 }
 
@@ -354,6 +382,8 @@ export function redactForUi(state: SessionState): UiSessionState {
     blobs: redactBlobs(state.blobs),
     hintsUsed: state.hintsUsed,
     cliSessions: state.cliSessions,
+    commsEvents: state.commsEvents,
+    commsHandled: state.commsHandled,
     ended: state.ended,
   };
 }

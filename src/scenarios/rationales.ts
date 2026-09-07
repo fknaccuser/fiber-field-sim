@@ -6,6 +6,7 @@ export function rationaleForStep(step: Intent, previous: Intent[] = []): string 
     case 'customer-contact': return previous.some((s) => s.type === 'customer-contact')
       ? 'You compare another customer report with the first to establish whether the affected premises share an upstream path before you spend a truck roll.'
       : 'You establish what stopped working and when. Compare the report with later measurements instead of assuming that a customer description identifies the cause.';
+    case 'comms': return 'You answer the message. Handling people is part of the job at this grade, and an unanswered escalation costs more than the minute it takes to reply.';
     case 'truck-roll': return 'You move to the next test boundary so you can inspect or measure equipment you can physically reach. Remote status alone cannot establish conditions at this point.';
     case 'power-meter': return previous.some((s) => s.type === 'power-meter')
       ? 'You compare the light level at this boundary with your earlier reading. A change between the two points narrows the section that needs investigation.'

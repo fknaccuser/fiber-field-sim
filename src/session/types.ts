@@ -8,6 +8,7 @@
 import type { FaultTarget, FiberTubeColor, WorldState } from '../world';
 import type { ProfileSet } from '../profiles';
 import type { Role } from './roles';
+import type { CommsEvent } from './comms';
 import type { CliFact, CliSession, Endpoint } from '../instruments/cli';
 import type { DetectedEvent, GroundTruthEvent, OtdrAccess, OtdrSettings, OtdrViolation } from '../instruments/otdr';
 import type { VflLeakKind } from '../instruments/vfl/vfl';
@@ -49,6 +50,7 @@ export type Intent =
   | { type: 'customer-contact'; customerId: string }
   | { type: 'hint' }
   | { type: 'excavate'; nodeId: string; method: 'hand' | 'machine'; distanceFromMarksInches: number }
+  | { type: 'comms'; eventId: string; replyId: string; seconds: number }
   | { type: 'diagnosis'; diagnosis: Diagnosis };
 
 export interface DiagnosisClaim {
@@ -95,6 +97,7 @@ export type ActionEvent = ActionEventBase &
     | { type: 'customer-contact'; customerId: string; symptom: string }
     | { type: 'hint'; level: number; cost: number; text: string; refused: boolean }
     | { type: 'excavate'; nodeId: string; method: 'hand' | 'machine'; distanceFromMarksInches: number; strike: boolean }
+    | { type: 'comms'; eventId: string; replyId: string; from: string; subject: string; reply: string }
     | { type: 'diagnosis'; diagnosis: Diagnosis }
     /** A presence/inventory rule blocked the intent; costs 0 time but is still logged for the replay. */
     | { type: 'refused'; intent: Intent; reason: string }
@@ -114,5 +117,9 @@ export interface SessionState {
   hintsUsed: number;
   /** Keyed by endpoint key `device:${id}` / `host:${id}`. */
   cliSessions: Record<string, CliSession>;
+  /** The day's inbound traffic, scheduled once at session start. */
+  commsEvents: CommsEvent[];
+  /** Ids of messages already dealt with. */
+  commsHandled: string[];
   ended: null | { by: 'diagnosis' | 'safety-strike'; atSimSeconds: number };
 }

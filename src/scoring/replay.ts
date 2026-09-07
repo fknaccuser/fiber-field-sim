@@ -50,6 +50,8 @@ function labelForIntent(world: SessionState['initialWorld'], intent: Intent): st
       return `Inspection scope on ${spanLabel(world, intent.spanId)}`;
     case 'cli':
       return `CLI (${endpointKey(intent.endpoint)}): ${intent.command}`;
+    case 'comms':
+      return `Answered ${intent.eventId}`;
     case 'truck-roll':
       return `Truck roll to ${nodeLabel(world, intent.toNodeId)}`;
     case 'records':
