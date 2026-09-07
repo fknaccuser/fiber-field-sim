@@ -11,7 +11,6 @@ function formatClock(totalSeconds: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-/** The shift you are on, from the scenario's authored time of day. */
 function shiftOf(timeOfDay: string): string {
   const hour = Number(timeOfDay.split(':')[0]);
   if (!Number.isFinite(hour)) return 'DAY SHIFT';
@@ -35,8 +34,19 @@ const KIND_LABELS: Partial<Record<NodeKind, string>> = {
   pop: 'POP',
 };
 
-/** A stylised OTDR trace across the header — decorative, never scenario data. */
-const TRACE_POINTS = '0,8 70,10 138,12 146,3 154,13 300,17 308,7 316,18 470,21 600,25 640,27 641,37 720,37';
+/** Decorative HUD telemetry across the header. Never scenario data. */
+const TRACE_POINTS = '0,26 60,24 130,22 138,9 146,23 300,19 308,6 316,20 470,16 600,12 640,10 641,2 720,2';
+
+function StatusLamp({ label, status }: { label: string; status: 'ok' | 'warn' | 'alarm' | 'idle' }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      <span className={`pulse-dot ${status}`} />
+      <span className="mono" style={{ fontSize: 8, letterSpacing: 2, color: 'var(--ink-soft)' }}>
+        {label}
+      </span>
+    </div>
+  );
+}
 
 export function LocationBar({ ui, dispatch, toast }: { ui: UiSessionState; dispatch(intent: Intent): void; toast: string | null }) {
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -57,16 +67,26 @@ export function LocationBar({ ui, dispatch, toast }: { ui: UiSessionState; dispa
     <div
       style={{
         flexShrink: 0,
-        background: '#0a1119',
-        borderBottom: '1px solid rgba(59,232,216,0.35)',
-        boxShadow: '0 1px 18px rgba(59,232,216,0.12)',
-        padding: '10px 12px 0',
+        position: 'relative',
+        background: 'rgba(10, 15, 29, 0.88)',
+        backdropFilter: 'blur(14px) saturate(120%)',
+        WebkitBackdropFilter: 'blur(14px) saturate(120%)',
+        borderBottom: '1px solid var(--cyan-line)',
+        boxShadow: '0 2px 28px rgba(0, 240, 255, 0.09)',
+        padding: '10px 14px 0',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+      {/* Telemetry ribbon behind the header content. */}
+      <svg viewBox="0 0 720 34" preserveAspectRatio="none" aria-hidden style={{ position: 'absolute', inset: 'auto 0 0 0', width: '100%', height: 34, opacity: 0.5 }}>
+        <polyline points={TRACE_POINTS} fill="none" stroke="var(--cyan)" strokeWidth={5} opacity={0.16} style={{ filter: 'blur(3px)' }} />
+        <polyline points={TRACE_POINTS} fill="none" stroke="var(--cyan)" strokeWidth={1.25} strokeDasharray={1400} style={{ animation: 'traceDraw 2.4s ease-out forwards' }} />
+      </svg>
+
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ minWidth: 0 }}>
-          <div className="eyebrow">
-            PACIFIC FIBER CO. — {region} · {shiftOf(ui.world.environment.timeOfDay)}
+          <div className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <span className="pulse-dot" style={{ width: 6, height: 6 }} />
+            FIBER//OPS · {region} · {shiftOf(ui.world.environment.timeOfDay)}
           </div>
           <button
             type="button"
@@ -76,11 +96,11 @@ export function LocationBar({ ui, dispatch, toast }: { ui: UiSessionState; dispa
             style={{
               display: 'block',
               maxWidth: '100%',
-              marginTop: 2,
+              marginTop: 3,
               padding: 0,
               background: 'transparent',
               border: 'none',
-              fontSize: 16,
+              fontSize: 17,
               textAlign: 'left',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -90,14 +110,23 @@ export function LocationBar({ ui, dispatch, toast }: { ui: UiSessionState; dispa
           >
             {(currentNode?.label ?? ui.locationNodeId).toUpperCase()}
           </button>
-          <div className="mono" style={{ fontSize: 10, letterSpacing: 1, color: 'var(--ink-soft)', marginTop: 2 }}>
-            TECH #0824 · {ui.meta.scenarioId.toUpperCase()} · SEED {ui.meta.seed}
+          <div className="mono" style={{ fontSize: 9.5, letterSpacing: 1.2, color: 'var(--ink-faint)', marginTop: 3 }}>
+            TECH-0824 · {ui.meta.scenarioId.toUpperCase()} · SEED {ui.meta.seed}
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, flexShrink: 0 }}>
           <div style={{ textAlign: 'right' }}>
-            <div className="mono" style={{ fontSize: 19, fontWeight: 800, letterSpacing: 2, color: overBudget ? 'var(--red)' : 'var(--amber)', textShadow: `0 0 12px ${overBudget ? 'rgba(255,77,94,.45)' : 'rgba(255,176,32,.4)'}` }}>
+            <div
+              className="mono"
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                letterSpacing: 3,
+                color: overBudget ? 'var(--red)' : 'var(--cyan)',
+                textShadow: `0 0 18px ${overBudget ? 'rgba(255,77,94,.55)' : 'rgba(0,240,255,.55)'}`,
+              }}
+            >
               {formatClock(ui.clockSeconds)}
             </div>
             {budgetSeconds !== null && (
@@ -106,40 +135,33 @@ export function LocationBar({ ui, dispatch, toast }: { ui: UiSessionState; dispa
               </div>
             )}
           </div>
-          <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
-            {(['LINK', 'ACT'] as const).map((l) => (
-              <div key={l} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: 'var(--green)',
-                    boxShadow: '0 0 8px var(--green)',
-                    animation: l === 'ACT' ? 'fsBlink 1s steps(2) infinite' : undefined,
-                  }}
-                />
-                <span className="mono" style={{ fontSize: 8, letterSpacing: 2, color: 'var(--ink-soft)' }}>{l}</span>
-              </div>
-            ))}
+          <div style={{ display: 'flex', gap: 11, paddingTop: 3 }}>
+            <StatusLamp label="LINK" status="ok" />
+            <StatusLamp label="PON" status={overBudget ? 'warn' : 'ok'} />
           </div>
         </div>
       </div>
 
-      <svg viewBox="0 0 720 40" preserveAspectRatio="none" aria-hidden style={{ display: 'block', width: '100%', height: 30, marginTop: 4 }}>
-        <polyline points={TRACE_POINTS} fill="none" stroke="var(--cyan)" strokeWidth={4} opacity={0.22} style={{ filter: 'blur(2px)' }} />
-        <polyline points={TRACE_POINTS} fill="none" stroke="var(--cyan)" strokeWidth={1.5} strokeDasharray={1400} style={{ animation: 'fsDraw 2.2s ease-out forwards' }} />
-      </svg>
-      <style>{'@keyframes fsBlink{50%{opacity:.12}}@keyframes fsDraw{from{stroke-dashoffset:1400}to{stroke-dashoffset:0}}@media (prefers-reduced-motion:reduce){svg polyline{animation:none!important;stroke-dashoffset:0!important}}'}</style>
+      <div style={{ height: 34 }} />
 
-      {overBudget && <div className="mono" style={{ fontSize: 10, letterSpacing: 1, color: 'var(--red)', paddingBottom: 6 }}>OVER BUDGET — EFFICIENCY IS NOW 0. THE SESSION CONTINUES.</div>}
-      {toast && <div className="mono" style={{ fontSize: 11, letterSpacing: 0.5, color: 'var(--cyan)', paddingBottom: 6, textShadow: '0 0 10px rgba(59,232,216,.5)' }}>&gt; {toast}</div>}
+      {overBudget && (
+        <div className="mono" style={{ position: 'relative', fontSize: 10, letterSpacing: 1, color: 'var(--red)', paddingBottom: 6 }}>
+          OVER BUDGET — EFFICIENCY IS NOW 0. THE SESSION CONTINUES.
+        </div>
+      )}
+      {toast && (
+        <div className="mono" style={{ position: 'relative', fontSize: 11, color: 'var(--cyan)', paddingBottom: 6, textShadow: '0 0 12px rgba(0,240,255,.55)' }}>
+          &gt; {toast}
+        </div>
+      )}
 
       <Sheet open={pickerOpen} onClose={() => setPickerOpen(false)} title="Truck roll">
         {Array.from(grouped.entries()).map(([kind, nodes]) => (
-          <div key={kind} style={{ marginBottom: 12 }}>
-            <div className="eyebrow" style={{ color: 'var(--cyan)', marginBottom: 6 }}>{KIND_LABELS[kind] ?? kind}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div key={kind} style={{ marginBottom: 14 }}>
+            <div className="eyebrow" style={{ color: 'var(--cyan)', marginBottom: 6 }}>
+              {KIND_LABELS[kind] ?? kind}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               {nodes.map((node) => (
                 <button
                   key={node.id}
@@ -151,20 +173,22 @@ export function LocationBar({ ui, dispatch, toast }: { ui: UiSessionState; dispa
                   style={{
                     minHeight: 44,
                     textAlign: 'left',
-                    background: 'var(--panel)',
-                    border: '1px solid var(--line)',
-                    borderRadius: 2,
+                    background: 'rgba(30,41,59,0.5)',
+                    border: '1px solid var(--cyan-line)',
+                    borderRadius: 'var(--radius)',
                     color: 'var(--ink)',
-                    padding: '8px 12px',
+                    padding: '9px 12px',
                     display: 'flex',
                     justifyContent: 'space-between',
                     gap: 10,
-                    fontFamily: 'var(--font-label)',
-                    fontSize: 12,
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 12.5,
                   }}
                 >
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{node.label}</span>
-                  <span style={{ color: 'var(--amber)', flexShrink: 0 }}>{Math.round(travelTimeSeconds(ui.meta, ui.locationNodeId, node.id) / 60)} MIN</span>
+                  <span className="mono" style={{ color: 'var(--orange)', flexShrink: 0, fontSize: 11 }}>
+                    {Math.round(travelTimeSeconds(ui.meta, ui.locationNodeId, node.id) / 60)} MIN
+                  </span>
                 </button>
               ))}
             </div>

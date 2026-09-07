@@ -1,55 +1,97 @@
 /*
- * Visual direction. The only place colour is defined.
+ * ============================================================================
+ * FIBEROPS — TACTICAL HUD DESIGN SYSTEM
+ * ============================================================================
  *
- * The language is a technician's console at night: near-black navy ground with a faint
- * survey grid, cyan for anything the instrument is telling you, orange for anything that
- * wants your hands, monospace for every label because this is equipment and not a website.
- * Panels are cut with corner brackets rather than rounded cards.
+ * Deep cyber blue + neon industrial orange. Void-blue ground, glass surfaces,
+ * electric-cyan for anything the system is telling you, industrial orange for
+ * anything that wants your hands or your attention.
  *
- * The older token names (--text, --muted, --bezel, --cursor-a/b, --led-*) are kept as
- * aliases onto the new palette so every existing component reskins without being touched.
+ * This is the Tailwind config from the brief expressed as custom properties and
+ * utility classes. The codebase styles with inline objects and a handful of
+ * shared components, so adopting Tailwind would mean rewriting ~200 files for no
+ * behavioural gain. Everything below maps one-to-one:
+ *
+ *   theme.extend.colors      -> the token block
+ *   theme.extend.fontFamily  -> --font-display / --font-body / --font-mono
+ *   theme.extend.boxShadow   -> .glow-blue / .glow-orange / --shadow-*
+ *   theme.extend.animation   -> .pulse-dot / .scan / .sweep
+ *   theme.extend.keyframes   -> @keyframes at the foot of this file
+ *
+ * Legacy token names (--text, --muted, --bezel, --panel, --led-*, --trace,
+ * --seg, --cursor-a/b) are kept as aliases so every existing component adopts
+ * the new identity without being edited.
  */
+
 :root {
-  /* Ground */
-  --bg: #070c12;
-  --panel: #0d141c;
-  --panel-2: #0a121b;
-  --term-bg: #04080c;
-  --line: #1c2938;
+  /* ---- Ground: ultra-dark void blues ---- */
+  --void: #050b14;
+  --bg: #050b14;
+  --bg-raised: #0a0f1d;
+  --bg-panel: #0f172a;
 
-  /* Ink */
-  --ink: #d9e4ec;
-  --ink-soft: #7e93a6;
+  /* ---- Surfaces: semi-transparent slate-blue glass ---- */
+  --surface: rgba(30, 41, 59, 0.62);
+  --surface-solid: #1e293b;
+  --surface-hi: rgba(30, 41, 59, 0.8);
 
-  /* Signal */
-  --cyan: #3be8d8;
-  --orange: #ff6a13;
-  --green: #2ee58a;
+  /* ---- Primary accent: cyan / electric blue ---- */
+  --cyan: #00f0ff;
+  --cyan-soft: #38bdf8;
+  --cyan-dim: rgba(0, 240, 255, 0.2);
+  --cyan-line: rgba(0, 240, 255, 0.22);
+
+  /* ---- Highlight accent: vibrant industrial orange ---- */
+  --orange: #ff6b00;
+  --orange-soft: #f97316;
+  --orange-dim: rgba(255, 107, 0, 0.18);
+  --orange-line: rgba(255, 107, 0, 0.32);
+
+  /* ---- Status ---- */
+  --green: #34d399;
+  --amber: #fbbf24;
   --red: #ff4d5e;
-  --amber: #ffb020;
-  --blue: #3b82f6;
 
-  /* --- aliases: existing components keep working, and reskin for free --- */
+  /* ---- Ink ---- */
+  --ink: #e2f1ff;
+  --ink-soft: #7c93ae;
+  --ink-faint: #445a72;
+
+  /* ---- Type ---- */
+  --font-display: 'Orbitron', 'Rajdhani', 'Chakra Petch', 'Bahnschrift', 'DIN Alternate', 'Avenir Next Condensed', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Share Tech Mono', ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, monospace;
+
+  /* ---- Depth ---- */
+  --shadow-panel: 0 8px 32px rgba(0, 0, 0, 0.55);
+  --shadow-inset: inset 0 0 12px rgba(0, 240, 255, 0.06);
+  --glow-cyan: 0 0 20px rgba(0, 240, 255, 0.35);
+  --glow-orange: 0 0 20px rgba(255, 107, 0, 0.38);
+
+  --radius: 3px;
+  --touch-min: 44px;
+
+  /* ---- Legacy aliases — existing components reskin for free ---- */
+  --panel: var(--bg-panel);
+  --panel-2: var(--bg-raised);
+  --term-bg: var(--void);
+  --line: var(--cyan-line);
+  --bezel: var(--cyan-line);
   --text: var(--ink);
   --muted: var(--ink-soft);
-  --bezel: var(--line);
-  --trace: var(--amber);
-  --grid: #16222f;
+  --grid: rgba(0, 240, 255, 0.05);
+  --trace: var(--orange-soft);
   --cursor-a: var(--green);
   --cursor-b: var(--cyan);
   --marker: var(--red);
-  --noise: #33465a;
+  --noise: var(--ink-faint);
   --led-ok: var(--green);
   --led-warn: var(--amber);
   --led-alarm: var(--red);
-  --seg: var(--amber);
-
-  --font-chrome: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'JetBrains Mono', monospace;
-  /* Labels, buttons and readouts are all equipment lettering. */
-  --font-label: var(--font-mono);
-
-  --touch-min: 44px;
+  --seg: var(--cyan);
+  --font-chrome: var(--font-body);
+  --font-label: var(--font-display);
+  --blue: var(--cyan-soft);
 }
 
 * {
@@ -64,70 +106,121 @@ body,
 }
 
 body {
-  background: var(--bg);
-  /* A survey grid under a soft glow, so the ground is never dead flat. */
+  background: var(--void);
+  /* Spatial depth: a cyan bloom top-left, an orange ember bottom-right, over a fine grid. */
   background-image:
-    radial-gradient(ellipse 80% 40% at 50% -10%, rgba(59, 232, 216, 0.06), transparent),
-    repeating-linear-gradient(0deg, rgba(59, 232, 216, 0.035) 0 1px, transparent 1px 44px),
-    repeating-linear-gradient(90deg, rgba(59, 232, 216, 0.035) 0 1px, transparent 1px 44px);
+    radial-gradient(ellipse 70% 50% at 15% -5%, rgba(0, 240, 255, 0.07), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 90% 105%, rgba(255, 107, 0, 0.06), transparent 70%),
+    linear-gradient(rgba(0, 240, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.028) 1px, transparent 1px);
+  background-size: auto, auto, 48px 48px, 48px 48px;
   background-attachment: fixed;
   color: var(--ink);
-  font-family: var(--font-chrome);
+  font-family: var(--font-body);
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
 }
 
-/* CRT scanlines over everything, never interactive. */
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+
+/* Scanline overlay — sits above everything, never interactive. */
 .scan {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 9;
-  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0 1px, transparent 1px 3px);
+  background: repeating-linear-gradient(0deg, rgba(0, 240, 255, 0.022) 0 1px, transparent 1px 3px);
 }
 
-button {
-  font-family: var(--font-label);
-  color: inherit;
+/* Glassmorphic panel. */
+.glass {
+  background: var(--surface);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  border: 1px solid var(--cyan-line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-panel), var(--shadow-inset);
 }
 
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible,
-[tabindex]:focus-visible {
-  outline: 1px solid var(--cyan);
-  outline-offset: 2px;
+.glow-blue {
+  box-shadow: var(--glow-cyan), var(--shadow-inset);
+  border-color: rgba(0, 240, 255, 0.55);
 }
 
-::selection {
-  background: rgba(59, 232, 216, 0.3);
+.glow-orange {
+  box-shadow: var(--glow-orange), inset 0 0 12px rgba(255, 107, 0, 0.08);
+  border-color: rgba(255, 107, 0, 0.6);
 }
+
+/* Cut-corner geometry — the HUD notch. */
+.notch {
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+
+/* Section kicker: uppercase, tracked out, display face. */
+.eyebrow {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--orange);
+}
+
+.hud-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 0 18px rgba(0, 240, 255, 0.4);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* Pulsing status dot. */
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: pulseDot 1.8s ease-in-out infinite;
+}
+.pulse-dot.warn { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+.pulse-dot.alarm { background: var(--red); box-shadow: 0 0 8px var(--red); }
+.pulse-dot.idle { background: var(--ink-faint); box-shadow: none; animation: none; }
 
 /*
- * Equipment chrome. Square corners, a hairline, and machined corner brackets — the
- * brackets are absolutely positioned so they never affect layout inside the panel.
+ * Panel frame with corner accents. The brackets are absolutely positioned, so they
+ * never affect layout inside the panel. `.bezel` is the legacy class name used
+ * throughout the tree — keeping it means every existing panel inherits the frame.
  */
 .bezel {
   position: relative;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    0 2px 10px rgba(0, 0, 0, 0.5);
+  background: var(--surface);
+  backdrop-filter: blur(10px) saturate(115%);
+  -webkit-backdrop-filter: blur(10px) saturate(115%);
+  border: 1px solid var(--cyan-line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-panel), var(--shadow-inset);
 }
 
 .bezel::before,
 .bezel::after {
   content: '';
   position: absolute;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   border: 1px solid var(--cyan);
-  opacity: 0.55;
+  opacity: 0.75;
   pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(0, 240, 255, 0.7));
 }
 
 .bezel::before {
@@ -144,67 +237,230 @@ select:focus-visible,
   border-top: none;
 }
 
-/* Opt out where a panel is purely structural (tab strips, backdrops). */
+/* Structural containers (tab strips, backdrops) opt out of the frame. */
 .bezel.flat::before,
 .bezel.flat::after {
   display: none;
 }
 
-.mono {
-  font-family: var(--font-mono);
+/* Orange variant for anything selected or demanding attention. */
+.bezel.alert {
+  border-color: var(--orange-line);
+  box-shadow: var(--glow-orange);
+}
+.bezel.alert::before,
+.bezel.alert::after {
+  border-color: var(--orange);
+  filter: drop-shadow(0 0 4px rgba(255, 107, 0, 0.7));
 }
 
-/* Small letterspaced caps — section kickers, equipment labels. */
-.eyebrow {
-  font-family: var(--font-label);
-  font-size: 10px;
-  letter-spacing: 3px;
-  font-weight: 800;
-  color: var(--orange);
+/* ---- Custom scrollbars ---- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 240, 255, 0.35) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(10, 15, 29, 0.6);
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(rgba(0, 240, 255, 0.45), rgba(56, 189, 248, 0.3));
+  border-radius: 0;
+  border: 1px solid rgba(0, 240, 255, 0.25);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.6);
+}
+
+button {
+  font-family: var(--font-display);
+  color: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 1px solid var(--cyan);
+  outline-offset: 2px;
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.4);
+}
+
+::selection {
+  background: rgba(0, 240, 255, 0.28);
+}
+
+/* ============================================================
+   CONTROLS
+   Hover/active/disabled states need real selectors, so controls are classed
+   here rather than styled inline.
+   ============================================================ */
+
+.hud-btn {
+  --accent: var(--orange);
+  --accent-rgb: 255, 107, 0;
+  position: relative;
+  min-height: var(--touch-min);
+  min-width: var(--touch-min);
+  padding: 10px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
   text-transform: uppercase;
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.08);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.18), inset 0 0 10px rgba(var(--accent-rgb), 0.06);
+  text-shadow: 0 0 10px rgba(var(--accent-rgb), 0.5);
+  cursor: pointer;
+  overflow: hidden;
+  transition: background 160ms ease, box-shadow 200ms ease, color 160ms ease, transform 90ms ease;
 }
 
-.hud-title {
-  font-family: var(--font-label);
-  font-weight: 800;
+/* A light sweep crosses the button on hover. */
+.hud-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 28%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+  transform: translateX(-160%);
+  pointer-events: none;
+}
+.hud-btn:hover:not(:disabled)::after {
+  animation: sweep 620ms ease-out;
+}
+.hud-btn:hover:not(:disabled) {
+  background: rgba(var(--accent-rgb), 0.16);
+  box-shadow: 0 0 26px rgba(var(--accent-rgb), 0.45), inset 0 0 14px rgba(var(--accent-rgb), 0.12);
+}
+.hud-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.hud-btn.is-on {
+  background: rgba(var(--accent-rgb), 0.22);
+  box-shadow: 0 0 22px rgba(var(--accent-rgb), 0.4), inset 0 0 16px rgba(var(--accent-rgb), 0.14);
+}
+.hud-btn:disabled {
+  color: var(--ink-faint);
+  background: transparent;
+  border-color: rgba(124, 147, 174, 0.22);
+  box-shadow: none;
+  text-shadow: none;
+  cursor: default;
+}
+.hud-btn--cyan {
+  --accent: var(--cyan);
+  --accent-rgb: 0, 240, 255;
+}
+
+/* Selector chip: hairline when idle, lit when engaged. */
+.hud-chip {
+  --accent: var(--cyan);
+  --accent-rgb: 0, 240, 255;
+  min-height: var(--touch-min);
+  padding: 7px 14px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
   letter-spacing: 1.5px;
-  color: #fff;
-  text-shadow: 0 0 14px rgba(59, 232, 216, 0.35);
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px solid rgba(124, 147, 174, 0.24);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 200ms ease;
+}
+.hud-chip:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: rgba(var(--accent-rgb), 0.55);
+}
+.hud-chip.is-on {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.1);
+  box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.22), inset 0 0 12px rgba(var(--accent-rgb), 0.08);
+  text-shadow: 0 0 10px rgba(var(--accent-rgb), 0.6);
+}
+.hud-chip:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.hud-chip--orange {
+  --accent: var(--orange);
+  --accent-rgb: 255, 107, 0;
 }
 
-/* --- held instrument shell (item 9, stow/raise) --- */
+/* Panel header badge. */
+.panel-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 2px;
+  border: 1px solid var(--cyan-line);
+  color: var(--cyan);
+  background: rgba(0, 240, 255, 0.07);
+}
+.panel-badge.alert {
+  border-color: var(--orange-line);
+  color: var(--orange);
+  background: rgba(255, 107, 0, 0.08);
+}
+
+/* ============================================================
+   HELD INSTRUMENT SHELL (item 9)
+   ============================================================ */
 .dock-back {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 0 8px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--line);
-  font-family: var(--font-label);
+  background: rgba(10, 15, 29, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--cyan-line);
+  font-family: var(--font-display);
   font-size: 11px;
-  letter-spacing: 1.5px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
   color: var(--ink-soft);
 }
 .dock-back button,
 .held-grip button {
   min-height: 44px;
   min-width: 64px;
-  border: 1px solid var(--line);
-  border-radius: 2px;
+  border: 1px solid var(--cyan-line);
+  border-radius: var(--radius);
   padding: 6px 12px;
   background: transparent;
   color: var(--cyan);
   font-size: 11px;
-  letter-spacing: 1.5px;
-  font-weight: 800;
+  letter-spacing: 2px;
+  font-weight: 700;
+  transition: box-shadow 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 .dock-back button:hover,
 .held-grip button:hover {
   border-color: var(--cyan);
-  background: rgba(59, 232, 216, 0.07);
+  background: rgba(0, 240, 255, 0.08);
+  box-shadow: var(--glow-cyan);
 }
 .held-body {
-  transition: transform 250ms ease;
+  transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
   touch-action: none;
 }
 .held-body.is-stowed {
@@ -239,15 +495,17 @@ select:focus-visible,
   padding: 8px 12px;
   border: 1px solid var(--cyan);
   border-bottom: none;
-  border-radius: 2px 2px 0 0;
-  background: var(--panel);
-  box-shadow: 0 0 18px rgba(59, 232, 216, 0.16) inset;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 22px rgba(0, 240, 255, 0.22), inset 0 0 14px rgba(0, 240, 255, 0.08);
   color: var(--ink);
   text-align: left;
-  font-family: var(--font-label);
+  font-family: var(--font-display);
 }
 .held-raise > span:last-child {
   font-size: 11px;
+  font-family: var(--font-mono);
   color: var(--ink-soft);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -256,7 +514,8 @@ select:focus-visible,
 .held-raise strong {
   flex-shrink: 0;
   font-size: 12px;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
   color: var(--cyan);
 }
 .held-ports {
@@ -264,12 +523,6 @@ select:focus-visible,
 }
 .held-ports button {
   min-height: 44px !important;
-}
-.held-body button:focus-visible,
-.held-raise:focus-visible,
-.dock-back button:focus-visible {
-  outline: 1px solid var(--cyan);
-  outline-offset: 2px;
 }
 
 @media (max-width: 480px) {
@@ -280,11 +533,27 @@ select:focus-visible,
   }
 }
 
+/* ============================================================
+   KEYFRAMES
+   ============================================================ */
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.86); }
+}
+
+@keyframes sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+
+@keyframes traceDraw {
+  from { stroke-dashoffset: 1400; }
+  to { stroke-dashoffset: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .held-body {
-    transition: none;
-  }
-  .scan {
-    display: none;
-  }
+  .held-body { transition: none; }
+  .scan { display: none; }
+  .pulse-dot { animation: none; }
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
 }

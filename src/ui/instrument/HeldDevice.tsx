@@ -51,7 +51,6 @@ export function HeldDevice({ ui, dispatch, state, name, status, model, form, nee
   const navigation = useDockNavigation();
   const stowed = navigation.presentation === 'stowed';
   const expanded = navigation.presentation === 'enlarged';
-  const [backdropReady, setBackdropReady] = useState(false);
   const raiseRef = useRef<HTMLButtonElement>(null);
   const stowRef = useRef<HTMLButtonElement>(null);
   const previousStowed = useRef(stowed);
@@ -76,7 +75,6 @@ export function HeldDevice({ ui, dispatch, state, name, status, model, form, nee
       (stowed ? raiseRef : stowRef).current?.focus();
       previousStowed.current = stowed;
     }
-    if (stowed || expanded) setBackdropReady(false);
   }, [stowed, expanded]);
 
   const startSwipe = (event: PointerEvent<HTMLDivElement>) => {
@@ -137,7 +135,7 @@ export function HeldDevice({ ui, dispatch, state, name, status, model, form, nee
   return (
     <div style={{ position: 'relative', height: '100%', overflow: 'hidden', background: '#0b0f14' }}>
       {!expanded && <Suspense fallback={BACKDROP_FALLBACK}>
-        {stowed ? <div style={{ position: 'absolute', inset: '0 0 56px' }}><WorldViewport ui={ui} dispatch={dispatch} /></div> : <SceneBackdrop ui={ui} open={[]} onReady={() => setBackdropReady(true)} />}
+        {stowed ? <div style={{ position: 'absolute', inset: '0 0 56px' }}><WorldViewport ui={ui} dispatch={dispatch} /></div> : <SceneBackdrop ui={ui} open={[]} />}
       </Suspense>}
 
       {/* The lead: a jumper running from the device's port off toward the equipment behind. */}
@@ -260,7 +258,7 @@ export function HeldDevice({ ui, dispatch, state, name, status, model, form, nee
               <div style={{ color: 'var(--muted)' }}>_</div>
             </div>
           )}
-          {state.power === 'on' && !stowed && (backdropReady || expanded) && (
+          {state.power === 'on' && !stowed && (
             <div style={{ position: 'absolute', inset: 0, overflowY: 'auto' }}>
               {block && (
                 <div style={{ padding: '6px 10px', background: 'rgba(255,157,0,0.12)', borderBottom: '1px solid rgba(255,157,0,0.35)', color: 'var(--led-warn)', fontSize: 11 }}>{BLOCKER_TEXT[block]}</div>
