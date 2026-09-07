@@ -11,8 +11,9 @@ import { Led } from '../components/Led';
 import { SoftKey } from '../components/SoftKey';
 import { useViewportState } from '../viewport/viewportStore';
 import { layoutScene, type Placement } from './sceneLayout';
-import { canOpen, ontLeds } from './sceneState';
-import { availableModes, CAMERA_MODE_LABELS, type CameraMode } from './camera';
+import { canOpen, lastOtdrShot, ontLeds } from './sceneState';
+import { availableModes, CAMERA_MODE_LABELS, poseFor, type CameraMode } from './camera';
+import { CompassRose } from './CompassRose';
 import { AccessibleList } from './AccessibleList';
 
 const PlantScene = lazy(() => import('./PlantScene').then((m) => ({ default: m.PlantScene })));
@@ -54,7 +55,8 @@ export function WorldViewport({ ui, dispatch }: { ui: UiSessionState; dispatch(i
   const [cardOpen, setCardOpen] = useViewportState<boolean>('world.card', true);
 
   const focus = selectedId ? layout.placements.find((p) => p.nodeId === selectedId) ?? null : null;
-  const hasTrace = ui.log.some((a) => a.type === 'otdr-shot');
+  const tracedSpanIds = useMemo(() => lastOtdrShot(ui)?.pathSpanIds ?? [], [ui]);
+  const hasTrace = tracedSpanIds.length > 0;
   const modes = availableModes(focus, hasTrace);
   const effectiveMode = modes.includes(mode) ? mode : 'field';
 
@@ -104,6 +106,13 @@ export function WorldViewport({ ui, dispatch }: { ui: UiSessionState; dispatch(i
           </Chip>
         )}
       </div>
+
+      {/* Which way you are facing, read off the same pose the camera uses. */}
+      {!listMode && (
+        <div style={{ position: 'absolute', top: 44, left: 8 }}>
+          <CompassRose pose={poseFor(effectiveMode, layout, focus, tracedSpanIds)} />
+        </div>
+      )}
 
       {focus && !listMode && (
         <div className="bezel" style={{ position: 'absolute', left: 8, right: 8, bottom: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 6 }}>
