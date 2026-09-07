@@ -11,7 +11,14 @@ import { createRng, deriveSeed } from '../world';
 import type { Intent } from './types';
 import { ROLE_POLICY, type Role } from './roles';
 
-export type ReadinessFault = 'forgot-vfl' | 'forgot-scope' | 'flat-otdr-battery' | 'dirty-scope-tip' | 'no-cleaning-kit';
+/**
+ * Note the absence of a dirty-probe-tip morning. It was written, and removed again: it took
+ * nothing off the truck, no instrument read differently because of it, and there was no
+ * action to clean the tip with — so it announced a consequence that never arrived. A
+ * readiness fault has to be visible somewhere real or it is a lie to the trainee. Put it
+ * back when `scopeInspect` can be told about it and the shelf can offer a cleaning stick.
+ */
+export type ReadinessFault = 'forgot-vfl' | 'forgot-scope' | 'flat-otdr-battery' | 'no-cleaning-kit';
 
 export interface Readiness {
   fault: ReadinessFault | null;
@@ -47,12 +54,6 @@ const DETAIL: Record<ReadinessFault, { removes: string[]; needs: string[]; headl
     headline: 'The OTDR is dead. It has been sitting off the charger since Friday.',
     coaching: 'Put the tester on charge overnight. A flat OTDR is a wasted truck roll.',
   },
-  'dirty-scope-tip': {
-    removes: [],
-    needs: [],
-    headline: 'The scope tip is filthy — every end-face you inspect will read dirty.',
-    coaching: 'Clean the probe tip before you inspect anything, or you will condemn a good connector.',
-  },
   'no-cleaning-kit': {
     removes: ['cleaning-kit'],
     needs: [],
@@ -61,7 +62,7 @@ const DETAIL: Record<ReadinessFault, { removes: string[]; needs: string[]; headl
   },
 };
 
-const ORDER: ReadinessFault[] = ['forgot-vfl', 'forgot-scope', 'flat-otdr-battery', 'dirty-scope-tip', 'no-cleaning-kit'];
+const ORDER: ReadinessFault[] = ['forgot-vfl', 'forgot-scope', 'flat-otdr-battery', 'no-cleaning-kit'];
 
 /** Inventory strings the reference solution genuinely depends on. */
 export function toolsRequiredBy(steps: readonly Intent[]): Set<string> {

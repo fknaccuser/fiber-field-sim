@@ -8,6 +8,7 @@
 import type { FaultTarget, FiberTubeColor, WorldState } from '../world';
 import type { ProfileSet } from '../profiles';
 import type { Role } from './roles';
+import type { Readiness } from './readiness';
 import type { CommsEvent } from './comms';
 import type { CliFact, CliSession, Endpoint } from '../instruments/cli';
 import type { DetectedEvent, GroundTruthEvent, OtdrAccess, OtdrSettings, OtdrViolation } from '../instruments/otdr';
@@ -18,6 +19,9 @@ export interface ScenarioMeta {
   title: string;
   tier: 1 | 2 | 3 | 4 | 5 | 6;
   seed: number;
+  /** What did or did not make it onto the truck this morning. Safe for the UI: it names
+   *  kit, never the fault. */
+  readiness?: Readiness;
   startLocationNodeId: string;
   timeBudgetMinutes?: number;
   remoteCliAccess: boolean;

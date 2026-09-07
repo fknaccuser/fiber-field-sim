@@ -16,8 +16,9 @@ export function ToolShelf({ ui, onOpen }: { ui: UiSessionState; onOpen(tab: TabI
   const slots = shelfSlots(ui.world.truckInventory);
   const stock = consumables(ui.world.truckInventory);
   const missing = slots.filter((s) => !s.present);
-  // Junior grades get coached when the kit is short. From L3 up, you notice or you don't.
-  const junior = ui.meta.role === undefined || ui.meta.role === 'l1' || ui.meta.role === 'l2';
+  // The morning itself, when it went wrong. `coaching` is already role-gated where it is
+  // decided — junior grades are told the habit that prevents it, senior grades are not.
+  const morning = ui.meta.readiness ?? null;
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', background: 'linear-gradient(#0a121b, #060b10)' }}>
@@ -28,12 +29,15 @@ export function ToolShelf({ ui, onOpen }: { ui: UiSessionState; onOpen(tab: TabI
           {slots.filter((s) => s.present).length}/{slots.length} INSTRUMENTS LOADED
           {missing.length > 0 && <span style={{ color: 'var(--red)' }}> · {missing.map((m) => m.tool.name.toUpperCase()).join(', ')} NOT ON THE TRUCK</span>}
         </div>
-        {missing.length > 0 && junior && (
+        {morning?.fault && (
           <div className="bezel alert" style={{ marginTop: 10, padding: '9px 11px' }}>
-            <div className="eyebrow" style={{ color: 'var(--orange)' }}>Pre-trip</div>
-            <p style={{ margin: '4px 0 0', fontSize: 12, lineHeight: 1.55, color: 'var(--ink-soft)' }}>
-              Happens to everyone. Run the pre-trip before you leave the yard: every instrument out of the case and back in it, tester on charge, consumables restocked.
-            </p>
+            <div className="eyebrow" style={{ color: 'var(--orange)' }}>This morning</div>
+            <p style={{ margin: '4px 0 0', fontSize: 12.5, lineHeight: 1.5, color: 'var(--ink)' }}>{morning.headline}</p>
+            {morning.coaching && (
+              <p style={{ margin: '7px 0 0', fontSize: 12, lineHeight: 1.55, color: 'var(--ink-soft)' }}>
+                Happens to everyone. {morning.coaching}
+              </p>
+            )}
           </div>
         )}
       </div>

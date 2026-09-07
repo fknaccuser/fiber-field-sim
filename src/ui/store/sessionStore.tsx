@@ -140,6 +140,9 @@ function useSessionStoreInternal(): SessionStore {
       // remove a tool this job needs.
       const readiness = readinessFor(seed, role, baseMeta.referenceSolution.steps);
       const loadedWorld = readiness.removes.length > 0 ? { ...world, truckInventory: applyReadiness(world.truckInventory, readiness) } : world;
+      // Carry the morning through, not just its effect: the shelf should be able to say
+      // *why* the VFL is missing rather than only showing a gap where it should be.
+      if (readiness.fault) meta.readiness = readiness;
       const profiles = resolveProfileSet(def.profiles);
       const session = startSession(loadedWorld, profiles, meta);
       void (async () => {

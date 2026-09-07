@@ -49,6 +49,9 @@ node. Role is chosen here and travels into the run as `&role=`.
   `effectiveHintPolicy` takes the **stricter** of role and tier, so a junior grade can
   never soften a hard scenario.
 - `src/session/readiness.ts` — the morning that went wrong (VFL on the bench, flat OTDR).
+  Wired in `sessionStore.tsx`, and the *narrative* is carried through on
+  `ScenarioMeta.readiness`, not just its effect — so the shelf says "The VFL is not on the
+  truck. It is still on the bench where you tested it." rather than only showing a gap.
   Seeded, and bounded by a property that is unit-tested: **a readiness failure never
   removes a tool the reference solution needs**, so it can cost you time but can never
   make a work order unsolvable. Junior grades get coaching; from L3 up the same morning
@@ -112,9 +115,12 @@ Stated plainly so the next session does not have to discover it.
 - **The truck as a place (spec §6).** `src/ui/truck/` draws the tools and the empty slots,
   but it is still a grid, not the inside of a service body. No roll-up door animation, no
   foam cutouts, no fibre reel on its spindle, no interior lights coming up.
-- **Tool condition shown physically (spec §6).** `readiness.ts` already produces
-  `dirty-scope-tip` and `flat-otdr-battery`, but the shelf does not render a battery pip or
-  a smudged tip — the state exists with no physical expression.
+- **Tool condition shown physically (spec §6).** No battery pip, no smudged tip. Related:
+  `dirty-scope-tip` was **removed** from the readiness table rather than displayed. It took
+  nothing off the truck, no instrument read differently because of it, and there was no
+  action to clean a tip with — so it announced a consequence that never arrived. A pip
+  saying `TIP DIRTY` above an instrument that reads normally is a lie to the trainee. Put
+  it back when `scopeInspect` can be told about it and the shelf can offer a cleaning stick.
 - **Ambient truth (spec §5).** `environment.timeOfDay` and weather are carried by the
   scenario and still unused by the renderer.
 - **Prep phase.** The night-before / morning pre-trip screens, and the drive back to the
@@ -151,6 +157,14 @@ These are enforced, not aspirational. Breaking one should fail a test.
    included. All randomness through `createRng(deriveSeed(...))`.
 4. **The map never leaks.** `buildMapOverlay` marks only what the trainee has *observed*
    (the action log) or *claimed* (draft/submitted diagnosis). It never sees the answer key.
+
+### One accepted trade-off
+
+A readiness failure is guaranteed never to remove a tool the reference solution needs.
+That guarantee is what keeps every work order solvable — but it means a missing VFL also
+weakly tells you the VFL is not on the reference path. The tell is pre-existing (the empty
+slot on the shelf already said it) and the alternative — sometimes handing out an
+unsolvable job — is worse. Worth knowing it is there.
 
 ---
 
