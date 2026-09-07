@@ -157,7 +157,8 @@ export function HeldDevice({ ui, dispatch, state, name, status, model, form, nee
           left: 6,
           right: 6,
           bottom: 6,
-          top: 'clamp(40px, 20%, 150px)',
+          top: 'clamp(28px, 18%, 150px)',
+          overflowY: 'auto',
           borderRadius: b.radius,
           padding: b.pad,
           background: 'linear-gradient(#4a5058, #33383e 30%, #24282d)',
@@ -236,8 +237,8 @@ export function HeldDevice({ ui, dispatch, state, name, status, model, form, nee
         <div
           data-device-screen
           style={{
-            flex: 1,
-            minHeight: 0,
+            flex: '1 1 auto',
+            minHeight: 180,
             borderRadius: b.screenRadius,
             border: '2px solid #14171b',
             background: state.power === 'off' ? '#0c0e11' : 'var(--bg)',

@@ -26,8 +26,10 @@ export const EYE_HEIGHT = 1.7;
 /** How close the equipment view sits to each kind of object, and what it looks at. */
 const FRAMING: Record<PlacementKind, { distance: number; height: number; targetY: number }> = {
   pop: { distance: 16, height: 6, targetY: 2.5 },
-  fdh: { distance: 2.4, height: 1.5, targetY: 1.0 },
-  splitter: { distance: 1.2, height: 1.5, targetY: 1.4 },
+  // The cabinet is 1.8 m on a plinth; stand back far enough to see the cap and the
+  // port field at once, at about chest height.
+  fdh: { distance: 3.0, height: 1.75, targetY: 1.25 },
+  splitter: { distance: 1.9, height: 1.6, targetY: 1.35 },
   // Steep enough to actually look down into the pit rather than across the rim.
   handhole: { distance: 1.7, height: 2.7, targetY: -0.4 },
   pedestal: { distance: 1.6, height: 1.1, targetY: 0.65 },

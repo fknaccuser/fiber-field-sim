@@ -110,6 +110,20 @@ export const EquipmentProfileSchema = z.object({
         portCount: z.number().int().positive(),
         needsConfirmation: z.boolean().optional(),
         notes: z.string().optional(),
+        /** Physical layout for the 3D model, so a different cabinet is a YAML change. */
+        layout: z
+          .object({
+            bodyColor: z.string().default('#ded3c0'),
+            capColor: z.string().default('#2b2622'),
+            heightM: z.number().positive().default(1.8),
+            widthM: z.number().positive().default(0.9),
+            depthM: z.number().positive().default(0.55),
+            adapterGrid: z.object({ rows: z.number().int().positive(), cols: z.number().int().positive() }).default({ rows: 6, cols: 12 }),
+            splitterShelves: z.number().int().nonnegative().default(2),
+            activeShelves: z.number().int().nonnegative().default(3),
+            dRings: z.number().int().nonnegative().default(11),
+          })
+          .optional(),
       }),
     )
     .min(1),

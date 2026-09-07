@@ -30,6 +30,16 @@ catalog:
   - id: fdh-cabinet-450-series
     kind: fdh-cabinet
     portCount: 288
+    layout:
+      bodyColor: "#ded3c0"
+      capColor: "#2b2622"
+      heightM: 1.8
+      widthM: 0.9
+      depthM: 0.55
+      adapterGrid: { rows: 6, cols: 12 }
+      splitterShelves: 2
+      activeShelves: 3
+      dRings: 11
     needsConfirmation: true
     notes: >
       Field tech described a CommScope cabinet "similar to the 450 series." 288

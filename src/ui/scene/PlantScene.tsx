@@ -18,7 +18,7 @@ import { layoutScene, type Placement, type SceneLayout } from './sceneLayout';
 import { lastOtdrShot, ontLeds } from './sceneState';
 import { poseFor, type CameraMode, type CameraPose } from './camera';
 import { TUBE_COLORS } from './models/common';
-import { FdhCabinet, Handhole, NapPedestal, PopBuilding, Yard } from './models/plant';
+import { DEFAULT_CABINET_LAYOUT, FdhCabinet, Handhole, NapPedestal, PopBuilding, Yard } from './models/plant';
 import { House } from './models/premise';
 import { CableRoutes, Ground, TraceMarkers } from './models/environment';
 
@@ -172,9 +172,11 @@ export function SceneContents({ ui, layout, mode, selectedId, openIds, selectedT
             const splitterNode = splitter?.node ?? ui.world.topology.nodes.find((n) => n.kind === 'splitter');
             const dist = splitterNode ? ui.world.topology.spans.filter((s) => s.fromNodeId === splitterNode.id) : [];
             const feeder = splitterNode ? ui.world.topology.spans.find((s) => s.toNodeId === splitterNode.id) : undefined;
+            const cabinetLayout = { ...DEFAULT_CABINET_LAYOUT, ...(ui.profiles.equipment.catalog.find((c) => c.id === p.node.equipmentRef && c.kind === 'fdh-cabinet')?.layout ?? {}) };
             return (
               <FdhCabinet
                 key={p.nodeId}
+                layout={cabinetLayout}
                 placement={p}
                 splitter={splitterNode}
                 distSpans={dist}

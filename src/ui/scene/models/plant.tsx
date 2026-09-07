@@ -1,4 +1,6 @@
 /** Outside-plant and central-office equipment: POP + OLT rack, FDH cabinet, handhole + splice closure, NAP pedestal, truck yard. */
+import { useLayoutEffect, useRef } from 'react';
+import { Color, Matrix4, type InstancedMesh } from 'three';
 import type { FiberSpan, NetworkDeviceConfig, TopologyNode } from '../../../world';
 import type { Placement } from '../sceneLayout';
 import { Box, GroundRing, Hinge, Label, Led3D, MARK_COLOR, PALETTE, Slide, Tube, TUBE_COLORS } from './common';
@@ -87,66 +89,265 @@ function OltRackNeighbour({ position }: { position: [number, number, number] }) 
 
 // --- FDH cabinet -------------------------------------------------------------------------------
 
-export function FdhCabinet({ placement, splitter, distSpans, feederSpan, open, selected, current, mark, onSelect, splitterSelected }: { placement: Placement; splitter: TopologyNode | undefined; distSpans: FiberSpan[]; feederSpan: FiberSpan | undefined; open: boolean; selected: boolean; current: boolean; mark: string | null; onSelect: (id: string) => void; splitterSelected: boolean }) {
+export interface CabinetLayout {
+  bodyColor: string;
+  capColor: string;
+  heightM: number;
+  widthM: number;
+  depthM: number;
+  adapterGrid: { rows: number; cols: number };
+  splitterShelves: number;
+  activeShelves: number;
+  dRings: number;
+}
+
+export const DEFAULT_CABINET_LAYOUT: CabinetLayout = {
+  bodyColor: '#ded3c0',
+  capColor: '#2b2622',
+  heightM: 1.8,
+  widthM: 0.9,
+  depthM: 0.55,
+  adapterGrid: { rows: 6, cols: 12 },
+  splitterShelves: 2,
+  activeShelves: 3,
+  dRings: 11,
+};
+
+/**
+ * The distribution port field: a dense bulkhead of green SC/APC adapters, mostly
+ * unpopulated. Instanced, because a 6x12 grid is 72 meshes and this cabinet already carries
+ * a lot of geometry — one draw call instead of seventy-two.
+ */
+function AdapterField({ rows, cols, occupied, width, height, z }: { rows: number; cols: number; occupied: number; width: number; height: number; z: number }) {
+  const ref = useRef<InstancedMesh>(null);
+  const count = rows * cols;
+  useLayoutEffect(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    const m = new Matrix4();
+    const lit = new Color('#2f9e5b');
+    const dark = new Color('#143a2a');
+    const stepX = width / cols;
+    const stepY = height / rows;
+    for (let i = 0; i < count; i++) {
+      const c = i % cols;
+      const r = Math.floor(i / cols);
+      m.makeTranslation(-width / 2 + stepX * (c + 0.5), height / 2 - stepY * (r + 0.5), 0);
+      mesh.setMatrixAt(i, m);
+      // A used port is lit; the rest are bare adapter bodies waiting for a jumper.
+      mesh.setColorAt(i, i < occupied ? lit : dark);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [rows, cols, occupied, width, height, count]);
+
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, count]} position={[0, 0, z]}>
+      <boxGeometry args={[(width / cols) * 0.62, (height / rows) * 0.5, 0.022]} />
+      <meshStandardMaterial roughness={0.55} />
+    </instancedMesh>
+  );
+}
+
+/**
+ * A pad-mounted street cabinet, modelled from photographs of the real plant (see
+ * docs/reference/). Cream powder-coated body, dark drip-edge cap wide enough to set an OTDR
+ * on, double doors opening toward the street. Inside, top to bottom: stacked SC/APC adapter
+ * modules dressed with yellow jumpers on the left, the distribution port field on the right,
+ * splitter cassettes, an active shelf of purple 1RU chassis, a dense fan of yellow patch
+ * cords, a slack coil, and an empty bottom shelf.
+ *
+ * Geometry comes from the equipment profile's catalog entry, so a different cabinet is a
+ * YAML change rather than a code change.
+ */
+export function FdhCabinet({
+  placement,
+  splitter,
+  distSpans,
+  feederSpan,
+  open,
+  selected,
+  current,
+  mark,
+  onSelect,
+  splitterSelected,
+  layout = DEFAULT_CABINET_LAYOUT,
+}: {
+  placement: Placement;
+  splitter: TopologyNode | undefined;
+  distSpans: FiberSpan[];
+  feederSpan: FiberSpan | undefined;
+  open: boolean;
+  selected: boolean;
+  current: boolean;
+  mark: string | null;
+  onSelect: (id: string) => void;
+  splitterSelected: boolean;
+  layout?: CabinetLayout;
+}) {
   const p = placement.position;
   const ratio = typeof splitter?.attributes?.splitRatio === 'string' ? (splitter.attributes.splitRatio as string) : '1x32';
   const accent = current ? MARK_COLOR.current : selected ? '#ffffff' : mark ? MARK_COLOR[mark as keyof typeof MARK_COLOR] : undefined;
-  const occupied = new Set(distSpans.map((_, i) => i));
+
+  const W = layout.widthM;
+  const H = layout.heightM;
+  const D = layout.depthM;
+  const halfW = W / 2;
+  const backZ = -D / 2;
+  const bodyBottom = 0.22; // the cabinet sits on a plinth
+  const bodyTop = bodyBottom + H;
+  const feederStrand = feederSpan?.strands?.[0];
+
   return (
     <group position={[p.x, 0, p.z]}>
-      <Box size={[1.5, 0.16, 1.1]} position={[0, 0.08, 0]} color={PALETTE.pad} />
-      {/* Doors and port field face the street, which is the side a technician walks up from. */}
+      {/* Concrete pad with a slight lip, weathered at the base. */}
+      <Box size={[W + 0.6, 0.14, D + 0.5]} position={[0, 0.07, 0]} color={PALETTE.pad} roughness={1} />
+      <Box size={[W + 0.14, bodyBottom, D + 0.1]} position={[0, bodyBottom / 2 + 0.07, 0]} color={'#b9ae9c'} roughness={1} />
+
       <group rotation={[0, Math.PI, 0]}>
-      <group onClick={select(onSelect, placement.nodeId)}>
-        {/* Body: back, sides, top with a drip lip. Passive fiber cabinet -- no vents, no fans. */}
-        <Box size={[1.0, 1.5, 0.08]} position={[0, 0.91, -0.26]} color={PALETTE.cabinet} metalness={0.25} />
-        <Box size={[0.08, 1.5, 0.6]} position={[-0.46, 0.91, 0]} color={PALETTE.cabinet} metalness={0.25} />
-        <Box size={[0.08, 1.5, 0.6]} position={[0.46, 0.91, 0]} color={PALETTE.cabinet} metalness={0.25} />
-        <Box size={[1.06, 0.08, 0.68]} position={[0, 1.7, 0]} color={PALETTE.cabinetDark} metalness={0.25} />
-        <Box size={[1.0, 0.1, 0.6]} position={[0, 0.2, 0]} color={PALETTE.cabinetDark} />
-        {/* Doors, hinged at the outer edges. */}
-        <Hinge open={open} axis="y" openAngle={-2.0} position={[-0.46, 0.91, 0.3]}>
-          <Box size={[0.46, 1.44, 0.04]} position={[0.23, 0, 0]} color={PALETTE.cabinet} metalness={0.25} />
-          <Box size={[0.03, 0.12, 0.05]} position={[0.42, 0, 0.03]} color={'#2a2a2a'} />
-        </Hinge>
-        <Hinge open={open} axis="y" openAngle={2.0} position={[0.46, 0.91, 0.3]}>
-          <Box size={[0.46, 1.44, 0.04]} position={[-0.23, 0, 0]} color={PALETTE.cabinet} metalness={0.25} />
-          <Box size={[0.03, 0.12, 0.05]} position={[-0.42, 0, 0.03]} color={'#2a2a2a'} />
-        </Hinge>
-        <Box size={[0.3, 0.1, 0.005]} position={[0, 1.5, 0.325]} color={'#e5e7ea'} />
-      </group>
-      {/* Interior, built only while the doors are open: feeder input, splitter module, distribution port field, parking lot, patch cords. */}
-      {open && (
-      <group position={[0, 0, -0.1]}>
-        <Box size={[0.9, 1.3, 0.02]} position={[0, 0.92, -0.2]} color={'#c9ccd1'} />
-        <group position={[-0.32, 1.42, -0.16]}>
-          <Box size={[0.08, 0.08, 0.06]} color={TUBE_COLORS.blue} />
-          <Tube points={[[0, -0.04, 0], [0, -0.5, 0.02], [0, -1.2, 0]]} radius={0.01} color={feederSpan?.strands?.[0] ? TUBE_COLORS[feederSpan.strands[0].fiberColor] : TUBE_COLORS.blue} />
+        <group onClick={select(onSelect, placement.nodeId)}>
+          {/* Body: back, sides, floor. Passive fibre cabinet — no vents, no fans. */}
+          <Box size={[W, H, 0.05]} position={[0, bodyBottom + H / 2, backZ]} color={layout.bodyColor} roughness={0.85} />
+          <Box size={[0.05, H, D]} position={[-halfW + 0.025, bodyBottom + H / 2, 0]} color={layout.bodyColor} roughness={0.85} />
+          <Box size={[0.05, H, D]} position={[halfW - 0.025, bodyBottom + H / 2, 0]} color={layout.bodyColor} roughness={0.85} />
+          <Box size={[W, 0.05, D]} position={[0, bodyBottom + 0.025, 0]} color={'#c8bdaa'} roughness={0.9} />
+
+          {/* Dark drip-edge cap, overhanging on every side. Flat enough to stage a tester on. */}
+          <Box size={[W + 0.09, 0.075, D + 0.09]} position={[0, bodyTop + 0.037, 0]} color={layout.capColor} roughness={0.7} />
+          <Box size={[W + 0.05, 0.03, D + 0.05]} position={[0, bodyTop - 0.01, 0]} color={'#3a332c'} roughness={0.8} />
+
+          {/* Doors, hinged at the outer edges, with a gasket channel down the inner face. */}
+          {[-1, 1].map((side) => (
+            <Hinge key={side} open={open} axis="y" openAngle={side * -2.25} position={[side * halfW, bodyBottom + H / 2, D / 2 - 0.03]}>
+              <Box size={[halfW, H - 0.04, 0.035]} position={[(-side * halfW) / 2, 0, 0]} color={layout.bodyColor} roughness={0.8} />
+              <Box size={[halfW - 0.06, H - 0.14, 0.008]} position={[(-side * halfW) / 2, 0, -0.022]} color={'#1a1714'} />
+              {/* Latch and hasp on the leading edge. */}
+              <Box size={[0.035, 0.16, 0.045]} position={[-side * (halfW - 0.05), -0.05, 0.03]} color={'#2b2b2b'} metalness={0.5} />
+              <Box size={[0.16, 0.055, 0.004]} position={[(-side * halfW) / 2, H / 2 - 0.16, 0.02]} color={'#e8e6e0'} />
+            </Hinge>
+          ))}
         </group>
-        <group position={[0.05, 1.4, -0.15]} onClick={splitter ? select(onSelect, splitter.id) : undefined}>
-          <Box size={[0.36, 0.14, 0.09]} color={splitterSelected ? '#ffffff' : '#e8eaee'} emissive={splitterSelected ? '#5ab0ff' : undefined} />
-          <Box size={[0.2, 0.05, 0.005]} position={[0, 0.02, 0.047]} color={'#1d2a3a'} />
-          {(splitterSelected || current || selected) && <Label position={[0, 0.16, 0]} text={`Splitter ${ratio}`} small />}
-        </group>
-        {Array.from({ length: 32 }).map((_, i) => {
-          const col = i % 8;
-          const row = Math.floor(i / 8);
-          const isOccupied = occupied.has(i);
-          return <Box key={i} size={[0.05, 0.05, 0.03]} position={[-0.32 + col * 0.09, 1.12 - row * 0.1, -0.17]} color={isOccupied ? '#2f9e5b' : '#6e7580'} />;
-        })}
-        {distSpans.map((_, i) => (
-          <Tube key={i} points={[[0.05 + (i - distSpans.length / 2) * 0.03, 1.33, -0.14], [0.2 + (i - distSpans.length / 2) * 0.05, 1.25, -0.1], [-0.32 + (i % 8) * 0.09, 1.12 - Math.floor(i / 8) * 0.1, -0.15]]} radius={0.005} color={PALETTE.fiberYellow} />
-        ))}
-        <Box size={[0.9, 0.08, 0.04]} position={[0, 0.55, -0.17]} color={'#9aa1aa'} />
-        {Array.from({ length: 10 }).map((_, i) => (
-          <Box key={i} size={[0.03, 0.05, 0.03]} position={[-0.36 + i * 0.08, 0.5, -0.17]} color={'#6e7580'} />
-        ))}
-        <Tube points={[[0, 0.25, -0.2], [0, -0.7, -0.2]]} radius={0.05} color={PALETTE.conduit} />
+
+        {/* ---- Interior. Built only while the doors are open. ---- */}
+        {open && (
+          <group>
+            {/* Backboard the whole assembly hangs off. */}
+            <Box size={[W - 0.12, H - 0.12, 0.02]} position={[0, bodyBottom + H / 2, backZ + 0.04]} color={'#cdc3b2'} roughness={0.9} />
+
+            {/* --- Upper: adapter modules left, distribution port field right --- */}
+            {Array.from({ length: 5 }).map((_, i) => (
+              <group key={`mod${i}`} position={[-halfW + 0.24, bodyTop - 0.16 - i * 0.1, backZ + 0.1]}>
+                <Box size={[0.34, 0.075, 0.09]} color={'#d6d2c8'} roughness={0.7} />
+                {Array.from({ length: 6 }).map((__, k) => (
+                  <Box key={k} size={[0.035, 0.05, 0.02]} position={[-0.13 + k * 0.052, 0, 0.055]} color={'#2f9e5b'} />
+                ))}
+                {/* Yellow jumpers leaving the module, each with a white flag label. */}
+                {Array.from({ length: 4 }).map((__, k) => (
+                  <group key={`j${k}`}>
+                    <Tube points={[[-0.13 + k * 0.052, 0, 0.07], [-0.05 + k * 0.03, -0.05 - k * 0.012, 0.13], [0.12, -0.16 - k * 0.02, 0.1]]} radius={0.004} color={PALETTE.fiberYellow} />
+                    <Box size={[0.026, 0.014, 0.002]} position={[-0.04 + k * 0.03, -0.06 - k * 0.012, 0.13]} color={'#f2f0ea'} />
+                  </group>
+                ))}
+              </group>
+            ))}
+
+            <group position={[halfW - 0.3, bodyTop - 0.42, backZ + 0.1]}>
+              <Box size={[0.5, 0.56, 0.03]} position={[0, 0, -0.02]} color={'#c2b8a6'} roughness={0.85} />
+              <AdapterField rows={layout.adapterGrid.rows} cols={layout.adapterGrid.cols} occupied={distSpans.length} width={0.46} height={0.52} z={0.012} />
+            </group>
+
+            {/* Radius limiters and the D-ring column down the right-hand side. */}
+            {Array.from({ length: layout.dRings }).map((_, i) => (
+              <mesh key={`ring${i}`} position={[halfW - 0.06, bodyTop - 0.18 - i * 0.11, backZ + 0.13]} rotation={[Math.PI / 2, 0, 0]}>
+                <torusGeometry args={[0.032, 0.007, 6, 14, Math.PI * 1.35]} />
+                <meshStandardMaterial color={'#15161a'} roughness={0.8} />
+              </mesh>
+            ))}
+
+            {/* --- Splitter cassettes --- */}
+            {Array.from({ length: layout.splitterShelves }).map((_, i) => (
+              <group key={`spl${i}`} position={[-halfW + 0.3, bodyTop - 0.74 - i * 0.13, backZ + 0.12]} onClick={splitter ? select(onSelect, splitter.id) : undefined}>
+                <Box size={[0.4, 0.1, 0.11]} color={i === 0 && splitterSelected ? '#ffffff' : '#e9eaee'} emissive={i === 0 && splitterSelected ? '#00f0ff' : undefined} roughness={0.5} />
+                <Box size={[0.22, 0.035, 0.004]} position={[0, 0.015, 0.057]} color={'#1d2a3a'} />
+                {i === 0 && (selected || current || splitterSelected) && <Label position={[0, 0.14, 0.06]} text={`SPLITTER ${ratio.toUpperCase()}`} small />}
+              </group>
+            ))}
+
+            {/* --- Active shelf: purple 1RU chassis, the signature of this cabinet --- */}
+            {Array.from({ length: layout.activeShelves }).map((_, i) => (
+              <group key={`ch${i}`} position={[0, bodyTop - 1.02 - i * 0.11, backZ + 0.14]}>
+                <Box size={[W - 0.2, 0.085, 0.2]} color={i === 0 ? '#4a2a72' : '#3f2463'} roughness={0.45} metalness={0.2} />
+                <Box size={[W - 0.24, 0.05, 0.006]} position={[0, 0, 0.103]} color={'#2a1745'} />
+                {/* Port group LEDs — green where the chassis is carrying, dark where it is not. */}
+                {Array.from({ length: 8 }).map((__, k) => (
+                  <mesh key={k} position={[-0.28 + k * 0.08, 0.012, 0.107]}>
+                    <sphereGeometry args={[0.0055, 6, 6]} />
+                    <meshStandardMaterial color={k < 5 ? '#2ee58a' : '#1b2b22'} emissive={k < 5 ? '#2ee58a' : '#000'} emissiveIntensity={k < 5 ? 1.5 : 0} />
+                  </mesh>
+                ))}
+                <Box size={[0.05, 0.03, 0.004]} position={[0.3, -0.02, 0.104]} color={'#0f1a24'} />
+              </group>
+            ))}
+
+            {/* Management panel with RJ45 jacks. */}
+            <group position={[-halfW + 0.22, bodyTop - 0.9, backZ + 0.13]}>
+              <Box size={[0.3, 0.07, 0.14]} color={'#b9c0c8'} roughness={0.6} />
+              {Array.from({ length: 4 }).map((_, k) => (
+                <Box key={k} size={[0.03, 0.035, 0.02]} position={[-0.1 + k * 0.065, 0, 0.08]} color={'#2b3238'} />
+              ))}
+            </group>
+
+            {/* Teal multimode duplex loops across the middle. */}
+            <Tube points={[[-0.3, bodyTop - 0.98, backZ + 0.24], [-0.05, bodyTop - 1.06, backZ + 0.3], [0.28, bodyTop - 0.98, backZ + 0.24]]} radius={0.006} color={'#2fb6c4'} />
+            <Tube points={[[-0.28, bodyTop - 1.09, backZ + 0.24], [0.0, bodyTop - 1.17, backZ + 0.29], [0.3, bodyTop - 1.09, backZ + 0.24]]} radius={0.006} color={'#2fb6c4'} />
+
+            {/* Feeder in, dressed down the left to the splitter. */}
+            <Tube
+              points={[
+                [-halfW + 0.1, bodyBottom + 0.1, backZ + 0.1],
+                [-halfW + 0.12, bodyTop - 0.9, backZ + 0.12],
+                [-halfW + 0.26, bodyTop - 0.78, backZ + 0.16],
+              ]}
+              radius={0.011}
+              color={feederStrand ? TUBE_COLORS[feederStrand.fiberColor] : TUBE_COLORS.blue}
+            />
+
+            {/* Dense fan of distribution jumpers from the splitter out to the port field. */}
+            {distSpans.slice(0, 14).map((span, i) => (
+              <group key={span.id}>
+                <Tube
+                  points={[
+                    [-halfW + 0.44, bodyTop - 0.76, backZ + 0.16],
+                    [-0.05 + i * 0.012, bodyTop - 0.6 - i * 0.006, backZ + 0.22],
+                    [halfW - 0.5 + (i % 12) * 0.038, bodyTop - 0.2 - Math.floor(i / 12) * 0.087, backZ + 0.13],
+                  ]}
+                  radius={0.0035}
+                  color={PALETTE.fiberYellow}
+                />
+                <Box size={[0.024, 0.012, 0.002]} position={[-0.02 + i * 0.012, bodyTop - 0.62 - i * 0.006, backZ + 0.23]} color={'#f2f0ea'} />
+              </group>
+            ))}
+
+            {/* Port-label strips on the left, and a coil of yellow slack on the bottom shelf. */}
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Box key={`lbl${i}`} size={[0.13, 0.03, 0.004]} position={[-halfW + 0.16, bodyTop - 1.2 - i * 0.06, backZ + 0.12]} color={'#11171d'} />
+            ))}
+            <mesh position={[-halfW + 0.26, bodyBottom + 0.13, backZ + 0.2]} rotation={[Math.PI / 2.2, 0, 0.2]}>
+              <torusGeometry args={[0.1, 0.011, 8, 26]} />
+              <meshStandardMaterial color={PALETTE.fiberYellow} roughness={0.5} />
+            </mesh>
+
+            {/* Empty equipment shelf at the bottom — free space for a future card. */}
+            <Box size={[W - 0.14, 0.014, D - 0.14]} position={[0, bodyBottom + 0.3, 0.02]} color={'#d9d5cc'} roughness={0.8} />
+
+            {/* Conduit entering from below the pad. */}
+            <Tube points={[[0, bodyBottom + 0.04, backZ + 0.16], [0, -0.6, backZ + 0.16]]} radius={0.05} color={PALETTE.conduit} />
+          </group>
+        )}
       </group>
-      )}
-      </group>
-      {(selected || current || splitterSelected) && <GroundRing position={[0, 0, -0.6]} color={current ? MARK_COLOR.current : '#ffffff'} radius={1.1} />}
-      {(selected || current || mark || splitterSelected) && <Label position={[0, 2.2, 0]} text={placement.node.label} accent={accent} />}
+
+      {(selected || current || splitterSelected) && <GroundRing position={[0, 0, -0.55]} color={current ? MARK_COLOR.current : '#ffffff'} radius={W} />}
+      {(selected || current || mark || splitterSelected) && <Label position={[0, bodyTop + 0.34, 0]} text={placement.node.label} accent={accent} />}
     </group>
   );
 }
