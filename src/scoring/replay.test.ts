@@ -43,7 +43,7 @@ function showVlanAction(id: string, index: number) {
 
 describe('21. decision replay', () => {
   it('following the reference exactly marks every step on-path with no divergence', () => {
-    const meta = baseMeta({ referenceSolution: { steps: referenceSteps, totalSeconds: 335, affectedCustomerMinutes: 0 } });
+    const meta = baseMeta({ referenceSolution: { rationales: ["Reach the test boundary.", "Measure the optical path."], steps: referenceSteps, totalSeconds: 335, affectedCustomerMinutes: 0 } });
     const state = makeSession({ world: emptyWorld(), meta, log: [truckRollAction('a0', 0), otdrAction('a1', 1)] });
     const replay = computeReplay(state, []);
     expect(replay.steps.map((s) => s.classification)).toEqual(['on-path', 'on-path']);
@@ -51,7 +51,7 @@ describe('21. decision replay', () => {
   });
 
   it('an unrelated command inserted at step 2 is unnecessary and sets divergenceIndex to 1', () => {
-    const meta = baseMeta({ referenceSolution: { steps: referenceSteps, totalSeconds: 335, affectedCustomerMinutes: 0 } });
+    const meta = baseMeta({ referenceSolution: { rationales: ["Reach the test boundary.", "Measure the optical path."], steps: referenceSteps, totalSeconds: 335, affectedCustomerMinutes: 0 } });
     const state = makeSession({ world: emptyWorld(), meta, log: [truckRollAction('a0', 0), showVlanAction('a1', 1), otdrAction('a2', 2)] });
     const replay = computeReplay(state, []);
     expect(replay.steps[1].classification).toBe('unnecessary');
@@ -59,7 +59,7 @@ describe('21. decision replay', () => {
   });
 
   it('repeating an OTDR shot with identical settings is redundant', () => {
-    const meta = baseMeta({ referenceSolution: { steps: referenceSteps, totalSeconds: 335, affectedCustomerMinutes: 0 } });
+    const meta = baseMeta({ referenceSolution: { rationales: ["Reach the test boundary.", "Measure the optical path."], steps: referenceSteps, totalSeconds: 335, affectedCustomerMinutes: 0 } });
     const state = makeSession({ world: emptyWorld(), meta, log: [truckRollAction('a0', 0), otdrAction('a1', 1), otdrAction('a2', 2)] });
     const replay = computeReplay(state, []);
     expect(replay.steps.map((s) => s.classification)).toEqual(['on-path', 'on-path', 'redundant']);

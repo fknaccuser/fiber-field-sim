@@ -6,6 +6,8 @@
  * solution that the validator (item 5) can replay to a perfect score. Everything is
  * derived from one RNG stream, so id + seed reproduces the definition exactly.
  */
+import type { Intent } from '../../session/types';
+import { rationaleForStep } from '../rationales';
 import type { z } from 'zod';
 import { createRng, deriveSeed } from '../../world';
 import type { Rng } from '../../world';
@@ -495,6 +497,7 @@ function reaches(plant: Plant, fromSpanId: string, nodeId: string): boolean {
 interface Built {
   faults: DraftFault[];
   steps: DraftStep[];
+  rationales: string[];
   expectedClaims: ExpectedClaim[];
   affectedPorts: Port[];
   symptomPool: string[];
@@ -510,11 +513,13 @@ interface Built {
 
 class Steps {
   readonly steps: DraftStep[] = [];
+  readonly rationales: string[] = [];
   location: string;
   constructor(start: string) {
     this.location = start;
   }
   push(step: DraftStep): string {
+    this.rationales.push(rationaleForStep(step as Intent, this.steps as Intent[]));
     this.steps.push(step);
     return `$${this.steps.length - 1}`;
   }
@@ -596,7 +601,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
       return {
         ...base,
         faults: [{ instanceId: `f-${port.ontId}-unpowered`, kind: 'ont-unpowered', target: { type: 'site', nodeId: port.ontId }, params: {} }],
-        steps: S.steps,
+        steps: S.steps, rationales: S.rationales,
         expectedClaims: stripClaims(claims),
         affectedPorts: [port],
         symptomPool: SYMPTOMS.unpowered,
@@ -624,7 +629,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
             params: { positionMeters: port.nidPos, lossDb: Math.round((1.0 + rng.next() * 1.4) * 100) / 100, reflectanceDb: -rng.int(20, 32) },
           },
         ],
-        steps: S.steps,
+        steps: S.steps, rationales: S.rationales,
         expectedClaims: stripClaims(claims),
         affectedPorts: [port],
         symptomPool: SYMPTOMS.degraded,
@@ -644,7 +649,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
       return {
         ...base,
         faults: [{ instanceId, kind: 'macrobend', target: { type: 'fiber-span', spanId: port.dropSpanId }, params: { positionMeters: p, severity: pick(rng, ['moderate', 'severe']), causeTag: pick(rng, ['staple', 'door-frame', 'tight-coil']) } }],
-        steps: S.steps,
+        steps: S.steps, rationales: S.rationales,
         expectedClaims: stripClaims(claims),
         affectedPorts: [port],
         symptomPool: SYMPTOMS.degraded,
@@ -689,7 +694,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
         description = `A severed distribution fiber near ${port.address} needs a repair dig, but the one-call ticket on the work order is older than it looks. Find the cut, and check the paperwork before anyone digs.`;
       }
       S.diagnose(claims);
-      return { ...base, faults, steps: S.steps, expectedClaims: stripClaims(claims), affectedPorts: [port], symptomPool: SYMPTOMS.dark, hints, title, description };
+      return { ...base, faults, steps: S.steps, rationales: S.rationales, expectedClaims: stripClaims(claims), affectedPorts: [port], symptomPool: SYMPTOMS.dark, hints, title, description };
     }
     case 'fiber-break-feeder': {
       const feeder = plant.spans.find((s) => s.id === hub.feederInSpanId)!;
@@ -705,7 +710,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
       return {
         ...base,
         faults: [{ instanceId, kind: 'fiber-break', target: { type: 'fiber-span', spanId: hub.feederInSpanId }, params: { positionMeters: p, cause: 'dig-strike' } }],
-        steps: S.steps,
+        steps: S.steps, rationales: S.rationales,
         expectedClaims: stripClaims(claims),
         affectedPorts: hub.ports,
         symptomPool: SYMPTOMS.darkNeighbourhood,
@@ -726,7 +731,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
       return {
         ...base,
         faults: [{ instanceId, kind: 'fusion-splice-degraded', target: { type: 'fiber-span', spanId: port.distSpanId }, params: { positionMeters: p, lossDb: Math.round((0.8 + rng.next() * 0.9) * 100) / 100, causeTag: pick(rng, ['bad-cleave', 'contamination', 'arc-miscal']) } }],
-        steps: S.steps,
+        steps: S.steps, rationales: S.rationales,
         expectedClaims: stripClaims(claims),
         affectedPorts: [port],
         symptomPool: SYMPTOMS.degraded,
@@ -784,7 +789,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
             params: { tubeColor: 'blue', fiberColor: 'orange', rollType: 'spliced-into-dark-spare', actualTubeColor: 'blue', actualFiberColor: 'green' },
           },
         ],
-        steps: S.steps,
+        steps: S.steps, rationales: S.rationales,
         expectedClaims: stripClaims(claims),
         affectedPorts: hubB.ports,
         symptomPool: SYMPTOMS.darkNeighbourhood,
@@ -802,7 +807,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
       return {
         ...base,
         faults: [{ instanceId: `f-${port.ontId}-serial`, kind: 'ont-serial-mismatch', target: { type: 'device-global', deviceId: OLT_DEV }, params: { ontId: port.ponOntId, provisionedSerial: wrongSerial } }],
-        steps: S.steps,
+        steps: S.steps, rationales: S.rationales,
         expectedClaims: stripClaims(claims),
         affectedPorts: [port],
         symptomPool: SYMPTOMS.logical,
@@ -819,7 +824,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
       return {
         ...base,
         faults: [{ instanceId: 'f-dist-uplink-rx', kind: 'transceiver-rx-power-low', target, params: { rxPowerDbm: -rng.int(26, 29) } }],
-        steps: S.steps,
+        steps: S.steps, rationales: S.rationales,
         expectedClaims: stripClaims(claims),
         affectedPorts: [],
         symptomPool: SYMPTOMS.degraded,
@@ -839,7 +844,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
         ...base,
         remoteHostAccess: true,
         faults: [{ instanceId: 'f-dist-dhcp-exhausted', kind: 'dhcp-scope-exhausted', target: { type: 'device-global', deviceId: DIST_RTR }, params: { vlan: 100, network: '10.100.0.0/24', poolSize: 200 } }],
-        steps: S.steps,
+        steps: S.steps, rationales: S.rationales,
         expectedClaims: stripClaims(claims),
         affectedPorts: plant.hubs.flatMap((hb) => hb.ports),
         symptomPool: SYMPTOMS.logical,
@@ -859,7 +864,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
       return {
         ...base,
         faults: [{ instanceId: `f-${rogue.ontId}-rogue`, kind: 'rogue-ont', target: { type: 'device-global', deviceId: OLT_DEV }, params: { ontId: rogue.ponOntId } }],
-        steps: S.steps,
+        steps: S.steps, rationales: S.rationales,
         expectedClaims: stripClaims(claims),
         affectedPorts: hub.ports,
         symptomPool: SYMPTOMS.darkNeighbourhood,
@@ -886,7 +891,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
         remoteHostAccess: true,
         outOfScope: true,
         faults: [{ instanceId: 'f-dns-down', kind: 'dns-server-unresponsive', outOfScope: true, target: { type: 'device-global', deviceId: 'dns-1' }, params: { health: 'down' } }],
-        steps: S.steps,
+        steps: S.steps, rationales: S.rationales,
         expectedClaims: stripClaims(claims),
         affectedPorts: plant.hubs.flatMap((hb) => hb.ports),
         symptomPool: SYMPTOMS.dns,
@@ -1005,7 +1010,7 @@ export function generateScenario(params: GeneratorParams, seed: number): Scenari
     customerReports: reports,
     faults: [...built.faults, ...herrings.faults],
     redHerringPool: herrings.pool,
-    referenceSolution: { steps: built.steps, expectedClaims: built.expectedClaims },
+    referenceSolution: { steps: built.steps, rationales: built.rationales, expectedClaims: built.expectedClaims },
   };
 
   return ScenarioDefinitionSchema.parse(draft);

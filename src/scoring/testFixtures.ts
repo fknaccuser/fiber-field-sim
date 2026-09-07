@@ -33,7 +33,7 @@ export function baseMeta(overrides: Partial<ScenarioMeta> = {}): ScenarioMeta {
     serviceCheckHostname: 'portal.isp.net',
     travelSeconds: { default: 300, pairs: [] },
     hints: [],
-    referenceSolution: { steps: [], totalSeconds: 600, affectedCustomerMinutes: 0 },
+    referenceSolution: { rationales: [], steps: [], totalSeconds: 600, affectedCustomerMinutes: 0 },
     today: '2026-01-01',
     ...overrides,
   };

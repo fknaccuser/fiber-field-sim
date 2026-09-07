@@ -291,8 +291,9 @@ export const ScenarioDefinitionSchema = z.object({
   hints: z.array(z.string()).default([]),
   referenceSolution: z.object({
     steps: z.array(IntentSchema),
+    rationales: z.array(z.string().trim().min(1)),
     expectedClaims: z.array(DiagnosisClaimSchema.omit({ evidenceActionIds: true })).default([]),
-  }),
+  }).refine((solution) => solution.steps.length === solution.rationales.length, { message: 'Every reference step needs an aligned rationale', path: ['rationales'] }),
 });
 
 export type ScenarioDefinition = z.infer<typeof ScenarioDefinitionSchema>;

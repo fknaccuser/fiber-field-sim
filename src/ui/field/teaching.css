@@ -1,0 +1,17 @@
+.teaching-rail { margin: 8px 10px; border: 1px solid #315468; border-radius: 10px; background: #101d28; color: #e2ecf5; flex-shrink: 0; }
+.teaching-rail header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; }
+.teaching-kicker { display: block; color: #70dcee; font: 10px ui-monospace, monospace; letter-spacing: .12em; margin-bottom: 5px; }
+.teaching-rail strong { font-size: 13px; }
+.teaching-rail small { color: #a1b3c3; margin-left: 12px; font-size: 11px; font-weight: 400; }
+.teaching-rail button { border: 1px solid #3b6172; background: #132b38; color: #a4f1f6; padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.teaching-rail button:focus-visible { outline: 2px solid #22d3ee; outline-offset: 3px; }
+.teaching-body { max-height: min(32vh, 300px); overflow-y: auto; border-top: 1px solid #315468; padding: 0 14px 10px; }
+.teaching-note { color: #a1b3c3; font-size: 11px; }
+.teaching-body ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.teaching-body li { display: flex; gap: 10px; border-radius: 6px; padding: 10px; border: 1px solid transparent; }
+.teaching-body li.current { background: #172e3d; border-color: #32677c; }
+.teaching-body li.complete .teaching-number { color: #34d399; border-color: #34d399; }
+.teaching-number { display: grid; place-items: center; flex: 0 0 24px; height: 24px; border-radius: 50%; border: 1px solid #547287; font: 12px ui-monospace, monospace; }
+.teaching-body p { color: #b6c7d7; font-size: 12px; line-height: 1.5; margin: 5px 0 8px; }
+.teaching-body b { color: #70dcee; font: 10px ui-monospace, monospace; }
+@media (max-width: 480px) { .teaching-rail small { display: block; margin: 4px 0 0; } .teaching-body { max-height: 28vh; } }

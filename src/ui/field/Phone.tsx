@@ -28,10 +28,10 @@ export function Phone({ ui, dispatch }: { ui: UiSessionState; dispatch(intent: I
         );
       })}
 
-      <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 8 }}>Hint a senior tech</div>
+      <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 8 }}>{ui.meta.tier <= 2 ? 'Ask dispatch for the next question' : ui.meta.tier === 3 ? 'Ask dispatch to confirm your observations' : 'Ask a senior tech'}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <Chip disabled={hintsRemaining <= 0} onClick={() => dispatch({ type: 'hint' })}>
-          {hintsRemaining <= 0 ? 'No hints left' : `Hint (${hintsRemaining} left, ${policy.cost} pts)`}
+          {hintsRemaining <= 0 ? 'No hints left' : `Hint (${Number.isFinite(hintsRemaining) ? hintsRemaining : 'unlimited'} left, ${policy.cost} pts)`}
         </Chip>
       </div>
       {lastHintText && <div style={{ fontSize: 13, fontStyle: 'italic', color: 'var(--muted)' }}>"{lastHintText}"</div>}

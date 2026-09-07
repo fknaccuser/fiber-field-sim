@@ -3,80 +3,14 @@
  * reference solution, so item 6 can show the trainee where they diverged.
  */
 import type { FaultInstance } from '../world';
-import type { ActionEvent, Intent, SessionState, StrandRef } from '../session/types';
+import type { ActionEvent, Intent, SessionState } from '../session/types';
 import type { Endpoint } from '../instruments/cli';
 import { EVIDENCE_RULES, type EvidenceContext } from './evidenceRules';
+import { matchReferenceSteps, stepKey } from '../session/stepMatching';
 import type { DecisionReplay, ReplayStep } from './types';
 
 function endpointKey(endpoint: Endpoint): string {
   return endpoint.kind === 'device' ? `device:${endpoint.deviceId}` : `host:${endpoint.hostId}`;
-}
-
-function strandKey(strand?: StrandRef): string {
-  return strand ? `${strand.tubeColor}/${strand.fiberColor}` : '';
-}
-
-function cliSignature(endpoint: Endpoint, handlerId: string | null | undefined, command: string): string {
-  const key = endpointKey(endpoint);
-  if (handlerId) return `cli|${key}|${handlerId}`;
-  const tokens = command.trim().split(/\s+/).slice(0, 2).join(' ');
-  return `cli|${key}|${tokens}`;
-}
-
-function intentSignature(intent: Intent): string {
-  switch (intent.type) {
-    case 'otdr-shot':
-      return `otdr-shot|${intent.access.accessNodeId}|${intent.access.launchSpanId}|${intent.settings.wavelengthNm}|${strandKey(intent.access.strand)}`;
-    case 'power-meter':
-      return `power-meter|${intent.nodeId}|${strandKey(intent.strand)}`;
-    case 'vfl':
-      return `vfl|${intent.spanId}`;
-    case 'scope':
-      return `scope|${intent.eventId}`;
-    case 'cli':
-      return cliSignature(intent.endpoint, undefined, intent.command);
-    case 'truck-roll':
-      return `truck-roll|${intent.toNodeId}`;
-    case 'records':
-      return `records|${intent.nodeId ?? ''}|${intent.spanId ?? ''}`;
-    case 'customer-contact':
-      return `customer-contact|${intent.customerId}`;
-    case 'hint':
-      return 'hint';
-    case 'excavate':
-      return 'excavate';
-    case 'diagnosis':
-      return 'diagnosis';
-  }
-}
-
-function actionSignature(action: ActionEvent): string {
-  switch (action.type) {
-    case 'otdr-shot':
-      return `otdr-shot|${action.access.accessNodeId}|${action.access.launchSpanId}|${action.settings.wavelengthNm}|${strandKey(action.access.strand)}`;
-    case 'power-meter':
-      return `power-meter|${action.nodeId}|${strandKey(action.strand)}`;
-    case 'vfl':
-      return `vfl|${action.spanId}`;
-    case 'scope':
-      return `scope|${action.eventId}`;
-    case 'cli':
-      return cliSignature(action.endpoint, action.handlerId, action.command);
-    case 'truck-roll':
-      return `truck-roll|${action.toNodeId}`;
-    case 'records':
-      return `records|${action.nodeId ?? ''}|${action.spanId ?? ''}`;
-    case 'customer-contact':
-      return `customer-contact|${action.customerId}`;
-    case 'hint':
-      return 'hint';
-    case 'excavate':
-      return 'excavate';
-    case 'diagnosis':
-      return 'diagnosis';
-    case 'refused':
-      return 'refused';
-  }
 }
 
 function hasViolation(action: ActionEvent): boolean {
@@ -138,14 +72,14 @@ function labelForAction(world: SessionState['initialWorld'], action: ActionEvent
 
 export function computeReplay(state: SessionState, trueFaults: FaultInstance[]): DecisionReplay {
   const referenceSteps = state.meta.referenceSolution.steps;
-  const referenceSignatures = referenceSteps.map(intentSignature);
-  const matchedReferenceIndices = new Set<number>();
+  const matches = matchReferenceSteps(referenceSteps, state.log);
+  
   const seenActionSignatures = new Set<string>();
   const steps: ReplayStep[] = [];
   let divergenceIndex: number | null = null;
 
   for (const action of state.log) {
-    const sig = actionSignature(action);
+    const sig = stepKey(action);
     let classification: ReplayStep['classification'];
 
     if (hasViolation(action)) {
@@ -153,9 +87,9 @@ export function computeReplay(state: SessionState, trueFaults: FaultInstance[]):
     } else if (action.type === 'refused') {
       classification = 'refused';
     } else {
-      const refIndex = referenceSignatures.findIndex((refSig, idx) => refSig === sig && !matchedReferenceIndices.has(idx));
+      const refIndex = matches.indexOf(action.id);
       if (refIndex !== -1) {
-        matchedReferenceIndices.add(refIndex);
+
         classification = 'on-path';
       } else if (seenActionSignatures.has(sig)) {
         classification = 'redundant';
@@ -181,9 +115,7 @@ export function computeReplay(state: SessionState, trueFaults: FaultInstance[]):
   }
 
   const referencePath = referenceSteps.map((intent, idx) => {
-    const sig = referenceSignatures[idx];
-    const match = state.log.find((a) => actionSignature(a) === sig);
-    return { label: labelForIntent(state.initialWorld, intent), matchedActionId: match?.id ?? null };
+    return { label: labelForIntent(state.initialWorld, intent), matchedActionId: matches[idx] };
   });
 
   const summary = buildSummary(state, steps, divergenceIndex, referencePath);
@@ -209,7 +141,7 @@ function buildSummary(
       `First diverged at step ${divergenceIndex + 1} (${step?.label ?? 'unknown'})${referenceNext ? `; the reference solution instead did: ${referenceNext.label}.` : '.'}`,
     );
   } else {
-    summary.push('Followed the reference solution\'s path exactly.');
+    summary.push('Completed the reference checks; their order may differ.');
   }
 
   summary.push(`Took ${state.clockSeconds}s vs a ${state.meta.referenceSolution.totalSeconds}s reference.`);

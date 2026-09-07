@@ -37,7 +37,7 @@ function baseMeta(overrides: Partial<ScenarioMeta> = {}): ScenarioMeta {
     remoteCliAccess: false, remoteHostAccess: false, positionToleranceMeters: 10,
     serviceCheckHostname: 'portal.isp.net',
     travelSeconds: { default: 300, pairs: [{ from: 'fdh-1', to: 'ont-1', seconds: 900 }] },
-    hints: [], referenceSolution: { steps: [], totalSeconds: 0, affectedCustomerMinutes: 0 }, today: '2026-01-01',
+    hints: [], referenceSolution: { rationales: [], steps: [], totalSeconds: 0, affectedCustomerMinutes: 0 }, today: '2026-01-01',
     ...overrides,
   };
 }

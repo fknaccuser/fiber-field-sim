@@ -4,6 +4,7 @@
  * trainee-driven settings, enforces presence/inventory rules first, and records every
  * action for the replay. Never mutates its input.
  */
+import { buildTeachingSteps, dispatchAdvice } from './teaching';
 import { cloneWorld, findNode } from '../world';
 import type { CustomerReport, PlantRecord, WorldState } from '../world';
 import { trace } from '../instruments/otdr';
@@ -226,10 +227,10 @@ function performCustomerContact(state: SessionState, intent: Extract<Intent, { t
 function performHint(state: SessionState, _intent: Extract<Intent, { type: 'hint' }>) {
   const policy = HINT_POLICY[state.meta.tier];
   const level = state.hintsUsed;
-  const text = state.meta.hints[level] ?? null;
+  const text = dispatchAdvice(state.meta, state.initialWorld, state.log, level);
   const refused = level >= policy.max || text === null;
   const cost = refused ? 0 : policy.cost;
-  const action: ActionEvent = { ...nextActionBase(state), durationSeconds: HINT_SECONDS, type: 'hint', level, cost, text: text ?? '', refused };
+  const action: ActionEvent = { ...nextActionBase(state), durationSeconds: HINT_SECONDS, type: 'hint', level, cost, text: refused ? '' : text ?? '', refused };
   const nextState: SessionState = { ...appendAction(state, action), hintsUsed: refused ? state.hintsUsed : state.hintsUsed + 1 };
   return { state: nextState, result: { type: 'hint' as const, text: refused ? null : text } };
 }
@@ -282,7 +283,8 @@ export type UiActionEvent = ActionEvent extends infer T ? (T extends { groundTru
 export type UiBlobs = Record<string, string[] | PublicOtdrTraceResult>;
 
 export interface UiSessionState {
-  meta: ScenarioMeta;
+  meta: Omit<ScenarioMeta, 'referenceSolution' | 'hints'>;
+  teachingSteps: import('./teaching').TeachingStep[];
   world: UiWorldState;
   initialWorld: UiWorldState;
   profiles: SessionState['profiles'];
@@ -328,8 +330,10 @@ function redactBlobs(blobs: Record<string, unknown>): UiBlobs {
 
 /** Strips every place a `SessionState` carries the answer key. This is the only shape the UI store may hold or pass to a component. */
 export function redactForUi(state: SessionState): UiSessionState {
+  const { referenceSolution: _solution, hints: _hints, ...meta } = state.meta;
   return {
-    meta: state.meta,
+    meta,
+    teachingSteps: buildTeachingSteps(state.meta, state.initialWorld, state.log),
     world: redactWorld(state.world),
     initialWorld: redactWorld(state.initialWorld),
     profiles: state.profiles,

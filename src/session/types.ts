@@ -28,7 +28,7 @@ export interface ScenarioMeta {
   /** Ordered, least to most specific. */
   hints: string[];
   /** Totals computed by item 5's validator. */
-  referenceSolution: { steps: Intent[]; totalSeconds: number; affectedCustomerMinutes: number };
+  referenceSolution: { steps: Intent[]; rationales: string[]; stepSeconds?: number[]; totalSeconds: number; affectedCustomerMinutes: number };
   /** ISO date, for plant-record ages. */
   today: string;
 }

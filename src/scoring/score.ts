@@ -8,6 +8,7 @@ import { computeCustomerImpact } from './customerImpact';
 import { computeSafety } from './safety';
 import { computeReplay } from './replay';
 import { average } from './util';
+import { buildDebrief } from './debrief';
 
 export function scoreSession(state: SessionState): ScoreReport {
   if (!state.ended) throw new Error('scoreSession called on a session that has not ended');
@@ -32,6 +33,7 @@ export function scoreSession(state: SessionState): ScoreReport {
   const total = safety.score === 0 ? 0 : average(Object.values(axes).map((a) => a.score));
 
   return {
+    debrief: buildDebrief(state, accuracy),
     axes,
     total,
     endedBy: state.ended.by,

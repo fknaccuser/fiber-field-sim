@@ -23,6 +23,34 @@ describe('4. redactForUi', () => {
     expect(serialized).not.toContain('groundTruth');
     expect(serialized).not.toContain('"hidden"');
   });
+
+  /**
+   * The three greps above were not enough. `ScenarioMeta.referenceSolution.steps` ends in a
+   * `diagnosis` intent carrying the correct claims, and `meta` used to be handed to the UI
+   * whole -- so `ui.meta.referenceSolution` was the complete answer key, reachable from any
+   * component, and `ui.meta.hints` handed over every hint without paying its score cost.
+   * This asserts the shape rather than a spelling, so a future field carrying the answer
+   * fails here too.
+   */
+  it('carries neither the reference solution nor the hint texts, at any point in a run', () => {
+    const def = getScenario('t4-wrong-roll-closure-7');
+    const { world, meta } = instantiateScenario(def, 1);
+    const profiles = resolveProfileSet(def.profiles);
+    const trueFault = world.appliedFaults.find((f) => !f.isRedHerring)!;
+    let state = startSession(world, profiles, meta);
+
+    // Check after every action, not just at the end: a leak that only exists mid-run counts.
+    for (const step of [null, ...meta.referenceSolution.steps]) {
+      if (step) state = perform(state, step).state;
+      const ui = redactForUi(state);
+      expect(ui.meta).not.toHaveProperty('referenceSolution');
+      expect(ui.meta).not.toHaveProperty('hints');
+
+      const serialized = JSON.stringify(ui.meta);
+      expect(serialized).not.toContain(trueFault.kind);
+      for (const hint of meta.hints) expect(serialized).not.toContain(hint);
+    }
+  });
 });
 
 describe('4. no rendered ui source file reads hidden ground truth', () => {
@@ -36,7 +64,10 @@ describe('4. no rendered ui source file reads hidden ground truth', () => {
 
   it('src/ui/** (outside store/) never references hidden., appliedFaults, or groundTruth', () => {
     const uiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'ui');
-    const forbidden = ['hidden.', 'appliedFaults', 'groundTruth'];
+    // `referenceSolution` is the answer key in a different costume: its last step is the
+    // correct diagnosis. Rendered UI reads `teachingSteps` (a redaction-safe projection)
+    // or the post-session `ScoreReport.debrief` instead.
+    const forbidden = ['hidden.', 'appliedFaults', 'groundTruth', 'referenceSolution'];
     const offenders: string[] = [];
 
     function walk(dir: string, topLevel: boolean): void {

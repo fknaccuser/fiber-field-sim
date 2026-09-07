@@ -406,6 +406,17 @@ redHerringPool:
       params: { positionMeters: 600, lossDb: 0.15 }
 
 referenceSolution:
+  rationales:
+    - "You establish the reported service failure at the first premise without assuming that an internet complaint means an optical outage."
+    - "You compare a customer on another branch. Similar symptoms across branches help you decide whether a shared service needs investigation."
+    - "You inspect ONT status across the PON. Compare the physical access state with the application complaint before travelling to the plant."
+    - "You inspect the host address, gateway and resolver configuration. You need that baseline before interpreting reachability or name-resolution tests."
+    - "You test the local gateway by IP address. This establishes whether the first routing boundary is reachable without involving name resolution."
+    - "You test a remote destination by IP address. Compare it with the gateway result to determine whether forwarding extends beyond the local network."
+    - "You test the service by hostname. Compare this outcome with the IP-only test to decide whether name resolution needs a separate check."
+    - "You query name resolution directly. The response separates resolver behavior from the forwarding path you tested earlier."
+    - "You test the configured resolver address from the router. A second vantage point helps distinguish service response from basic reachability."
+    - "You cite the observations that separate physical access, forwarding and service behavior. Escalate work outside your authority with a specific, evidence-backed explanation."
   steps:
     - type: customer-contact
       customerId: cust-a-201

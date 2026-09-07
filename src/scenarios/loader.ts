@@ -137,14 +137,14 @@ export function buildSpan(def: ScenarioDefinition, spanLengths: Map<string, numb
 }
 
 /** Runs the authored reference solution against the just-built world (`perform` never mutates its input, so this is safe to do on the world we're about to return) to derive the two numbers item 5's validator and item 4's scorer need: total time and affected-customer-minutes. */
-function computeReferenceTotals(world: WorldState, profiles: ProfileSet, meta: ScenarioMeta): { totalSeconds: number; affectedCustomerMinutes: number } {
+function computeReferenceTotals(world: WorldState, profiles: ProfileSet, meta: ScenarioMeta): { totalSeconds: number; affectedCustomerMinutes: number; stepSeconds: number[] } {
   let state = startSession(world, profiles, meta);
   for (const step of meta.referenceSolution.steps) {
     state = perform(state, step).state;
   }
   const totalSeconds = state.clockSeconds;
   const affected = affectedCustomerIds(world, profiles, meta);
-  return { totalSeconds, affectedCustomerMinutes: affected.length * (totalSeconds / 60) };
+  return { totalSeconds, affectedCustomerMinutes: affected.length * (totalSeconds / 60), stepSeconds: state.log.map((action) => action.durationSeconds) };
 }
 
 export function instantiateScenario(def: ScenarioDefinition, seed: number): { world: WorldState; meta: ScenarioMeta } {
@@ -191,7 +191,7 @@ export function instantiateScenario(def: ScenarioDefinition, seed: number): { wo
     serviceCheckHostname: cloned.serviceCheckHostname,
     travelSeconds: cloned.travelSeconds,
     hints: cloned.hints,
-    referenceSolution: { steps: cloned.referenceSolution.steps.map(rewriteStep), totalSeconds: 0, affectedCustomerMinutes: 0 },
+    referenceSolution: { steps: cloned.referenceSolution.steps.map(rewriteStep), rationales: cloned.referenceSolution.rationales, totalSeconds: 0, affectedCustomerMinutes: 0 },
     today: cloned.today,
   };
 

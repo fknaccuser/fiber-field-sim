@@ -25,7 +25,7 @@ describe('6. a fault targeting a nonexistent span', () => {
       topology: { nodes: [{ id: 'n1', kind: 'fdh', label: 'N1' }], spans: [] },
       customerReports: [],
       faults: [{ instanceId: 'f-ghost-span', kind: 'fusion-splice-degraded', target: { type: 'fiber-span', spanId: 'sp-does-not-exist' }, params: { positionMeters: 10, lossDb: 0.2 } }],
-      referenceSolution: { steps: [{ type: 'diagnosis', diagnosis: { claims: [], noFaultInScope: true } }] },
+      referenceSolution: { rationales: ['Cite the evidence supporting your conclusion.'], steps: [{ type: 'diagnosis', diagnosis: { claims: [], noFaultInScope: true } }] },
     });
 
     const issues = validateScenario(def);
@@ -60,7 +60,7 @@ describe('7. structural errors', () => {
         ],
       },
       customerReports: [],
-      referenceSolution: { steps: [{ type: 'diagnosis', diagnosis: { claims: [], noFaultInScope: true } }] },
+      referenceSolution: { rationales: ['Cite the evidence supporting your conclusion.'], steps: [{ type: 'diagnosis', diagnosis: { claims: [], noFaultInScope: true } }] },
     });
     expect(validateScenario(def).some((i) => i.code === 'E5')).toBe(true);
   });
@@ -86,7 +86,7 @@ describe('7. structural errors', () => {
         spans: [{ id: 'sp-drop', fromNodeId: 'ont-1', toNodeId: 'olt-1', lengthMeters: 50, events: [] }],
       },
       customerReports: [],
-      referenceSolution: { steps: [{ type: 'diagnosis', diagnosis: { claims: [], noFaultInScope: true } }] },
+      referenceSolution: { rationales: ['Cite the evidence supporting your conclusion.'], steps: [{ type: 'diagnosis', diagnosis: { claims: [], noFaultInScope: true } }] },
     });
     expect(validateScenario(def).some((i) => i.code === 'E6')).toBe(true);
   });
@@ -117,7 +117,7 @@ describe('7. structural errors', () => {
           ],
         },
         customerReports: [],
-        referenceSolution: { steps: [{ type: 'diagnosis', diagnosis: { claims: [], noFaultInScope: true } }] },
+        referenceSolution: { rationales: ['Cite the evidence supporting your conclusion.'], steps: [{ type: 'diagnosis', diagnosis: { claims: [], noFaultInScope: true } }] },
       });
 
     const withMap = build([{ fromSpanId: 'sp-feeder', toSpanId: 'sp-out' }]);
@@ -134,6 +134,7 @@ describe('7. structural errors', () => {
       referenceSolution: {
         ...t4.referenceSolution,
         steps: t4.referenceSolution.steps.filter((step) => !(step.type === 'power-meter' && step.nodeId === 'cl-7')),
+        rationales: t4.referenceSolution.rationales.filter((_, i) => !(t4.referenceSolution.steps[i].type === 'power-meter' && 'nodeId' in t4.referenceSolution.steps[i] && t4.referenceSolution.steps[i].nodeId === 'cl-7')),
       },
     };
     const issues = validateScenario(withoutPowerMeterAtClosure);

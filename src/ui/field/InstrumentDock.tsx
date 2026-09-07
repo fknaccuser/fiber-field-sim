@@ -12,7 +12,8 @@ import { Vfl } from '../meters/Vfl';
 import { Scope } from '../meters/Scope';
 import { Terminal } from '../terminal/Terminal';
 import { ViewportHost, type ViewportDef } from '../viewport/ViewportHost';
-import { useViewportState } from '../viewport/viewportStore';
+import { useViewportState, writeViewportState } from '../viewport/viewportStore';
+import { TeachingRail } from './TeachingRail';
 import { Phone } from './Phone';
 import { Records } from './Records';
 import { Diagnose, type DiagnosePrefill } from './Diagnose';
@@ -103,6 +104,18 @@ export function InstrumentDock({ ui, dispatch, initialTab = 'world' }: { ui: UiS
       {(stack.length > 1 || tab !== 'world') && (
         <div className="dock-back"><button type="button" onClick={back}>← Back</button><span>{viewports.find((v) => v.id === tab)?.label}{place.presentation !== 'raised' ? ` · ${place.presentation}` : ''}</span></div>
       )}
+      {/* Tier 1 and 2 guidance. "Show me where" focuses the object in the world without
+          moving the truck or spending simulated time. */}
+      <TeachingRail
+        ui={ui}
+        onShow={(nodeId) => {
+          writeViewportState('world.selected', nodeId);
+          writeViewportState('world.mode', 'equipment');
+          writeViewportState('world.card', true);
+          writeViewportState('world.list', false);
+          setTab('world');
+        }}
+      />
       <ViewportHost<TabId> viewports={viewports} active={tab} onActivate={setTab} nav={<DockBar active={tab} onGo={setTab} phoneBadge={ui.world.customerReports.length} />} />
     </DockNavigation.Provider>
   );

@@ -12,7 +12,18 @@ import { perform as runnerPerform, redactForUi, startSession } from '../../sessi
 import type { PerformResult, UiActionEvent, UiSessionState } from '../../session/runner';
 import type { Intent, SessionState } from '../../session/types';
 import type { ScoreReport } from '../../scoring/types';
-import { getOrCreateTraineeId, saveSession, type SessionIdentity, type StoredSession } from './persistence';
+import { getOrCreateTraineeId, getSession, saveSession, type SessionIdentity, type StoredSession } from './persistence';
+import { scoreSession } from '../../scoring/score';
+
+/** Upgrade the presentation of old finished sessions without rewriting historical scores. */
+export async function loadDebriefSession(id: string): Promise<StoredSession | undefined> {
+  const stored = await getSession(id);
+  if (stored?.endedAt && stored.report && !stored.report.debrief) {
+    const updated = scoreSession(resumeSession(stored));
+    return { ...stored, report: { ...stored.report, debrief: updated.debrief, replay: updated.replay } };
+  }
+  return stored;
+}
 
 /** The intent that produced a logged action -- recovers everything `perform` needs to replay it, so a stored session can be rebuilt by re-running the same steps through a fresh, deterministic instantiation. */
 function intentFromActionEvent(action: UiActionEvent): Intent {
@@ -103,9 +114,10 @@ function useSessionStoreInternal(): SessionStore {
       clearTimeout(saveTimer.current);
       saveTimer.current = null;
     }
-    const run = () => void saveSession(identity, session, report);
-    if (immediate) run();
-    else saveTimer.current = setTimeout(run, SAVE_DEBOUNCE_MS);
+    const run = () => saveSession(identity, session, report);
+    if (immediate) return run();
+    saveTimer.current = setTimeout(() => { void run(); }, SAVE_DEBOUNCE_MS);
+    return Promise.resolve();
   }, []);
 
   const start = useCallback(
@@ -135,8 +147,13 @@ function useSessionStoreInternal(): SessionStore {
       const { state: nextSession, result } = runnerPerform(state.session, intent);
       dispatchAction({ type: 'perform', session: nextSession, result });
       const report = result.type === 'diagnosis' ? result.report : null;
-      scheduleSave(nextSession, identity, report, intent.type === 'diagnosis');
-      if (result.type === 'diagnosis') navigate(`/replay/${identity.id}`);
+      const saved = scheduleSave(nextSession, identity, report, intent.type === 'diagnosis');
+      if (result.type === 'diagnosis') {
+        void saved.then(() => navigate(`/replay/${identity.id}`)).catch(() => {
+          // The result is still available in memory if browser storage is unavailable.
+          navigate(`/replay/${identity.id}`, { state: { saveFailed: true } });
+        });
+      }
     },
     [state.session, state.identity, scheduleSave, navigate],
   );

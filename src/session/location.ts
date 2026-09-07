@@ -47,7 +47,7 @@ export function checkPresence(world: WorldState, meta: ScenarioMeta, locationNod
   }
 }
 
-export function travelTimeSeconds(meta: ScenarioMeta, fromNodeId: string, toNodeId: string): number {
+export function travelTimeSeconds(meta: Pick<ScenarioMeta, 'travelSeconds'>, fromNodeId: string, toNodeId: string): number {
   const pair = meta.travelSeconds.pairs.find((p) => (p.from === fromNodeId && p.to === toNodeId) || (p.from === toNodeId && p.to === fromNodeId));
   return pair ? pair.seconds : meta.travelSeconds.default;
 }

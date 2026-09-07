@@ -559,6 +559,10 @@ function checkWarnings(def: ScenarioDefinition): ValidationIssue[] {
 }
 
 export function validateScenario(def: ScenarioDefinition): ValidationIssue[] {
+  const rationales = def.referenceSolution.rationales;
+  if (!rationales || rationales.length !== def.referenceSolution.steps.length || rationales.some((why) => !why.trim())) {
+    return [err('E14', 'referenceSolution.rationales', 'Every reference step must have one non-empty explanation.')];
+  }
   return [
     ...checkUniqueIds(def),
     ...checkReferences(def),

@@ -42,7 +42,7 @@ function worldWithAffectedCustomers(n: number): WorldState {
 
 describe('18. customer impact', () => {
   it('4 affected customers for 30 simulated minutes vs a 40-minute total reference scores 33', () => {
-    const meta = baseMeta({ referenceSolution: { steps: [], totalSeconds: 0, affectedCustomerMinutes: 40 } });
+    const meta = baseMeta({ referenceSolution: { rationales: [], steps: [], totalSeconds: 0, affectedCustomerMinutes: 40 } });
     const state = makeSession({ world: worldWithAffectedCustomers(4), log: [], meta, clockSeconds: 30 * 60 });
     const result = computeCustomerImpact(state);
     expect(result.score).toBeCloseTo((100 * 40) / 120, 1);

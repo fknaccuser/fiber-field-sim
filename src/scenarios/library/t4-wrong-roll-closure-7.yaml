@@ -454,6 +454,18 @@ redHerringPool:
       params: { positionMeters: 30, severity: light }
 
 referenceSolution:
+  rationales:
+    - "You establish the first affected address and the timing of the outage. A report gives you a starting point, not a diagnosis."
+    - "You compare a second address on the same branch. Shared symptoms help you test whether a common upstream section deserves attention before individual drops."
+    - "You identify the documented feeder and strand for FDH-B. A measurement only has meaning when you know which path is supposed to feed the cabinet."
+    - "You read the recent work order and splice sheet at Closure 7. Treat the stated assignments as an intended path to verify in the field."
+    - "You compare ONT states across the branches. This tests whether the common symptom is missing light or an individual customer equipment condition."
+    - "You move to the cabinet input so your next reading tests the shared boundary upstream of its customer drops."
+    - "You measure the light arriving at the splitter input. Compare it with the receive window before deciding whether to investigate upstream or downstream."
+    - "You trace the feeder from the cabinet and account for the launch cable. The event distance helps you identify the next physical boundary to inspect."
+    - "You move to Closure 7 to compare the feeder with the cabinet observation. Physical presence lets you measure the assigned strand at the next boundary."
+    - "You measure the documented blue/orange strand and compare its light level with the cabinet input. This tests whether the intended path remains continuous across the intervening work."
+    - "You name the conclusion at the correct strand and cite the assignment record and both boundary measurements. Explain the discrepancy with evidence before authorizing a repair."
   steps:
     - type: customer-contact
       customerId: cust-b-301
