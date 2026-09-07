@@ -97,6 +97,18 @@ Two decisions worth keeping:
 Geometry is pure and tested in `src/ui/map/sheet.ts`. The sheet turns sideways when the
 drawing is wide and the page is tall, the way you would turn the paper.
 
+### The truck, and the phone in your hand (spec §5, §6)
+
+`src/ui/field/PhoneSlab.tsx` — the phone is a slab that rises from the bottom edge, with a
+carrier strip, the shift clock and a battery that drains across the day. Same gesture
+language as the instruments. Not built on `HeldDevice`: a phone has no dust cap, launch
+lead or boot sequence.
+
+`src/ui/truck/ToolShelf.tsx` — the service body is a place: the roll-up door rolls, the
+interior lights come up behind it, the shelves have lit top lips and dark undersides, the
+instruments sit in foam cutouts (an empty one is outlined in red), and the launch reel
+stands on its spindle.
+
 ### Compass (spec §6, last bullet)
 
 `src/ui/scene/compass.ts` + `CompassRose.tsx`. Derived from the camera pose, which was
@@ -108,13 +120,9 @@ already pure, so it needs no render loop.
 
 Stated plainly so the next session does not have to discover it.
 
-- **First-person framing (spec §5).** Partly there: the world is at eye height, and held
-  instruments have `raised` / `stowed` / `enlarged`. Not there: the **phone as a slab you
-  physically raise**, and the **laptop opening on the tailgate** with lid and bezel around
-  the console. Both are still tabs.
-- **The truck as a place (spec §6).** `src/ui/truck/` draws the tools and the empty slots,
-  but it is still a grid, not the inside of a service body. No roll-up door animation, no
-  foam cutouts, no fibre reel on its spindle, no interior lights coming up.
+- **The laptop on the tailgate (spec §5).** Still a tab. The phone is now a held slab
+  (`src/ui/field/PhoneSlab.tsx`) and instruments have `raised`/`stowed`/`enlarged`, but the
+  console does not open on a lid with a sliver of truck bed around it.
 - **Tool condition shown physically (spec §6).** No battery pip, no smudged tip. Related:
   `dirty-scope-tip` was **removed** from the readiness table rather than displayed. It took
   nothing off the truck, no instrument read differently because of it, and there was no
@@ -177,8 +185,11 @@ unsolvable job — is worse. Worth knowing it is there.
   gets its own noun (`deviceState.ts`, `shelfState.ts`, `sheet.ts`), never `thing.ts`.
 - **Stale Vite module cache after a rename** produces a blank page with no console error.
   Kill the server, delete `node_modules/.vite`, restart.
-- **`ResizeObserver` does not fire in a document that is not being rendered** (a background
-  tab, or a keep-alive viewport behind another). Measure synchronously first, then observe.
+- **Nothing that gates first paint may depend on the frame loop.** `ResizeObserver`
+  callbacks are only delivered during a rendering update, and `requestAnimationFrame` is
+  throttled to zero — in a background tab, or a keep-alive viewport behind another. Both
+  bit here: a blank print, and a roll-up door stuck shut over the shelf. Measure
+  synchronously then observe; set reveal state directly in an effect, not inside rAF.
 - **Structural checks can pass while the drawing is wrong.** Element counts said the print
   was fine; reading the generated markup showed the whole block crushed into a 60px band,
   duplicate labels on the same pixel, and splitters printed over their own cabinets. Look
