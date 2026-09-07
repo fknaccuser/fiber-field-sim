@@ -1,0 +1,22 @@
+Bundled typefaces
+=================
+
+These files are latin-subset WOFF2 builds, bundled so the application works fully
+offline and never makes a runtime font request.
+
+  orbitron-700.woff2      Orbitron          Copyright (c) Matt McInerney
+  rajdhani-600.woff2      Rajdhani          Copyright (c) Indian Type Foundry
+  rajdhani-700.woff2      Rajdhani          Copyright (c) Indian Type Foundry
+  jetbrains-mono.woff2    JetBrains Mono    Copyright (c) JetBrains
+
+All three are licensed under the SIL Open Font License, Version 1.1, which permits
+bundling and redistribution with or without modification, including as part of a
+larger work. The licence is available at https://openfontlicense.org and the
+canonical sources are:
+
+  https://fonts.google.com/specimen/Orbitron
+  https://fonts.google.com/specimen/Rajdhani
+  https://fonts.google.com/specimen/JetBrains+Mono
+
+The fonts are used under their reserved names and have not been modified beyond
+subsetting to latin.

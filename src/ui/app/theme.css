@@ -23,6 +23,45 @@
  * the new identity without being edited.
  */
 
+/*
+ * Fonts are bundled, not fetched. The app is an offline-capable PWA and must never make a
+ * runtime request, so the latin woff2 subsets live in public/fonts/ and are precached by
+ * the service worker (vite.config.ts globPatterns already covers woff2). All three families
+ * are SIL Open Font License 1.1 — see public/fonts/OFL-NOTICE.txt.
+ *
+ * Orbitron is wide and geometric: excellent for the hero title, unreadable at 10px with
+ * letter-spacing, so it is used only for `.hud-title`. Rajdhani is condensed with a tall
+ * x-height and carries the small tracked caps that most of this interface is made of.
+ */
+@font-face {
+  font-family: 'Orbitron';
+  src: url('/fonts/orbitron-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Rajdhani';
+  src: url('/fonts/rajdhani-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Rajdhani';
+  src: url('/fonts/rajdhani-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono.woff2') format('woff2');
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* ---- Ground: ultra-dark void blues ---- */
   --void: #050b14;
@@ -58,7 +97,10 @@
   --ink-faint: #445a72;
 
   /* ---- Type ---- */
-  --font-display: 'Orbitron', 'Rajdhani', 'Chakra Petch', 'Bahnschrift', 'DIN Alternate', 'Avenir Next Condensed', 'Segoe UI', system-ui, sans-serif;
+  /** Hero only — wide, geometric, unreadable small. */
+  --font-hero: 'Orbitron', 'Rajdhani', 'Bahnschrift', 'Segoe UI', system-ui, sans-serif;
+  /** Every label, button and kicker: condensed, tall x-height, holds up at 10px tracked. */
+  --font-display: 'Rajdhani', 'Chakra Petch', 'Bahnschrift', 'DIN Alternate', 'Segoe UI', system-ui, sans-serif;
   --font-body: 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'Share Tech Mono', ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, monospace;
 
@@ -171,7 +213,7 @@ body {
 }
 
 .hud-title {
-  font-family: var(--font-display);
+  font-family: var(--font-hero);
   font-weight: 700;
   letter-spacing: 2px;
   text-transform: uppercase;
