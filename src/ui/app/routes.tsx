@@ -1,5 +1,5 @@
 import { Route, Routes } from 'react-router-dom';
-import { Home } from '../screens/Home';
+import { Dispatch } from '../dispatch/Dispatch';
 import { ScenarioPicker } from '../screens/ScenarioPicker';
 import { FieldSession } from '../screens/FieldSession';
 import { Replay } from '../screens/Replay';
@@ -9,7 +9,7 @@ import { DevOtdr } from '../screens/DevOtdr';
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
+      <Route path="/" element={<Dispatch />} />
       <Route path="/scenarios" element={<ScenarioPicker />} />
       <Route path="/run/:scenarioId" element={<FieldSession />} />
       <Route path="/replay/:sessionId" element={<Replay />} />
