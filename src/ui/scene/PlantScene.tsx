@@ -16,6 +16,7 @@ import { buildMapOverlay, dominantNodeMark, dominantSpanMark, type NodeMark, typ
 import { useViewportState } from '../viewport/viewportStore';
 import { layoutScene, type Placement, type SceneLayout } from './sceneLayout';
 import { lastOtdrShot, ontLeds } from './sceneState';
+import { ambientFor } from './ambient';
 import { poseFor, type CameraMode, type CameraPose } from './camera';
 import { TUBE_COLORS } from './models/common';
 import { DEFAULT_CABINET_LAYOUT, FdhCabinet, Handhole, NapPedestal, PopBuilding, Yard } from './models/plant';
@@ -144,16 +145,18 @@ export function SceneContents({ ui, layout, mode, selectedId, openIds, selectedT
   const holeXs = useMemo(() => layout.placements.filter((p) => p.kind === 'handhole').map((p) => p.position.x), [layout]);
   const houses = layout.placements.filter((p) => p.kind === 'house');
   const oltDevice = ui.world.devices.find((d) => d.role === 'olt');
+  const sky = useMemo(() => ambientFor(ui.world.environment.timeOfDay, ui.world.environment.weather), [ui.world.environment.timeOfDay, ui.world.environment.weather]);
   const decorated = quality === 'full';
 
   return (
     <>
       <KickFirstFrame />
-      <ambientLight intensity={0.62} />
-      <hemisphereLight args={['#cfe2ff', '#6b5a44', 0.55]} />
-      <directionalLight position={[-30, 45, -20]} intensity={1.25} castShadow={false} />
-      <fog attach="fog" args={['#b9c6d4', 60, quality === 'full' ? 260 : 160]} />
-      <color attach="background" args={['#aebfd0']} />
+      {/* Light comes from the scenario: a 07:00 marine-layer job does not look like 15:00 clear. */}
+      <ambientLight intensity={sky.ambientIntensity} />
+      <hemisphereLight args={[sky.hemisphere.sky, sky.hemisphere.ground, sky.hemisphere.intensity]} />
+      <directionalLight position={sky.sun.position} intensity={sky.sun.intensity} color={sky.sun.color} castShadow={false} />
+      <fog attach="fog" args={[sky.sky, sky.fogNear, quality === 'full' ? sky.fogFar : Math.min(sky.fogFar, 160)]} />
+      <color attach="background" args={[sky.sky]} />
 
       <Ground layout={layout} xray={xray} decorated={decorated} locateMarkXs={locateMarkXs} holeXs={holeXs} />
       <CableRoutes layout={layout} spanMarks={spanMarks} tracedSpanIds={tracedSpanIds} xray={xray} />
@@ -264,13 +267,15 @@ export function PlantScene(props: Omit<PlantSceneProps, 'layout'> & { layout: Sc
 
   useEffect(() => setUserMoved(false), [mode, focus?.nodeId]);
 
+  const canvasSky = ambientFor(props.ui.world.environment.timeOfDay, props.ui.world.environment.weather).sky;
+
   return (
     <Canvas
       frameloop="demand"
       dpr={quality === 'full' ? [1, 1.6] : [0.75, 1]}
       gl={{ antialias: quality === 'full', powerPreference: 'low-power' }}
       camera={{ position: [pose.position.x, pose.position.y, pose.position.z], fov: 55, near: 0.05, far: 400 }}
-      style={{ background: '#aebfd0', touchAction: 'none' }}
+      style={{ background: canvasSky, touchAction: 'none' }}
       onPointerMissed={() => props.onSelect(null)}
     >
       {!userMoved && <CameraRig pose={pose} controls={controls} onSettled={() => undefined} />}

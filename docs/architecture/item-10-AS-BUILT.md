@@ -109,6 +109,18 @@ interior lights come up behind it, the shelves have lit top lips and dark unders
 instruments sit in foam cutouts (an empty one is outlined in red), and the launch reel
 stands on its spindle.
 
+### Ambient truth (spec §5)
+
+`src/ui/scene/ambient.ts` — `timeOfDay` and `weather` had been carried by every scenario
+since the generator was written and read by nothing but a shift label. They now drive sky
+colour, fog distance, sun position, intensity and colour. `t5-everyones-down` is a 19:45
+callout and now looks like one; `t4` at 14:10 overcast is flat and grey; a marine layer
+closes the fog to 110 m so you cannot see down the street. The phone's clock reads from the
+same value, so the screen in your hand agrees with the sky.
+
+Pure and tested, including that the sun never drops below the horizon and an unknown
+weather string falls back to clear rather than producing a black scene.
+
 ### Compass (spec §6, last bullet)
 
 `src/ui/scene/compass.ts` + `CompassRose.tsx`. Derived from the camera pose, which was
@@ -129,8 +141,6 @@ Stated plainly so the next session does not have to discover it.
   action to clean a tip with — so it announced a consequence that never arrived. A pip
   saying `TIP DIRTY` above an instrument that reads normally is a lie to the trainee. Put
   it back when `scopeInspect` can be told about it and the shelf can offer a cleaning stick.
-- **Ambient truth (spec §5).** `environment.timeOfDay` and weather are carried by the
-  scenario and still unused by the renderer.
 - **Prep phase.** The night-before / morning pre-trip screens, and the drive back to the
   yard, are not built. Readiness is decided by seed rather than by anything you did.
 

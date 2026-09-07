@@ -12,12 +12,14 @@
 import { useRef, type PointerEvent, type ReactNode } from 'react';
 import { useDockNavigation } from './dockNavigation';
 import { isStowSwipe } from './navigation';
+import { minutesOf } from '../scene/ambient';
 
-/** Shift start, so the phone clock reads like a working day rather than 00:04. */
-const SHIFT_START_MINUTES = 7 * 60 + 40;
+/** Fallback only: the scenario's own time of day is used when it parses. */
+const DEFAULT_START_MINUTES = 7 * 60 + 40;
 
-function clockAt(simSeconds: number): string {
-  const total = SHIFT_START_MINUTES + Math.floor(simSeconds / 60);
+/** The phone agrees with the sky. Simulated seconds run on from the scenario's clock. */
+function clockAt(simSeconds: number, startMinutes: number): string {
+  const total = startMinutes + Math.floor(simSeconds / 60);
   return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }
 
@@ -41,8 +43,9 @@ function Battery({ pct }: { pct: number }) {
   );
 }
 
-export function PhoneSlab({ clockSeconds, badge, children }: { clockSeconds: number; badge: number; children: ReactNode }) {
+export function PhoneSlab({ clockSeconds, startTime, badge, children }: { clockSeconds: number; startTime: string; badge: number; children: ReactNode }) {
   const navigation = useDockNavigation();
+  const startMinutes = minutesOf(startTime) ?? DEFAULT_START_MINUTES;
   const stowed = navigation.presentation === 'stowed';
   const swipe = useRef<{ x: number; y: number; time: number; id: number } | null>(null);
 
@@ -137,7 +140,7 @@ export function PhoneSlab({ clockSeconds, badge, children }: { clockSeconds: num
               <SignalBars />
               FIBEROPS
             </span>
-            <span style={{ color: 'var(--ink)', fontSize: 11 }}>{clockAt(clockSeconds)}</span>
+            <span style={{ color: 'var(--ink)', fontSize: 11 }}>{clockAt(clockSeconds, startMinutes)}</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
               {battery}
               <Battery pct={battery} />

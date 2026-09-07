@@ -106,7 +106,7 @@ export function InstrumentDock({ ui, dispatch, initialTab = 'world' }: { ui: UiS
       policy: 'keep-alive',
       // Held, not tabbed: a slab you raise and lower with the same gesture as the instruments.
       render: () => (
-        <PhoneSlab clockSeconds={ui.clockSeconds} badge={waiting}>
+        <PhoneSlab clockSeconds={ui.clockSeconds} startTime={ui.world.environment.timeOfDay} badge={waiting}>
           <Phone ui={ui} dispatch={dispatch} />
         </PhoneSlab>
       ),

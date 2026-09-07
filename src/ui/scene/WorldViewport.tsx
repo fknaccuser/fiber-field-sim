@@ -14,6 +14,7 @@ import { layoutScene, type Placement } from './sceneLayout';
 import { canOpen, lastOtdrShot, ontLeds } from './sceneState';
 import { availableModes, CAMERA_MODE_LABELS, poseFor, type CameraMode } from './camera';
 import { CompassRose } from './CompassRose';
+import { ambientFor } from './ambient';
 import { AccessibleList } from './AccessibleList';
 
 const PlantScene = lazy(() => import('./PlantScene').then((m) => ({ default: m.PlantScene })));
@@ -109,8 +110,12 @@ export function WorldViewport({ ui, dispatch }: { ui: UiSessionState; dispatch(i
 
       {/* Which way you are facing, read off the same pose the camera uses. */}
       {!listMode && (
-        <div style={{ position: 'absolute', top: 44, left: 8 }}>
+        <div style={{ position: 'absolute', top: 44, left: 8, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
           <CompassRose pose={poseFor(effectiveMode, layout, focus, tracedSpanIds)} />
+          {/* Conditions, so the light you are working in is information rather than decor. */}
+          <span className="mono" style={{ fontSize: 9.5, letterSpacing: 1.2, color: 'var(--ink-faint)', paddingLeft: 4 }}>
+            {ambientFor(ui.world.environment.timeOfDay, ui.world.environment.weather).label.toUpperCase()}
+          </span>
         </div>
       )}
 
