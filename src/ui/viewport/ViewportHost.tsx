@@ -44,7 +44,7 @@ export interface ViewportDef<Id extends string> {
   render(): ReactNode;
 }
 
-export function ViewportHost<Id extends string>({ viewports, active, onActivate }: { viewports: Array<ViewportDef<Id>>; active: Id; onActivate(id: Id): void }) {
+export function ViewportHost<Id extends string>({ viewports, active, onActivate, nav }: { viewports: Array<ViewportDef<Id>>; active: Id; onActivate(id: Id): void; nav?: ReactNode }) {
   const everActive = useRef(new Set<Id>());
   everActive.current.add(active);
 
@@ -68,28 +68,32 @@ export function ViewportHost<Id extends string>({ viewports, active, onActivate 
           );
         })}
       </div>
-      <div className="bezel" style={{ display: 'flex', overflowX: 'auto', flexShrink: 0 }}>
-        {viewports.map((v) => (
-          <button
-            key={v.id}
-            type="button"
-            onClick={() => onActivate(v.id)}
-            style={{
-              flex: '1 0 auto',
-              minHeight: 48,
-              minWidth: 64,
-              background: active === v.id ? 'var(--panel-2)' : 'transparent',
-              color: active === v.id ? 'var(--text)' : 'var(--muted)',
-              border: 'none',
-              borderTop: active === v.id ? '2px solid var(--cursor-b)' : '2px solid transparent',
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
-            {v.label}
-          </button>
-        ))}
-      </div>
+      {/* The host owns the stage; the caller owns how you get between viewports. */}
+      {nav ?? (
+        <div className="bezel flat" style={{ display: 'flex', overflowX: 'auto', flexShrink: 0 }}>
+          {viewports.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => onActivate(v.id)}
+              style={{
+                flex: '1 0 auto',
+                minHeight: 48,
+                minWidth: 64,
+                background: active === v.id ? 'var(--panel-2)' : 'transparent',
+                color: active === v.id ? 'var(--cyan)' : 'var(--ink-soft)',
+                border: 'none',
+                borderTop: active === v.id ? '2px solid var(--cyan)' : '2px solid transparent',
+                fontSize: 11,
+                letterSpacing: 1,
+                fontWeight: 800,
+              }}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,26 +1,53 @@
-/* Visual direction tokens -- the only place colors are defined (item 6 doc, section 9). */
+/*
+ * Visual direction. The only place colour is defined.
+ *
+ * The language is a technician's console at night: near-black navy ground with a faint
+ * survey grid, cyan for anything the instrument is telling you, orange for anything that
+ * wants your hands, monospace for every label because this is equipment and not a website.
+ * Panels are cut with corner brackets rather than rounded cards.
+ *
+ * The older token names (--text, --muted, --bezel, --cursor-a/b, --led-*) are kept as
+ * aliases onto the new palette so every existing component reskins without being touched.
+ */
 :root {
-  --bg: #0b0f14;
-  --panel: #121821;
-  --panel-2: #1a2230;
-  --bezel: #2a3441;
-  --text: #d7dee8;
-  --muted: #8a96a6;
+  /* Ground */
+  --bg: #070c12;
+  --panel: #0d141c;
+  --panel-2: #0a121b;
+  --term-bg: #04080c;
+  --line: #1c2938;
 
-  --trace: #ffb000;
-  --grid: #1f2a38;
-  --cursor-a: #3ddc97;
-  --cursor-b: #5ab0ff;
-  --marker: #ff5c5c;
-  --noise: #4a5568;
+  /* Ink */
+  --ink: #d9e4ec;
+  --ink-soft: #7e93a6;
 
-  --led-ok: #37d67a;
-  --led-warn: #ffb000;
-  --led-alarm: #ff4d4d;
-  --seg: #ff9d00;
+  /* Signal */
+  --cyan: #3be8d8;
+  --orange: #ff6a13;
+  --green: #2ee58a;
+  --red: #ff4d5e;
+  --amber: #ffb020;
+  --blue: #3b82f6;
+
+  /* --- aliases: existing components keep working, and reskin for free --- */
+  --text: var(--ink);
+  --muted: var(--ink-soft);
+  --bezel: var(--line);
+  --trace: var(--amber);
+  --grid: #16222f;
+  --cursor-a: var(--green);
+  --cursor-b: var(--cyan);
+  --marker: var(--red);
+  --noise: #33465a;
+  --led-ok: var(--green);
+  --led-warn: var(--amber);
+  --led-alarm: var(--red);
+  --seg: var(--amber);
 
   --font-chrome: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'JetBrains Mono', monospace;
+  /* Labels, buttons and readouts are all equipment lettering. */
+  --font-label: var(--font-mono);
 
   --touch-min: 44px;
 }
@@ -38,43 +65,226 @@ body,
 
 body {
   background: var(--bg);
-  color: var(--text);
+  /* A survey grid under a soft glow, so the ground is never dead flat. */
+  background-image:
+    radial-gradient(ellipse 80% 40% at 50% -10%, rgba(59, 232, 216, 0.06), transparent),
+    repeating-linear-gradient(0deg, rgba(59, 232, 216, 0.035) 0 1px, transparent 1px 44px),
+    repeating-linear-gradient(90deg, rgba(59, 232, 216, 0.035) 0 1px, transparent 1px 44px);
+  background-attachment: fixed;
+  color: var(--ink);
   font-family: var(--font-chrome);
+  -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
 }
 
+/* CRT scanlines over everything, never interactive. */
+.scan {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0 1px, transparent 1px 3px);
+}
+
 button {
-  font-family: inherit;
+  font-family: var(--font-label);
   color: inherit;
 }
 
-/* Equipment chrome, not cards: an inner highlight plus a drop shadow, never a gradient. */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 1px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgba(59, 232, 216, 0.3);
+}
+
+/*
+ * Equipment chrome. Square corners, a hairline, and machined corner brackets — the
+ * brackets are absolutely positioned so they never affect layout inside the panel.
+ */
 .bezel {
+  position: relative;
   background: var(--panel);
-  border: 1px solid var(--bezel);
-  border-radius: 8px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 2px 6px rgba(0, 0, 0, 0.4);
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.bezel::before,
+.bezel::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--cyan);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.bezel::before {
+  top: -1px;
+  left: -1px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.bezel::after {
+  bottom: -1px;
+  right: -1px;
+  border-left: none;
+  border-top: none;
+}
+
+/* Opt out where a panel is purely structural (tab strips, backdrops). */
+.bezel.flat::before,
+.bezel.flat::after {
+  display: none;
 }
 
 .mono {
   font-family: var(--font-mono);
 }
 
-.dock-back { display: flex; align-items: center; gap: 12px; padding: 0 8px; background: var(--panel); font-size: 12px; color: var(--muted); }
-.dock-back button, .held-grip button { min-height: 44px; min-width: 64px; border: 0; border-radius: 6px; padding: 6px 12px; background: var(--panel-2); color: var(--text); }
-.held-body { transition: transform 250ms ease; touch-action: none; }
-.held-body.is-stowed { transform: translateY(calc(100% + 40px)); pointer-events: none; }
-.held-body.is-expanded { inset: 0 !important; padding: 6px !important; border-radius: 0 !important; }
-.held-body [data-device-screen] { touch-action: pan-y; }
-.held-grip { display: flex; align-items: center; justify-content: center; gap: 12px; flex-shrink: 0; color: var(--muted); }
-.held-raise { position: absolute; bottom: 0; left: 6px; right: 6px; min-height: 50px; display: flex; gap: 10px; align-items: center; padding: 8px 12px; border: 1px solid var(--bezel); border-radius: 10px 10px 0 0; background: var(--panel); color: var(--text); text-align: left; }
-.held-raise > span:last-child { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.held-raise strong { flex-shrink: 0; font-size: 12px; }
-.held-ports { flex-wrap: wrap; }
-.held-ports button { min-height: 44px !important; }
-.held-body button:focus-visible, .held-raise:focus-visible, .dock-back button:focus-visible { outline: 2px solid var(--cursor-b); outline-offset: 2px; }
-@media (max-width: 480px) { .held-body { padding: 10px !important; gap: 6px !important; top: 48px !important; } }
-@media (prefers-reduced-motion: reduce) { .held-body { transition: none; } }
+/* Small letterspaced caps — section kickers, equipment labels. */
+.eyebrow {
+  font-family: var(--font-label);
+  font-size: 10px;
+  letter-spacing: 3px;
+  font-weight: 800;
+  color: var(--orange);
+  text-transform: uppercase;
+}
+
+.hud-title {
+  font-family: var(--font-label);
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #fff;
+  text-shadow: 0 0 14px rgba(59, 232, 216, 0.35);
+}
+
+/* --- held instrument shell (item 9, stow/raise) --- */
+.dock-back {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-label);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: var(--ink-soft);
+}
+.dock-back button,
+.held-grip button {
+  min-height: 44px;
+  min-width: 64px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--cyan);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  font-weight: 800;
+}
+.dock-back button:hover,
+.held-grip button:hover {
+  border-color: var(--cyan);
+  background: rgba(59, 232, 216, 0.07);
+}
+.held-body {
+  transition: transform 250ms ease;
+  touch-action: none;
+}
+.held-body.is-stowed {
+  transform: translateY(calc(100% + 40px));
+  pointer-events: none;
+}
+.held-body.is-expanded {
+  inset: 0 !important;
+  padding: 6px !important;
+  border-radius: 0 !important;
+}
+.held-body [data-device-screen] {
+  touch-action: pan-y;
+}
+.held-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-shrink: 0;
+  color: var(--ink-soft);
+}
+.held-raise {
+  position: absolute;
+  bottom: 0;
+  left: 6px;
+  right: 6px;
+  min-height: 50px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid var(--cyan);
+  border-bottom: none;
+  border-radius: 2px 2px 0 0;
+  background: var(--panel);
+  box-shadow: 0 0 18px rgba(59, 232, 216, 0.16) inset;
+  color: var(--ink);
+  text-align: left;
+  font-family: var(--font-label);
+}
+.held-raise > span:last-child {
+  font-size: 11px;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.held-raise strong {
+  flex-shrink: 0;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--cyan);
+}
+.held-ports {
+  flex-wrap: wrap;
+}
+.held-ports button {
+  min-height: 44px !important;
+}
+.held-body button:focus-visible,
+.held-raise:focus-visible,
+.dock-back button:focus-visible {
+  outline: 1px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .held-body {
+    padding: 10px !important;
+    gap: 6px !important;
+    top: 48px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .held-body {
+    transition: none;
+  }
+  .scan {
+    display: none;
+  }
+}

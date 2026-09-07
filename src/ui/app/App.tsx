@@ -11,6 +11,7 @@ export function App() {
         <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <AppRoutes />
         </div>
+        <div className="scan" aria-hidden />
         <ServiceWorkerBridge />
       </SessionStoreProvider>
     </BrowserRouter>

@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { DockNavigation } from './dockNavigation';
+import { DockBar } from './DockBar';
+import { ToolShelf } from '../truck/ToolShelf';
 import { presentTool, pushPlace, type DockPlace, type TabId, type ToolPresentation } from './navigation';
 import type { UiSessionState } from '../../session/runner';
 import type { Intent } from '../../session/types';
@@ -22,7 +24,7 @@ export type { TabId } from './navigation';
 const WorldViewport = lazy(() => import('../scene/WorldViewport').then((m) => ({ default: m.WorldViewport })));
 const MapViewport = lazy(() => import('../map/MapViewport').then((m) => ({ default: m.MapViewport })));
 
-export function InstrumentDock({ ui, dispatch, initialTab = 'phone' }: { ui: UiSessionState; dispatch(intent: Intent): void; initialTab?: TabId }) {
+export function InstrumentDock({ ui, dispatch, initialTab = 'world' }: { ui: UiSessionState; dispatch(intent: Intent): void; initialTab?: TabId }) {
   const location = useLocation();
   const navigate = useNavigate();
   const runKey = `${ui.meta.scenarioId}:${ui.meta.seed}`;
@@ -68,6 +70,7 @@ export function InstrumentDock({ ui, dispatch, initialTab = 'phone' }: { ui: UiS
         </Suspense>
       ),
     },
+    { id: 'shelf', label: 'Tool shelf', policy: 'keep-alive', render: () => <ToolShelf ui={ui} onOpen={setTab} /> },
     {
       id: 'otdr',
       label: 'OTDR',
@@ -100,7 +103,7 @@ export function InstrumentDock({ ui, dispatch, initialTab = 'phone' }: { ui: UiS
       {(stack.length > 1 || tab !== 'world') && (
         <div className="dock-back"><button type="button" onClick={back}>← Back</button><span>{viewports.find((v) => v.id === tab)?.label}{place.presentation !== 'raised' ? ` · ${place.presentation}` : ''}</span></div>
       )}
-      <ViewportHost<TabId> viewports={viewports} active={tab} onActivate={setTab} />
+      <ViewportHost<TabId> viewports={viewports} active={tab} onActivate={setTab} nav={<DockBar active={tab} onGo={setTab} phoneBadge={ui.world.customerReports.length} />} />
     </DockNavigation.Provider>
   );
 }
