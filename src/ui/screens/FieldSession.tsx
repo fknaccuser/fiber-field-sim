@@ -18,6 +18,8 @@ function describeResult(result: PerformResult): string {
       return `Power meter: ${result.dbm === null ? 'no signal' : `${result.dbm.toFixed(1)} dBm`}`;
     case 'comms':
       return 'Replied';
+    case 'clean-probe':
+      return result.cleaned ? 'Probe tip cleaned' : (result.reason ?? 'Nothing to clean');
     case 'vfl':
       return `VFL: ${result.leaks.length} leak(s) found`;
     case 'scope':

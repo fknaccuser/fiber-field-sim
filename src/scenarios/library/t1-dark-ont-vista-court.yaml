@@ -16,7 +16,7 @@ profiles:
 environment:
   weather: clear
   timeOfDay: "10:30"
-truckInventory: [otdr, power-meter, vfl, inspection-scope, launch-cable-500m, laptop]
+truckInventory: [otdr, power-meter, vfl, inspection-scope, launch-cable-500m, laptop, cleaning-kit]
 startLocationNodeId: ont-vista-114
 remoteCliAccess: true
 remoteHostAccess: false

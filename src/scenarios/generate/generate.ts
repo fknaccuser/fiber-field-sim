@@ -995,7 +995,7 @@ export function generateScenario(params: GeneratorParams, seed: number): Scenari
     today: TODAY,
     profiles: PROFILES,
     environment: { weather: pick(rng, ['clear', 'overcast', 'marine-layer', 'hot']), timeOfDay: `${rng.int(7, 18)}:${pick(rng, ['00', '15', '30', '45'])}` },
-    truckInventory: ['otdr', 'power-meter', 'vfl', 'inspection-scope', 'launch-cable-500m', 'laptop'],
+    truckInventory: ['otdr', 'power-meter', 'vfl', 'inspection-scope', 'launch-cable-500m', 'laptop', 'cleaning-kit'],
     timeBudgetMinutes: params.tier >= 2 ? 45 + 15 * params.tier + 10 * truckRolls : undefined,
     startLocationNodeId: built.startLocationNodeId,
     remoteCliAccess: true,

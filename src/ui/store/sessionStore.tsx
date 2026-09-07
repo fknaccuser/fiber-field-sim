@@ -34,6 +34,8 @@ function intentFromActionEvent(action: UiActionEvent): Intent {
       return { type: 'otdr-shot', access: action.access, settings: action.settings };
     case 'power-meter':
       return { type: 'power-meter', nodeId: action.nodeId, wavelengthNm: action.wavelengthNm, strand: action.strand };
+    case 'clean-probe':
+      return { type: 'clean-probe' };
     case 'vfl':
       return { type: 'vfl', spanId: action.spanId, fromNodeId: action.fromNodeId };
     case 'scope':

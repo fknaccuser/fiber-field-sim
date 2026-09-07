@@ -61,6 +61,7 @@ export function makeSession(opts: {
     cliSessions: {},
     commsEvents: [],
     commsHandled: [],
+  probeTipDirty: false,
     ended: { by: opts.endedBy ?? 'diagnosis', atSimSeconds: opts.clockSeconds ?? 0 },
   };
 }

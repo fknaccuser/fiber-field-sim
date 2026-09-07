@@ -55,6 +55,7 @@ export type Intent =
   | { type: 'hint' }
   | { type: 'excavate'; nodeId: string; method: 'hand' | 'machine'; distanceFromMarksInches: number }
   | { type: 'comms'; eventId: string; replyId: string; seconds: number }
+  | { type: 'clean-probe' }
   | { type: 'diagnosis'; diagnosis: Diagnosis };
 
 export interface DiagnosisClaim {
@@ -102,6 +103,7 @@ export type ActionEvent = ActionEventBase &
     | { type: 'hint'; level: number; cost: number; text: string; refused: boolean }
     | { type: 'excavate'; nodeId: string; method: 'hand' | 'machine'; distanceFromMarksInches: number; strike: boolean }
     | { type: 'comms'; eventId: string; replyId: string; from: string; subject: string; reply: string }
+    | { type: 'clean-probe'; cleaned: boolean; reason: string | null }
     | { type: 'diagnosis'; diagnosis: Diagnosis }
     /** A presence/inventory rule blocked the intent; costs 0 time but is still logged for the replay. */
     | { type: 'refused'; intent: Intent; reason: string }
@@ -125,5 +127,7 @@ export interface SessionState {
   commsEvents: CommsEvent[];
   /** Ids of messages already dealt with. */
   commsHandled: string[];
+  /** A contaminated probe tip reads dirt onto every endface until it is cleaned. */
+  probeTipDirty: boolean;
   ended: null | { by: 'diagnosis' | 'safety-strike'; atSimSeconds: number };
 }

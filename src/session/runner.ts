@@ -36,6 +36,7 @@ export type PerformResult =
   | { type: 'hint'; text: string | null }
   | { type: 'excavate'; strike: boolean }
   | { type: 'comms'; replyId: string }
+  | { type: 'clean-probe'; cleaned: boolean; reason: string | null }
   | { type: 'diagnosis'; report: ScoreReport }
   | { type: 'refused'; reason: string };
 
@@ -47,6 +48,8 @@ export function startSession(world: WorldState, profiles: SessionState['profiles
     profiles,
     clockSeconds: 0,
     locationNodeId: meta.startLocationNodeId,
+    // The morning follows you into the field: a tip you did not clean is still dirty.
+    probeTipDirty: meta.readiness?.fault === 'dirty-scope-tip',
     log: [],
     blobs: {},
     hintsUsed: 0,
@@ -120,6 +123,8 @@ export function perform(state: SessionState, intent: Intent): { state: SessionSt
       return performVfl(state, intent);
     case 'scope':
       return performScope(state, intent);
+    case 'clean-probe':
+      return performCleanProbe(state);
     case 'cli':
       return performCli(state, intent);
     case 'truck-roll':
@@ -180,9 +185,35 @@ function performVfl(state: SessionState, intent: Extract<Intent, { type: 'vfl' }
 }
 
 function performScope(state: SessionState, intent: Extract<Intent, { type: 'scope' }>) {
-  const result = scopeInspect(state.world, intent.spanId, intent.eventId);
+  const result = scopeInspect(state.world, intent.spanId, intent.eventId, { dirtyTip: state.probeTipDirty });
   const action: ActionEvent = { ...nextActionBase(state), durationSeconds: result.simulatedSeconds, type: 'scope', spanId: intent.spanId, eventId: intent.eventId, grade: result.grade, zones: result.zones };
   return { state: appendAction(state, action), result: { type: 'scope' as const, grade: result.grade, zones: result.zones } };
+}
+
+/**
+ * A cleaning stick and thirty seconds. Refused without a cleaning kit on the truck, which is
+ * what makes the `no-cleaning-kit` morning bite: the two faults can strand you together.
+ */
+function performCleanProbe(state: SessionState) {
+  const hasKit = state.world.truckInventory.includes('cleaning-kit');
+  const reason = !hasKit
+    ? 'No cleaning supplies on the truck.'
+    : !state.probeTipDirty
+      ? 'The tip is already clean.'
+      : null;
+  const cleaned = reason === null;
+  const action: ActionEvent = {
+    ...nextActionBase(state),
+    durationSeconds: cleaned ? 30 : 5,
+    type: 'clean-probe',
+    cleaned,
+    reason,
+  };
+  const next = appendAction(state, action);
+  return {
+    state: cleaned ? { ...next, probeTipDirty: false } : next,
+    result: { type: 'clean-probe' as const, cleaned, reason },
+  };
 }
 
 function performCli(state: SessionState, intent: Extract<Intent, { type: 'cli' }>) {
@@ -333,6 +364,8 @@ export interface UiSessionState {
   cliSessions: Record<string, CliSession>;
   commsEvents: SessionState['commsEvents'];
   commsHandled: string[];
+  /** Safe to surface: it describes your own kit, never the plant or the fault. */
+  probeTipDirty: boolean;
   ended: SessionState['ended'];
 }
 
@@ -384,6 +417,7 @@ export function redactForUi(state: SessionState): UiSessionState {
     cliSessions: state.cliSessions,
     commsEvents: state.commsEvents,
     commsHandled: state.commsHandled,
+    probeTipDirty: state.probeTipDirty,
     ended: state.ended,
   };
 }

@@ -12,13 +12,12 @@ import type { Intent } from './types';
 import { ROLE_POLICY, type Role } from './roles';
 
 /**
- * Note the absence of a dirty-probe-tip morning. It was written, and removed again: it took
- * nothing off the truck, no instrument read differently because of it, and there was no
- * action to clean the tip with — so it announced a consequence that never arrived. A
- * readiness fault has to be visible somewhere real or it is a lie to the trainee. Put it
- * back when `scopeInspect` can be told about it and the shelf can offer a cleaning stick.
+ * `dirty-scope-tip` was removed once, for announcing a consequence that never arrived, and
+ * is back now that it has one: the scope reads contaminated through a dirty tip, and the
+ * tip can be cleaned with a stick off the shelf. Every fault in this list must be visible
+ * somewhere real, or it is a lie to the trainee.
  */
-export type ReadinessFault = 'forgot-vfl' | 'forgot-scope' | 'flat-otdr-battery' | 'no-cleaning-kit';
+export type ReadinessFault = 'forgot-vfl' | 'forgot-scope' | 'flat-otdr-battery' | 'dirty-scope-tip' | 'no-cleaning-kit';
 
 export interface Readiness {
   fault: ReadinessFault | null;
@@ -54,6 +53,12 @@ const DETAIL: Record<ReadinessFault, { removes: string[]; needs: string[]; headl
     headline: 'The OTDR is dead. It has been sitting off the charger since Friday.',
     coaching: 'Put the tester on charge overnight. A flat OTDR is a wasted truck roll.',
   },
+  'dirty-scope-tip': {
+    removes: [],
+    needs: [],
+    headline: 'The scope tip is filthy. Every end-face you inspect will read dirty until you clean it.',
+    coaching: 'Clean the probe tip before you inspect anything, or you will condemn a good connector.',
+  },
   'no-cleaning-kit': {
     removes: ['cleaning-kit'],
     needs: [],
@@ -62,7 +67,7 @@ const DETAIL: Record<ReadinessFault, { removes: string[]; needs: string[]; headl
   },
 };
 
-const ORDER: ReadinessFault[] = ['forgot-vfl', 'forgot-scope', 'flat-otdr-battery', 'no-cleaning-kit'];
+const ORDER: ReadinessFault[] = ['forgot-vfl', 'forgot-scope', 'flat-otdr-battery', 'dirty-scope-tip', 'no-cleaning-kit'];
 
 /** Inventory strings the reference solution genuinely depends on. */
 export function toolsRequiredBy(steps: readonly Intent[]): Set<string> {
@@ -80,12 +85,18 @@ export function toolsRequiredBy(steps: readonly Intent[]): Set<string> {
  * Decides the morning. `referenceSteps` is used only to guarantee the failure never removes
  * something the job needs — it is never surfaced to the trainee.
  */
-export function readinessFor(seed: number, role: Role, referenceSteps: readonly Intent[]): Readiness {
+export function readinessFor(
+  seed: number,
+  role: Role,
+  referenceSteps: readonly Intent[],
+  /** Faults the trainee guarded against on the pre-trip. Checking a thing means it is right. */
+  prepared: readonly ReadinessFault[] = [],
+): Readiness {
   const rng = createRng(deriveSeed(seed, 'readiness', role));
   if (rng.next() > CHANCE[role]) return NONE;
 
   const required = toolsRequiredBy(referenceSteps);
-  const safe = ORDER.filter((f) => DETAIL[f].needs.every((tool) => !required.has(tool)));
+  const safe = ORDER.filter((f) => DETAIL[f].needs.every((tool) => !required.has(tool)) && !prepared.includes(f));
   if (safe.length === 0) return NONE;
 
   const fault = safe[rng.int(0, safe.length - 1)];

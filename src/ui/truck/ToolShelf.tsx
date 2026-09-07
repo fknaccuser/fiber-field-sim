@@ -5,9 +5,11 @@
  */
 import { useEffect, useState } from 'react';
 import type { UiSessionState } from '../../session/runner';
+import type { Intent } from '../../session/types';
 import type { TabId } from '../field/navigation';
 import { TOOL_ART } from './toolModels';
 import { consumables, LAPTOP_APPS, shelfSlots } from './shelfState';
+import { SoftKey } from '../components/SoftKey';
 
 /** A shelf edge with real thickness: lit top lip, dark underside, extruded front rail. */
 function Rail({ label }: { label?: string }) {
@@ -113,11 +115,12 @@ function Reel({ metres }: { metres: string }) {
   );
 }
 
-export function ToolShelf({ ui, onOpen }: { ui: UiSessionState; onOpen(tab: TabId): void }) {
+export function ToolShelf({ ui, dispatch, onOpen }: { ui: UiSessionState; dispatch(intent: Intent): void; onOpen(tab: TabId): void }) {
   const slots = shelfSlots(ui.world.truckInventory);
   const stock = consumables(ui.world.truckInventory);
   // The reel is a physical object on the shelf, not a chip in a row.
   const reel = stock.find((c) => c.label === 'Launch reel' && c.present) ?? null;
+  const hasCleaningKit = ui.world.truckInventory.includes('cleaning-kit');
   const missing = slots.filter((s) => !s.present);
   // The morning itself, when it went wrong. `coaching` is already role-gated where it is
   // decided — junior grades are told the habit that prevents it, senior grades are not.
@@ -200,6 +203,13 @@ export function ToolShelf({ ui, onOpen }: { ui: UiSessionState; onOpen(tab: TabI
                 <div style={{ fontSize: 10.5, color: present ? 'var(--ink-soft)' : '#33465a', marginTop: 4, lineHeight: 1.4 }}>
                   {present ? tool.blurb : 'You did not load this before you left the yard.'}
                 </div>
+                {/* Condition, shown only where the engine actually models it. */}
+                {present && tool.id === 'scope' && ui.probeTipDirty && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7 }}>
+                    <span className="pulse-dot" style={{ background: 'var(--amber)', width: 7, height: 7 }} />
+                    <span className="mono" style={{ fontSize: 9, letterSpacing: 1.4, color: 'var(--amber)' }}>TIP CONTAMINATED</span>
+                  </div>
+                )}
               </div>
             </button>
           );
@@ -237,6 +247,22 @@ export function ToolShelf({ ui, onOpen }: { ui: UiSessionState; onOpen(tab: TabI
         </div>
 
         <div className="eyebrow" style={{ color: 'var(--cyan)', marginTop: 14 }}>CONSUMABLES</div>
+        {ui.probeTipDirty && (
+          <div className="bezel alert" style={{ marginTop: 8, padding: '9px 11px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 150 }}>
+              <div className="mono" style={{ fontSize: 10, letterSpacing: 1.3, color: 'var(--amber)' }}>PROBE TIP CONTAMINATED</div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', marginTop: 3, lineHeight: 1.45 }}>
+                Every end-face will read dirty — the same debris, in the same zones, on every connector.
+              </div>
+            </div>
+            <SoftKey
+              label={hasCleaningKit ? 'Clean the tip · 30s' : 'No cleaning kit'}
+              disabled={!hasCleaningKit}
+              onClick={() => dispatch({ type: 'clean-probe' })}
+            />
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           {reel && <Reel metres={reel.detail} />}
           {stock.filter((c) => c.label !== 'Launch reel' || !reel).map((c) => (

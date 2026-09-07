@@ -78,7 +78,7 @@ export function InstrumentDock({ ui, dispatch, initialTab = 'world' }: { ui: UiS
         </Suspense>
       ),
     },
-    { id: 'shelf', label: 'Tool shelf', policy: 'keep-alive', render: () => <ToolShelf ui={ui} onOpen={setTab} /> },
+    { id: 'shelf', label: 'Tool shelf', policy: 'keep-alive', render: () => <ToolShelf ui={ui} dispatch={dispatch} onOpen={setTab} /> },
     {
       id: 'otdr',
       label: 'OTDR',

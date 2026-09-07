@@ -34,6 +34,7 @@ const METHOD: Record<Intent['type'], string> = {
   'truck-roll': 'Move to the next accessible test boundary.',
   'power-meter': 'Establish whether usable light reaches the test boundary.',
   'otdr-shot': 'Locate loss and reflection events along the path.',
+  'clean-probe': 'Clean the probe tip so the scope shows the connector, not the tip.',
   scope: 'Check the condition of the connector face.',
   vfl: 'Check continuity along the selected fiber.',
   cli: 'Compare network and service state with your observations.',

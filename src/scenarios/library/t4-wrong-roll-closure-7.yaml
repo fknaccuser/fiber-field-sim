@@ -16,7 +16,7 @@ profiles:
 environment:
   weather: overcast
   timeOfDay: "14:10"
-truckInventory: [otdr, power-meter, vfl, inspection-scope, launch-cable-500m, laptop]
+truckInventory: [otdr, power-meter, vfl, inspection-scope, launch-cable-500m, laptop, cleaning-kit]
 timeBudgetMinutes: 90
 startLocationNodeId: yard-1
 remoteCliAccess: true

@@ -44,6 +44,8 @@ function labelForIntent(world: SessionState['initialWorld'], intent: Intent): st
       return `OTDR from ${nodeLabel(world, intent.access.accessNodeId)} into ${spanLabel(world, intent.access.launchSpanId)} @${intent.settings.wavelengthNm}nm, ${intent.settings.pulseWidthNs}ns, ${intent.settings.averagingSeconds}s`;
     case 'power-meter':
       return `Power meter at ${nodeLabel(world, intent.nodeId)} @${intent.wavelengthNm}nm`;
+    case 'clean-probe':
+      return 'Clean the inspection probe tip';
     case 'vfl':
       return `VFL on ${spanLabel(world, intent.spanId)} from ${nodeLabel(world, intent.fromNodeId)}`;
     case 'scope':
