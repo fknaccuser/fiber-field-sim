@@ -80,21 +80,24 @@ If that baseline is not green before you start, stop and say so. Do not build on
 - Do not add manufacturer logos, CAD, photographs or proprietary UI. Original "FiberOps"
   branding only. Credible form is fine; copied marks are not.
 
-## Start with
+## Your work order
 
-Two corrections to the stow/raise increment, **before** any new feature work. Both are
-specified in detail in
-[`docs/architecture/item-9-stow-raise.md`](docs/architecture/item-9-stow-raise.md) under
-"Follow-ups — do these first":
+**The active brief is [`docs/architecture/item-10-SPEC-the-experience.md`](docs/architecture/item-10-SPEC-the-experience.md).**
+It supersedes item 9. Read it in full before writing anything — it is a *visual and
+experiential* brief first and a technical one second, because the previous spec described
+behaviour without ever describing the look, and the UI consequently went three build items
+without changing.
 
-1. **Un-gate the instrument screen and restore the live backdrop.** The screen currently
-   does not render until a 3D snapshot succeeds, with no timeout. If no frame is ever
-   produced, the instrument is permanently blank.
-2. **Stop the device collapsing at short viewport heights.** At 739×313 the screen is 4 px
-   tall and the Measure button is not rendered.
+Start with **§7, the teaching layer**. It is the most-requested and least-delivered part of
+the whole project: tier 1 and 2 walking the trainee through the job with steps that name
+questions rather than answers, and — after every submitted diagnosis, at every tier — a
+debrief giving the correct diagnosis, the correct order of steps, and *why each step exists*.
+Most of it is wiring engine output that already exists into a screen that does not.
 
-Then continue with spec §3.1–3.2 — the persistent HUD, the truck, and the physical tool
-shelf — and replace the tab strip.
+Then §3–§4 (loading screen and dispatch dashboard, copied from the reference deployment),
+then §8 (the cabinet), then the rest in the order §11 gives.
 
-*(Historical: the original "start with" for this handoff was spec §3.3, stow/raise. That
-increment is implemented; see the document above.)*
+Two small regressions from the stow/raise increment are still open and are cheap to clear
+first — see [`item-9-stow-raise.md`](docs/architecture/item-9-stow-raise.md) "Follow-ups":
+the instrument screen is gated on a 3D snapshot with no timeout, and the device collapses at
+short viewport heights.
