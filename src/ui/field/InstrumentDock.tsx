@@ -15,9 +15,11 @@ import { ViewportHost, type ViewportDef } from '../viewport/ViewportHost';
 import { useViewportState, writeViewportState } from '../viewport/viewportStore';
 import { TeachingRail } from './TeachingRail';
 import { Phone } from './Phone';
+import { PhoneSlab } from './PhoneSlab';
 import { Records } from './Records';
 import { Diagnose, type DiagnosePrefill } from './Diagnose';
 import { Excavate, excavateAvailable } from './Excavate';
+import { pendingComms } from '../../session/comms';
 
 export type { TabId } from './navigation';
 
@@ -49,6 +51,9 @@ export function InstrumentDock({ ui, dispatch, initialTab = 'world' }: { ui: UiS
   };
   const back = () => stack.length > 1 ? navigate(-1) : setTab('world');
   const [prefill, setPrefill] = useViewportState<DiagnosePrefill | null>('diagnose.prefill', null);
+  // The badge counts what is actually waiting on an answer. Counting the customer reports
+  // instead made it a constant, and a number that never changes is not a notification.
+  const waiting = pendingComms(ui.commsEvents, ui.clockSeconds, ui.commsHandled).length;
 
   const viewports: Array<ViewportDef<TabId>> = [
     {
@@ -95,7 +100,17 @@ export function InstrumentDock({ ui, dispatch, initialTab = 'world' }: { ui: UiS
     { id: 'vfl', label: 'VFL', policy: 'unmount', render: () => <Vfl ui={ui} dispatch={dispatch} /> },
     { id: 'scope', label: 'Scope', policy: 'unmount', render: () => <Scope ui={ui} dispatch={dispatch} /> },
     { id: 'terminal', label: 'Terminal', policy: 'keep-alive', render: () => <Terminal ui={ui} dispatch={dispatch} /> },
-    { id: 'phone', label: 'Phone', policy: 'keep-alive', render: () => <Phone ui={ui} dispatch={dispatch} /> },
+    {
+      id: 'phone',
+      label: 'Phone',
+      policy: 'keep-alive',
+      // Held, not tabbed: a slab you raise and lower with the same gesture as the instruments.
+      render: () => (
+        <PhoneSlab clockSeconds={ui.clockSeconds} badge={waiting}>
+          <Phone ui={ui} dispatch={dispatch} />
+        </PhoneSlab>
+      ),
+    },
     { id: 'records', label: 'Records', policy: 'keep-alive', render: () => <Records ui={ui} dispatch={dispatch} /> },
     { id: 'diagnose', label: 'Diagnose', policy: 'keep-alive', render: () => <Diagnose ui={ui} dispatch={dispatch} prefill={prefill} /> },
   ];
@@ -118,7 +133,7 @@ export function InstrumentDock({ ui, dispatch, initialTab = 'world' }: { ui: UiS
           setTab('world');
         }}
       />
-      <ViewportHost<TabId> viewports={viewports} active={tab} onActivate={setTab} nav={<DockBar active={tab} onGo={setTab} phoneBadge={ui.world.customerReports.length} />} />
+      <ViewportHost<TabId> viewports={viewports} active={tab} onActivate={setTab} nav={<DockBar active={tab} onGo={setTab} phoneBadge={waiting} />} />
     </DockNavigation.Provider>
   );
 }
