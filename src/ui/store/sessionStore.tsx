@@ -8,6 +8,7 @@ import { createContext, useCallback, useContext, useMemo, useReducer, useRef, ty
 import { useNavigate } from 'react-router-dom';
 import { getScenario, instantiateScenario } from '../../scenarios';
 import { DEFAULT_ROLE, ROLE_POLICY, type Role } from '../../session/roles';
+import { applyReadiness, readinessFor } from '../../session/readiness';
 import { resolveProfileSet } from '../../profiles';
 import { perform as runnerPerform, redactForUi, startSession } from '../../session/runner';
 import type { PerformResult, UiActionEvent, UiSessionState } from '../../session/runner';
@@ -132,8 +133,12 @@ function useSessionStoreInternal(): SessionStore {
         role,
         timeBudgetMinutes: baseMeta.timeBudgetMinutes === undefined ? undefined : Math.round(baseMeta.timeBudgetMinutes * policy.timeBudgetMultiplier),
       };
+      // The morning: what actually made it onto the truck. Seeded, and guaranteed never to
+      // remove a tool this job needs.
+      const readiness = readinessFor(seed, role, baseMeta.referenceSolution.steps);
+      const loadedWorld = readiness.removes.length > 0 ? { ...world, truckInventory: applyReadiness(world.truckInventory, readiness) } : world;
       const profiles = resolveProfileSet(def.profiles);
-      const session = startSession(world, profiles, meta);
+      const session = startSession(loadedWorld, profiles, meta);
       void (async () => {
         const traineeId = await getOrCreateTraineeId();
         const identity: SessionIdentity = { id: crypto.randomUUID(), traineeId, startedAt: new Date().toISOString() };
