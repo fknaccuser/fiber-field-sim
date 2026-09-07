@@ -1,0 +1,5 @@
+# Cloudflare Pages: this is a single-page app. Routes like /run/t3-gen-plant-medium are
+# handled by the client-side router, not by files on disk, so every path that is not a real
+# asset must serve index.html and let the app route it. Without this, opening or refreshing
+# any URL other than "/" returns a 404.
+/*    /index.html   200
