@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   bendSignature,
   bidirectionalLoss,
+  generateLink,
+  oneWayMisleads,
   DEFAULT_PROFILE,
   isGainer,
   judgeSet,
@@ -118,5 +120,68 @@ describe('telling a bend from everything else', () => {
 
   it('calls it flat when both wavelengths agree — dirt or a bad cleave, not a bend', () => {
     expect(bendSignature(0.30, 0.33)).toBe('wavelength-flat');
+  });
+});
+
+describe('the link you have to accept', () => {
+  it('is deterministic for a seed', () => {
+    expect(generateLink(9, 6)).toEqual(generateLink(9, 6));
+  });
+
+  it('runs away from the launch, in order', () => {
+    const link = generateLink(4, 6);
+    for (let i = 1; i < link.length; i++) {
+      expect(link[i].distanceKm).toBeGreaterThan(link[i - 1].distanceKm);
+    }
+  });
+
+  it('always averages back to the truth, however badly one direction lies', () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      for (const e of generateLink(seed, 6)) {
+        expect(bidirectionalLoss(e.aToBDb, e.bToADb)).toBeCloseTo(e.trueLossDb, 2);
+      }
+    }
+  });
+
+  it('produces gainers — readings no splice could physically produce', () => {
+    let gainers = 0;
+    for (let seed = 1; seed <= 80; seed++) gainers += generateLink(seed, 6).filter((e) => e.gainer).length;
+    expect(gainers).toBeGreaterThan(0);
+  });
+
+  it('produces links where a one-way reading would have got the call wrong', () => {
+    let misleading = 0;
+    for (let seed = 1; seed <= 80; seed++) misleading += generateLink(seed, 6).filter((e) => oneWayMisleads(e)).length;
+    expect(misleading).toBeGreaterThan(0);
+  });
+
+  it('is mostly good work, so the bad ones stand out rather than being expected', () => {
+    const all = Array.from({ length: 60 }, (_, i) => generateLink(i + 1, 6)).flat();
+    const good = all.filter((e) => e.trueLossDb <= ACCEPT_MEAN_DB_FOR_TEST).length;
+    expect(good / all.length).toBeGreaterThan(0.5);
+  });
+});
+
+const ACCEPT_MEAN_DB_FOR_TEST = 0.1;
+
+describe('the bench always has something to teach', () => {
+  it('every link contains at least one call a one-way reading gets wrong', () => {
+    for (let seed = 1; seed <= 150; seed++) {
+      expect(generateLink(seed, 6).some((e) => oneWayMisleads(e)), `seed ${seed} had no trap`).toBe(true);
+    }
+  });
+
+  it('and the planted trap is the dangerous kind: reads clean from A, fails on the average', () => {
+    let dangerous = 0;
+    for (let seed = 1; seed <= 80; seed++) {
+      for (const e of generateLink(seed, 6)) {
+        if (e.aToBDb >= 0 && e.aToBDb <= 0.1 && bidirectionalLoss(e.aToBDb, e.bToADb) > 0.2) dangerous++;
+      }
+    }
+    expect(dangerous).toBeGreaterThan(0);
+  });
+
+  it('is still deterministic once the trap is planted', () => {
+    expect(generateLink(31, 6)).toEqual(generateLink(31, 6));
   });
 });

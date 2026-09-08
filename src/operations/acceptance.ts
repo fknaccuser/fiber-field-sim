@@ -20,6 +20,8 @@
  * industry figure, NOT this employer's specification, and it says so.
  */
 
+import { createRng, deriveSeed } from '../world';
+
 export type Confidence =
   /** Written in a published standard that can be cited. */
   | 'published-standard'
@@ -187,4 +189,92 @@ export function judgeSet(lossDb: readonly number[], profile: AcceptanceProfile =
  */
 export function bendSignature(loss1310Db: number, loss1550Db: number): 'macrobend' | 'wavelength-flat' {
   return loss1550Db > loss1310Db + 0.15 ? 'macrobend' : 'wavelength-flat';
+}
+
+
+export interface LinkEvent {
+  id: string;
+  label: string;
+  distanceKm: number;
+  /** What the splice actually costs. Never shown until both directions are in. */
+  trueLossDb: number;
+  /** What the OTDR reports shooting A to B. */
+  aToBDb: number;
+  /** And from the far end. */
+  bToADb: number;
+  /** True when one direction reports a physically impossible gain. */
+  gainer: boolean;
+}
+
+/**
+ * A link to accept, with the backscatter mismatch that makes one-way readings lie.
+ *
+ * The mismatch is the whole point. Two fibres spliced together rarely scatter light back
+ * identically, so the step the OTDR measures is offset by that difference — one way it
+ * reads low, the other way it reads high by the same amount, and the truth is the mean.
+ * Roughly a third of these are given a mismatch large enough to change the verdict, and
+ * some of those go far enough to report a gain, which is the version a trainee can actually
+ * see is impossible.
+ */
+export function generateLink(seed: number, count = 6): LinkEvent[] {
+  const rng = createRng(deriveSeed(seed, 'acceptance-link', String(count)));
+  const events: LinkEvent[] = [];
+  let km = 0.4;
+
+  for (let i = 0; i < count; i++) {
+    km += 0.3 + rng.next() * 1.4;
+    // Mostly good work, with a couple that genuinely fail.
+    const trueLoss = rng.next() < 0.25
+      ? 0.16 + rng.next() * 0.22
+      : 0.02 + rng.next() * 0.09;
+    // Backscatter mismatch: usually small, sometimes enough to flip the call.
+    const delta = rng.next() < 0.34 ? 0.08 + rng.next() * 0.14 : rng.next() * 0.03;
+
+    const aToB = Math.round((trueLoss - delta) * 1000) / 1000;
+    const bToA = Math.round((trueLoss + delta) * 1000) / 1000;
+
+    events.push({
+      id: `ev-${i + 1}`,
+      label: `Splice ${i + 1}`,
+      distanceKm: Math.round(km * 100) / 100,
+      trueLossDb: Math.round(trueLoss * 1000) / 1000,
+      aToBDb: aToB,
+      bToADb: bToA,
+      gainer: aToB < 0,
+    });
+  }
+  // A link that happens not to punish a one-way reading teaches nothing, and leaving that
+  // to chance means a trainee can run the bench three times and conclude the lesson is
+  // optional. So if the draw produced no trap, one is planted: a splice that reads
+  // comfortably inside the limit from A, and fails on the average. That is the dangerous
+  // case — not the gainer, which at least looks impossible and invites a second look.
+  if (!events.some((e) => oneWayMisleads(e))) {
+    const i = rng.int(0, events.length - 1);
+    const e = events[i];
+    const trueLoss = 0.26 + rng.next() * 0.1;   // over any profile's single-splice cap
+    const delta = trueLoss - (0.04 + rng.next() * 0.05); // A reads like clean work
+    events[i] = {
+      ...e,
+      trueLossDb: Math.round(trueLoss * 1000) / 1000,
+      aToBDb: Math.round((trueLoss - delta) * 1000) / 1000,
+      bToADb: Math.round((trueLoss + delta) * 1000) / 1000,
+      gainer: trueLoss - delta < 0,
+    };
+  }
+
+  return events;
+}
+
+/**
+ * Would a one-way reading have led you to the wrong call?
+ *
+ * This is the number the bench exists to produce. Judging on `aToB` alone and judging on
+ * the average can disagree in both directions: accepting a splice that actually fails, and
+ * cutting out a splice that was fine all along. Both are expensive, and neither is visible
+ * without shooting the far end.
+ */
+export function oneWayMisleads(event: LinkEvent, profile: AcceptanceProfile = DEFAULT_PROFILE): boolean {
+  const oneWay = event.aToBDb > profile.spliceMaxDb ? 'fail' : event.aToBDb > profile.spliceMeanDb ? 'marginal' : 'pass';
+  const truth = judgeSplice(event.aToBDb, profile, event.bToADb).verdict;
+  return oneWay !== truth;
 }

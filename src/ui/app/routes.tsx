@@ -8,6 +8,7 @@ import { History } from '../screens/History';
 import { DevOtdr } from '../screens/DevOtdr';
 import { TrayBench } from '../operations/TrayBench';
 import { SpliceBench } from '../operations/SpliceBench';
+import { AcceptanceBench } from '../operations/AcceptanceBench';
 
 export function AppRoutes() {
   return (
@@ -21,6 +22,7 @@ export function AppRoutes() {
       <Route path="/compare/:a/:b" element={<Replay />} />
       <Route path="/bench/tray" element={<TrayBench />} />
       <Route path="/bench/splice" element={<SpliceBench />} />
+      <Route path="/bench/test" element={<AcceptanceBench />} />
       <Route path="/dev/otdr" element={<DevOtdr />} />
     </Routes>
   );

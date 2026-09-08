@@ -31,6 +31,7 @@ import { listBenchRuns } from '../store/persistence';
 const BENCH: Partial<Record<JobKind, { to: string; label: string }>> = {
   'ribbon-splice': { to: '/bench/splice', label: 'Open the splice bench →' },
   'closure-dress': { to: '/bench/tray', label: 'Open the tray bench →' },
+  'acceptance-test': { to: '/bench/test', label: 'Open the acceptance bench →' },
 };
 
 const KIND_TAG: Record<JobKind, string> = {
