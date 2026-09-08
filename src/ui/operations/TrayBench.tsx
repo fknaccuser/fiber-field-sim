@@ -20,6 +20,8 @@ import {
   type Tray,
 } from '../../operations/tray';
 import { DEFAULT_PROFILE } from '../../operations/acceptance';
+import { BENCH_DOMAINS, scoreTrayRun } from '../../operations/benchRecord';
+import { getOrCreateTraineeId, saveBenchRun } from '../store/persistence';
 
 /** Standard buffer-tube colour order, which is also the order fibres are worked. */
 const TUBE_ORDER = ['blue', 'orange', 'green', 'brown', 'slate', 'white'] as const;
@@ -65,6 +67,34 @@ export function TrayBench() {
     [rows],
   );
   const verdict = useMemo(() => judgeTray(tray, labelled), [tray, labelled]);
+
+  // A tray has no natural finish the way a ribbon does — you stop when you are satisfied —
+  // so the trainee signs it off explicitly. That is also what happens on a real job.
+  const [signedOff, setSignedOff] = useState<number | null>(null);
+  const score = useMemo(() => scoreTrayRun(verdict), [verdict]);
+
+  const signOff = () => {
+    setSignedOff(score);
+    void (async () => {
+      try {
+        await saveBenchRun({
+          id: crypto.randomUUID(),
+          traineeId: await getOrCreateTraineeId(),
+          kind: 'tray-dress',
+          at: new Date().toISOString(),
+          seed: 0,
+          mistakes: verdict.issues.map((i) => i.code),
+          omitted: [],
+          seconds: 0,
+          passed: verdict.accepted,
+          score,
+          domains: BENCH_DOMAINS['tray-dress'],
+        });
+      } catch {
+        // A bench that cannot write its record is still a usable bench.
+      }
+    })();
+  };
 
   const set = (i: number, patch: Partial<Row>) =>
     setRows((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -192,7 +222,10 @@ export function TrayBench() {
                       onClick={() => setLabelled(!labelled)}>
                 {labelled ? 'Tray labelled' : 'Not labelled'}
               </button>
-              <button type="button" className="hud-btn" onClick={() => setRows(START.map((r) => ({ ...r })))}>Reset</button>
+              <button type="button" className="hud-btn" onClick={() => { setSignedOff(null); setRows(START.map((r) => ({ ...r }))); }}>Reset</button>
+          <button type="button" className="hud-btn hud-btn--cyan" onClick={signOff}>
+            {signedOff === null ? 'Sign the tray off' : `Signed off · ${signedOff}/100`}
+          </button>
               <button type="button" className="hud-btn"
                       onClick={() => setRows((p) => p.map((r) => ({ ...r, viaLimiter: false, coiledSlack: false })))}>
                 Rush it

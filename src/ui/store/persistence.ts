@@ -16,6 +16,7 @@ import { stripGroundTruth } from '../../session/runner';
 import type { UiActionEvent } from '../../session/runner';
 import type { SessionState } from '../../session/types';
 import type { AxisName, ScoreReport } from '../../scoring/types';
+import type { BenchRun } from '../../operations/benchRecord';
 
 export interface StoredSession {
   id: string;
@@ -56,12 +57,18 @@ class FiberSimDb extends Dexie {
   sessions!: Table<StoredSession, string>;
   settings!: Table<StoredSetting, string>;
   personalBests!: Table<PersonalBest, string>;
+  benchRuns!: Table<BenchRun, string>;
   constructor(name = 'fiber-sim') {
     super(name);
     this.version(1).stores({
       sessions: 'id, traineeId, scenarioId, seed, tier, startedAt, endedAt, total',
       settings: 'key',
       personalBests: 'key, total',
+    });
+    // v1 is left exactly as it shipped. Anyone already carrying history keeps it; Dexie
+    // adds the new table on upgrade rather than rebuilding the database.
+    this.version(2).stores({
+      benchRuns: 'id, traineeId, kind, at, score',
     });
   }
 }
@@ -180,4 +187,18 @@ export async function getOrCreateTraineeId(): Promise<string> {
   const id = crypto.randomUUID();
   await setSetting('traineeId', id);
   return id;
+}
+
+/**
+ * Bench work is recorded against the same trainee as a field session, so practice and
+ * performance sit in one history rather than two.
+ */
+export async function saveBenchRun(runRecord: BenchRun): Promise<void> {
+  await db.benchRuns.put(runRecord);
+}
+
+/** Most recent first. */
+export async function listBenchRuns(limit = 50): Promise<BenchRun[]> {
+  const all = await db.benchRuns.toArray();
+  return all.sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
 }

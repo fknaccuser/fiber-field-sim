@@ -13,7 +13,7 @@
  * Where a job has a bench behind it, the card opens it. Where it does not, the card says so
  * rather than offering a button that goes nowhere.
  */
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   buildConstructionDay,
@@ -24,6 +24,8 @@ import {
 } from '../../operations/dispatch';
 import { canExcavate, LEGAL_BASIS } from '../../operations/digalert';
 import type { Role } from '../../session/roles';
+import { BENCH_LABEL, standings, type BenchRun } from '../../operations/benchRecord';
+import { listBenchRuns } from '../store/persistence';
 
 /** Jobs that have somewhere to go. Everything else is honest about not being built yet. */
 const BENCH: Partial<Record<JobKind, { to: string; label: string }>> = {
@@ -136,6 +138,53 @@ function Card({ order, role, now }: { order: WorkOrder; role: Role; now: Date })
   );
 }
 
+/**
+ * Bench work, folded back into the day.
+ *
+ * The point of recording practice is that it changes what dispatch can tell you about
+ * yourself. The weakest standing is shown with the number of runs behind it, because one
+ * bad tray is not a competency problem and a readout that cannot say so sends people to
+ * practise the wrong thing.
+ */
+function BenchRecord() {
+  const [runs, setRuns] = useState<BenchRun[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void listBenchRuns(50).then((r) => { if (alive) setRuns(r); }).catch(() => { if (alive) setRuns([]); });
+    return () => { alive = false; };
+  }, []);
+
+  if (runs === null || runs.length === 0) return null;
+
+  const weakest = standings(runs)[0];
+  const last = runs[0];
+
+  return (
+    <div className="bezel" style={{ padding: '11px 13px', display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div>
+        <div className="mono" style={{ fontSize: 9.5, letterSpacing: 1.5, color: 'var(--ink-faint)' }}>BENCH RUNS LOGGED</div>
+        <div className="readout" style={{ fontSize: 22, color: 'var(--cyan)', marginTop: 3 }}>{runs.length}</div>
+      </div>
+      <div>
+        <div className="mono" style={{ fontSize: 9.5, letterSpacing: 1.5, color: 'var(--ink-faint)' }}>LAST</div>
+        <div style={{ fontSize: 12.5, marginTop: 4 }}>
+          {BENCH_LABEL[last.kind]} · <span style={{ color: last.score >= 85 ? 'var(--green)' : last.score >= 60 ? 'var(--amber)' : 'var(--red)' }}>{last.score}/100</span>
+        </div>
+      </div>
+      {weakest && (
+        <div>
+          <div className="mono" style={{ fontSize: 9.5, letterSpacing: 1.5, color: 'var(--ink-faint)' }}>WEAKEST AT THE BENCH</div>
+          <div style={{ fontSize: 12.5, marginTop: 4 }}>
+            {weakest.domain} · {weakest.average}/100
+            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)' }}> ({weakest.runs} run{weakest.runs === 1 ? '' : 's'})</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ConstructionBoard({ daySeed, role }: { daySeed: number; role: Role }) {
   // Pinned once so the board does not re-roll or re-date itself on every render.
   const now = useMemo(() => new Date(), []);
@@ -152,6 +201,8 @@ export function ConstructionBoard({ daySeed, role }: { daySeed: number; role: Ro
           {blocked > 0 ? `${blocked} OF ${orders.length} BLOCKED` : `${orders.length} READY`}
         </span>
       </div>
+
+      <BenchRecord />
 
       <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
         {orders.map((o) => <Card key={o.ticket} order={o} role={role} now={now} />)}

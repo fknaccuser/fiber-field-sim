@@ -15,7 +15,7 @@
  * Nothing here re-implements the rules: the steps, the mistakes, the losses and the timings
  * all come from operations/ribbon.ts, which was audited against an hour of the real job.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ACCEPT_MAX_DB,
@@ -28,6 +28,8 @@ import {
   type Phase,
   type StepId,
 } from '../../operations/ribbon';
+import { BENCH_DOMAINS, omittedFrom, scoreSpliceRun } from '../../operations/benchRecord';
+import { getOrCreateTraineeId, saveBenchRun } from '../store/persistence';
 
 const PHASE_LABEL: Record<Phase, string> = {
   setup: 'Setup · once a day',
@@ -111,13 +113,45 @@ export function SpliceBench() {
     [mistakes],
   );
 
+  // Recorded once, when the ribbon is finished. Practice that leaves no trace teaches only
+  // whoever happened to be watching.
+  const saved = useRef(false);
+  const score = useMemo(
+    () => scoreSpliceRun({ mistakes, omitted: omittedFrom(done), passed: outcome.pass }),
+    [mistakes, done, outcome.pass],
+  );
+
+  useEffect(() => {
+    if (!finished || saved.current) return;
+    saved.current = true;
+    void (async () => {
+      try {
+        await saveBenchRun({
+          id: crypto.randomUUID(),
+          traineeId: await getOrCreateTraineeId(),
+          kind: 'ribbon-splice',
+          at: new Date().toISOString(),
+          seed,
+          mistakes,
+          omitted: omittedFrom(done),
+          seconds: spent,
+          passed: outcome.pass,
+          score,
+          domains: BENCH_DOMAINS['ribbon-splice'],
+        });
+      } catch {
+        // A bench that cannot write its record is still a usable bench.
+      }
+    })();
+  }, [finished, seed, mistakes, done, spent, outcome.pass, score]);
+
   const take = (id: StepId, mistake?: Mistake) => {
     setDone((d) => [...d, id]);
     if (mistake) setMistakes((m) => [...m, mistake.id]);
     setIndex((i) => i + 1);
   };
 
-  const restart = () => { setIndex(0); setDone([]); setMistakes([]); };
+  const restart = () => { saved.current = false; setIndex(0); setDone([]); setMistakes([]); };
 
   return (
     <div style={{ minHeight: '100%', padding: '18px 14px 40px', maxWidth: 1180, margin: '0 auto' }}>
@@ -206,11 +240,20 @@ export function SpliceBench() {
             <div className="eyebrow" style={{ color: chosen.length === 0 ? 'var(--green)' : 'var(--orange)' }}>
               Debrief
             </div>
-            <h2 className="hud-title" style={{ fontSize: 16, margin: '8px 0 0' }}>
-              {chosen.length === 0
-                ? 'Clean ribbon, clean paperwork.'
-                : `${chosen.length} shortcut${chosen.length === 1 ? '' : 's'} taken.`}
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', margin: '8px 0 0' }}>
+              <h2 className="hud-title" style={{ fontSize: 16, margin: 0 }}>
+                {chosen.length === 0
+                  ? 'Clean ribbon, clean paperwork.'
+                  : `${chosen.length} shortcut${chosen.length === 1 ? '' : 's'} taken.`}
+              </h2>
+              <span style={{ flex: 1 }} />
+              <span className="readout" style={{ fontSize: 30, color: score >= 85 ? 'var(--green)' : score >= 60 ? 'var(--amber)' : 'var(--red)' }}>
+                {score}<span className="unit">/100</span>
+              </span>
+            </div>
+            <div className="mono" style={{ fontSize: 9.5, letterSpacing: 1.3, color: 'var(--ink-faint)', marginTop: 4 }}>
+              LOGGED TO YOUR TRAINING RECORD
+            </div>
             <p style={{ margin: '8px 0 0', fontSize: 13, lineHeight: 1.55, color: 'var(--ink-soft)' }}>
               {chosen.length === 0
                 ? 'Every step done as it should be. Twelve fibres, no re-burns, and a tray someone can re-enter in five years.'
