@@ -6,6 +6,7 @@ import { PreTrip } from '../prep/PreTrip';
 import { Replay } from '../screens/Replay';
 import { History } from '../screens/History';
 import { DevOtdr } from '../screens/DevOtdr';
+import { TrayBench } from '../operations/TrayBench';
 
 export function AppRoutes() {
   return (
@@ -17,6 +18,7 @@ export function AppRoutes() {
       <Route path="/replay/:sessionId" element={<Replay />} />
       <Route path="/history" element={<History />} />
       <Route path="/compare/:a/:b" element={<Replay />} />
+      <Route path="/bench/tray" element={<TrayBench />} />
       <Route path="/dev/otdr" element={<DevOtdr />} />
     </Routes>
   );
