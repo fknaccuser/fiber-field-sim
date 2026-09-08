@@ -131,6 +131,20 @@ export const JOB_TEMPLATES: readonly JobTemplate[] = [
   },
 ];
 
+/**
+ * What a construction rig actually carries.
+ *
+ * Complete for splicing and testing, because that is what this truck is for. The console
+ * cable is deliberately not on it — that lives with the network team, and a POP turn-up
+ * therefore blocks on kit rather than on willingness. A readiness gate that never fires
+ * teaches nothing, and this is the honest reason one of them does.
+ */
+export const STANDARD_RIG: readonly string[] = [
+  'mass-fusion-splicer', 'mass-cleaver', 'heat-jacket-stripper', 'ribbonizing-jig',
+  'cleaning-kit', 'otdr', 'power-meter', 'vfl', 'inspection-scope',
+  'launch-cable-500m', 'laptop', 'labels', 'hand-tools',
+];
+
 export function templateFor(kind: JobKind): JobTemplate {
   const t = JOB_TEMPLATES.find((x) => x.kind === kind);
   if (!t) throw new Error(`unknown job kind: ${kind}`);

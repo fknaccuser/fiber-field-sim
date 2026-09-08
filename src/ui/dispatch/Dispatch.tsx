@@ -12,6 +12,7 @@ import { Panel, Readout } from '../components/Panel';
 import { SoftKey } from '../components/SoftKey';
 import { DEFAULT_ROLE, isRole, ROLE_ORDER, ROLE_POLICY, unlockedRoles, type Role } from '../../session/roles';
 import { buildDay, committedMinutes, networkStability, SHIFT_MINUTES, type Priority, type WorkKind, type WorkOrder } from './day';
+import { ConstructionBoard } from './ConstructionBoard';
 
 const DAY_SEED_KEY = 'fiberops.daySeed';
 const STARTED_KEY = 'fiberops.dayStarted';
@@ -309,6 +310,9 @@ export function Dispatch() {
             ))}
           </div>
         )}
+
+        {/* The rest of the week: construction and maintenance, gated on kit, grade and locates. */}
+        {started && <ConstructionBoard daySeed={daySeed} role={role} />}
 
         {/* ---- Training record ---- */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
