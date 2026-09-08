@@ -14,13 +14,13 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   judgeTray,
-  MIN_BEND_RADIUS_MM,
   MIN_SLACK_MM,
   type FibrePlacement,
   type Tray,
 } from '../../operations/tray';
 import { DEFAULT_PROFILE } from '../../operations/acceptance';
 import { BENCH_DOMAINS, scoreTrayRun } from '../../operations/benchRecord';
+import { CLOSURES, type ClosureModel } from '../../operations/catalog';
 import { getOrCreateTraineeId, saveBenchRun } from '../store/persistence';
 
 /** Standard buffer-tube colour order, which is also the order fibres are worked. */
@@ -30,7 +30,6 @@ const TUBE_HEX: Record<string, string> = {
   brown: '#a16207', slate: '#94a3b8', white: '#e2e8f0',
 };
 
-const HOLDERS = 6;
 
 /** A fibre as the bench holds it: the two real choices, plus where it is seated. */
 interface Row {
@@ -61,12 +60,20 @@ const START: Row[] = TUBE_ORDER.slice(0, 4).map((t, i) => ({
 export function TrayBench() {
   const [rows, setRows] = useState<Row[]>(START);
   const [labelled, setLabelled] = useState(true);
+  // The closure you actually opened. Its trays decide how many holders you have and what
+  // radius the moulded limiters enforce — the catalog is the source, not a constant here.
+  const [closure, setClosure] = useState<ClosureModel>(CLOSURES[0]);
+
+  const holders = closure.splicesPerTray;
 
   const tray: Tray = useMemo(
-    () => ({ id: 'TRAY-1', holders: HOLDERS, placements: rows.map(toPlacement) }),
-    [rows],
+    () => ({ id: 'TRAY-1', holders, placements: rows.map(toPlacement) }),
+    [rows, holders],
   );
-  const verdict = useMemo(() => judgeTray(tray, labelled), [tray, labelled]);
+  const verdict = useMemo(
+    () => judgeTray(tray, labelled, closure.minBendRadiusMm),
+    [tray, labelled, closure.minBendRadiusMm],
+  );
 
   // A tray has no natural finish the way a ribbon does — you stop when you are satisfied —
   // so the trainee signs it off explicitly. That is also what happens on a real job.
@@ -116,7 +123,17 @@ export function TrayBench() {
 
           {/* ---------- the tray ---------- */}
           <section className="bezel" style={{ padding: 12 }}>
-            <div className="eyebrow" style={{ color: 'var(--cyan)' }}>Tray 1 · {HOLDERS} holders</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+              <span className="eyebrow" style={{ color: 'var(--cyan)' }}>
+                {closure.designation} · tray 1 of {closure.trays} · {holders} holders
+              </span>
+              <span style={{ flex: 1 }} />
+              {!closure.verified && (
+                <span className="mono" style={{ fontSize: 9, letterSpacing: 1.2, color: 'var(--amber)' }}>
+                  CAPACITY UNVERIFIED
+                </span>
+              )}
+            </div>
             <svg viewBox="0 0 520 300" style={{ width: '100%', height: 'auto', marginTop: 8 }} role="img"
                  aria-label={`Splice tray with ${rows.length} fibres routed. ${verdict.summary}`}>
               {/* tray body */}
@@ -128,7 +145,7 @@ export function TrayBench() {
 
               {/* holder rail */}
               <rect x="228" y="40" width="64" height="230" rx="4" fill="rgba(0,0,0,0.25)" stroke="var(--ink-faint)" strokeWidth="1" />
-              {Array.from({ length: HOLDERS }, (_, h) => (
+              {Array.from({ length: Math.min(holders, 6) }, (_, h) => (
                 <g key={h}>
                   <rect x="236" y={50 + h * 35} width="48" height="22" rx="2" fill="rgba(127,212,232,0.05)" stroke="var(--ink-faint)" strokeWidth="0.8" />
                   <text x="260" y={65 + h * 35} textAnchor="middle" fontSize="8" fill="var(--ink-faint)" fontFamily="var(--font-mono)">{h + 1}</text>
@@ -171,7 +188,7 @@ export function TrayBench() {
                     )}
                     {tight && (
                       <circle cx="168" cy={entryY} r="8" fill="none" stroke="var(--red)" strokeWidth="1.8">
-                        <title>Bend inside the {MIN_BEND_RADIUS_MM} mm minimum</title>
+                        <title>Bend inside the {closure.minBendRadiusMm} mm minimum</title>
                       </circle>
                     )}
                     <circle cx="28" cy={entryY} r="3.5" fill={hex} />
@@ -200,7 +217,7 @@ export function TrayBench() {
                     <select value={r.holder ?? ''} onChange={(e) => set(i, { holder: e.target.value === '' ? null : Number(e.target.value) })}
                             style={{ background: 'var(--bg-panel)', color: 'var(--ink)', border: '1px solid var(--line)', padding: '4px 6px', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                       <option value="">loose</option>
-                      {Array.from({ length: HOLDERS }, (_, h) => <option key={h} value={h + 1}>{h + 1}</option>)}
+                      {Array.from({ length: holders }, (_, h) => <option key={h} value={h + 1}>{h + 1}</option>)}
                     </select>
                   </label>
 
@@ -217,7 +234,20 @@ export function TrayBench() {
               ))}
             </div>
 
-            <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
+              {CLOSURES.map((c) => (
+                <button key={c.id} type="button" aria-pressed={c.id === closure.id}
+                        className={`hud-chip${c.id === closure.id ? ' is-on' : ''}`}
+                        onClick={() => setClosure(c)} title={c.note}>
+                  {c.designation}
+                </button>
+              ))}
+            </div>
+            <p className="mono" style={{ fontSize: 10, lineHeight: 1.6, color: 'var(--ink-faint)', margin: '8px 0 0', letterSpacing: 0.5 }}>
+              {closure.note.toUpperCase()}
+            </p>
+
+      <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
               <button type="button" className={`hud-chip${labelled ? ' is-on' : ''}`} aria-pressed={labelled}
                       onClick={() => setLabelled(!labelled)}>
                 {labelled ? 'Tray labelled' : 'Not labelled'}
@@ -265,7 +295,7 @@ export function TrayBench() {
 
           <p className="mono" style={{ fontSize: 10, lineHeight: 1.7, color: 'var(--ink-faint)', marginTop: 14, letterSpacing: 0.5 }}>
             DEFECTS BLOCK ACCEPTANCE. WORKMANSHIP DOES NOT — IT IS CHARGED TO WHOEVER OPENS THIS NEXT.
-            MINIMUM BEND RADIUS {MIN_BEND_RADIUS_MM} MM · WORKABLE SLACK {MIN_SLACK_MM} MM · JUDGED AGAINST {DEFAULT_PROFILE.name.toUpperCase()}
+            MINIMUM BEND RADIUS {closure.minBendRadiusMm} MM · WORKABLE SLACK {MIN_SLACK_MM} MM · JUDGED AGAINST {DEFAULT_PROFILE.name.toUpperCase()}
           </p>
         </section>
       </div>

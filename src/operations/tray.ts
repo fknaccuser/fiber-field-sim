@@ -18,6 +18,10 @@
  *  - CAPACITY. A tray filled past its holder count means the lid presses on fibre, which is
  *    why the loss appears when you CLOSE the closure and vanishes when you open it again.
  *
+ * The minimum radius is a parameter rather than a constant, because it is a property of the
+ * closure you actually opened — a tray's moulded limiters are what enforce it. The catalog
+ * supplies it; MIN_BEND_RADIUS_MM is only the fallback.
+ *
  * Pure, so a tray can be judged without a renderer.
  */
 
@@ -81,18 +85,18 @@ function label(p: FibrePlacement): string {
  * three years. Collapsing those two into "issues" teaches a trainee that they are the same
  * kind of wrong, and they are not.
  */
-export function inspectTray(tray: Tray, labelled: boolean): TrayIssue[] {
+export function inspectTray(tray: Tray, labelled: boolean, minBendRadiusMm: number = MIN_BEND_RADIUS_MM): TrayIssue[] {
   const issues: TrayIssue[] = [];
 
   for (const p of tray.placements) {
-    if (p.bendRadiusMm < MIN_BEND_RADIUS_MM) {
+    if (p.bendRadiusMm < minBendRadiusMm) {
       // Tighter bends leak more; the model scales rather than flagging a flat penalty.
-      const over = (MIN_BEND_RADIUS_MM - p.bendRadiusMm) / MIN_BEND_RADIUS_MM;
+      const over = (minBendRadiusMm - p.bendRadiusMm) / minBendRadiusMm;
       issues.push({
         severity: 'defect',
         code: 'bend-radius',
         where: label(p),
-        detail: `Routed at ${p.bendRadiusMm} mm against a ${MIN_BEND_RADIUS_MM} mm minimum. Macrobend loss, and it will read worse at 1550 nm than at 1310 nm.`,
+        detail: `Routed at ${p.bendRadiusMm} mm against a ${minBendRadiusMm} mm minimum. Macrobend loss, and it will read worse at 1550 nm than at 1310 nm.`,
         addedLossDb: Math.round(over * 0.6 * 1000) / 1000,
       });
     }
@@ -189,8 +193,8 @@ export interface TrayVerdict {
   summary: string;
 }
 
-export function judgeTray(tray: Tray, labelled: boolean): TrayVerdict {
-  const issues = inspectTray(tray, labelled);
+export function judgeTray(tray: Tray, labelled: boolean, minBendRadiusMm: number = MIN_BEND_RADIUS_MM): TrayVerdict {
+  const issues = inspectTray(tray, labelled, minBendRadiusMm);
   const defects = issues.filter((i) => i.severity === 'defect');
   const workmanship = issues.filter((i) => i.severity === 'workmanship');
   const added = Math.round(issues.reduce((s, i) => s + (i.addedLossDb ?? 0), 0) * 1000) / 1000;
