@@ -279,6 +279,12 @@ export const PROCEDURE: readonly Step[] = [
     mistakes: [
       { id: 'lost-blue-up', label: 'Twist between the tube and the machine', consequence: 'The splice is fine. The ribbon will not lie flat in the tray, and every future re-entry starts by undoing your twist.', rework: false },
       { id: 'crossed-in-glue', label: 'Fibres crossed when the ribbon was glued', consequence: 'A flip. Splices perfectly and connects two fibres to the wrong places — found on power metering, not here.', rework: true, reworkSeconds: 900 },
+      {
+        id: 'uneven-matrix',
+        label: 'Glue matrix uneven — outer fibres sitting proud',
+        consequence: 'Ribbon glued up on site is only as flat as you made it. Fibres standing proud will not seat level in the holder, so the machine reports offset on the OUTER fibres of the ribbon and leaves the middle alone. That shape is the tell: re-seat it, or re-glue it.',
+        addedLossDb: 0.16, affects: 'edges', rework: false,
+      },
     ],
   },
   {

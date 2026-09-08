@@ -47,6 +47,16 @@ describe('the procedure itself', () => {
     for (const m of allMistakes()) expect(m.consequence.length).toBeGreaterThan(30);
   });
 
+  it('leaves no loss signature orphaned', () => {
+    // A signature with no mistake behind it is one the UI can describe and the engine can
+    // never produce. That happened once, when a rewrite dropped the only 'edges' defect and
+    // left the bench claiming a shape it could not draw.
+    const used = new Set(allMistakes().filter((m) => m.addedLossDb).map((m) => m.affects ?? 'all'));
+    for (const signature of ['all', 'edges', 'scattered']) {
+      expect(used.has(signature as never), `no mistake produces the "${signature}" signature`).toBe(true);
+    }
+  });
+
   it('throws on an unknown step rather than returning something plausible', () => {
     expect(() => step('not-a-step' as StepId)).toThrow(/unknown ribbon step/);
   });
@@ -143,6 +153,15 @@ describe('what the splicer reports', () => {
     const r = spliceLoss(5, 12, ['skip-clean']);
     expect(r.pass).toBe(false);
     expect(r.failed.length).toBeGreaterThan(0);
+  });
+
+  it('an uneven glue matrix takes the OUTER fibres and leaves the middle alone', () => {
+    const r = spliceLoss(11, 12, ['uneven-matrix']);
+    const worstMiddle = Math.max(...r.lossDb.slice(1, -1));
+    expect(r.lossDb[0]).toBeGreaterThan(worstMiddle);
+    expect(r.lossDb[11]).toBeGreaterThan(worstMiddle);
+    // The untouched middle is the diagnostic half of it.
+    expect(worstMiddle).toBeLessThan(0.1);
   });
 
   it('a dull blade takes a scattered few, leaving the rest of the ribbon normal', () => {

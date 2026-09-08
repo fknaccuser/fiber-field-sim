@@ -27,6 +27,7 @@ import type { Role } from '../../session/roles';
 
 /** Jobs that have somewhere to go. Everything else is honest about not being built yet. */
 const BENCH: Partial<Record<JobKind, { to: string; label: string }>> = {
+  'ribbon-splice': { to: '/bench/splice', label: 'Open the splice bench →' },
   'closure-dress': { to: '/bench/tray', label: 'Open the tray bench →' },
 };
 
