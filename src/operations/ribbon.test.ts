@@ -3,21 +3,25 @@ import {
   ACCEPT_MAX_DB,
   ACCEPT_MEAN_DB,
   allMistakes,
+  caseSeconds,
   elapsedSeconds,
   omitted,
+  PHASES,
   PROCEDURE,
   spliceLoss,
   STEP_IDS,
   step,
+  stepsInPhase,
   validateOrder,
   type StepId,
 } from './ribbon';
 
-/** The order a technician who does everything right would work in. */
+/** The order a splicer working correctly moves in, setup through closeout. */
 const CLEAN: StepId[] = [
-  'stage-sleeves', 'open-closure', 'anchor-cable', 'strip-tube', 'clean-fibres',
-  'ribbonize', 'heat-strip', 'clean-bare', 'cleave', 'load-splicer', 'fuse',
-  'inspect-loss', 'shrink-sleeve', 'route-tray', 'dress-slack', 'label', 'close-closure',
+  'set-splice-mode', 'arc-test', 'open-closure', 'anchor-cable', 'strip-tube', 'lay-out-ribbons',
+  'stage-sleeves', 'strip-ribbon', 'clean-fibre', 'tap-separate', 'cleave', 'clean-vgrooves',
+  'load-splicer', 'fuse', 'inspect-loss', 'inspect-weld', 'shrink-sleeve', 'cool-sleeve',
+  'seat-in-tray', 'dress-slack', 'label', 'close-closure',
 ];
 
 describe('the procedure itself', () => {
@@ -35,16 +39,12 @@ describe('the procedure itself', () => {
   it('explains why every step exists, because that is the part being taught', () => {
     for (const s of PROCEDURE) {
       expect(s.why.length).toBeGreaterThan(40);
-      expect(s.title.length).toBeGreaterThan(3);
+      expect(PHASES).toContain(s.phase);
     }
   });
 
   it('gives every mistake a consequence rather than just a name', () => {
-    for (const m of allMistakes()) {
-      expect(m.consequence.length).toBeGreaterThan(30);
-      // A mistake must do something: cost loss, or force rework, or both.
-      expect(m.rework || typeof m.addedLossDb === 'number' || m.consequence.length > 0).toBe(true);
-    }
+    for (const m of allMistakes()) expect(m.consequence.length).toBeGreaterThan(30);
   });
 
   it('throws on an unknown step rather than returning something plausible', () => {
@@ -52,9 +52,35 @@ describe('the procedure itself', () => {
   });
 });
 
+describe('phases, because frequency is part of the lesson', () => {
+  it('puts the arc test in setup, not in the per-ribbon loop', () => {
+    // Arc testing every ribbon is as wrong as never arc testing.
+    expect(step('arc-test').phase).toBe('setup');
+    expect(step('cleave').phase).toBe('per-ribbon');
+    expect(step('close-closure').phase).toBe('closeout');
+  });
+
+  it('every step belongs to exactly one phase, and every phase has steps', () => {
+    const total = PHASES.reduce((n, p) => n + stepsInPhase(p).length, 0);
+    expect(total).toBe(PROCEDURE.length);
+    for (const p of PHASES) expect(stepsInPhase(p).length).toBeGreaterThan(0);
+  });
+
+  it('costs a real 432-to-432 case correctly: setup once, loop per ribbon, closeout per tray', () => {
+    const setup = elapsedSeconds(stepsInPhase('setup').map((s) => s.id), []);
+    const loop = elapsedSeconds(stepsInPhase('per-ribbon').map((s) => s.id), []);
+    const close = elapsedSeconds(stepsInPhase('closeout').map((s) => s.id), []);
+    // 36 ribbons, 12 to a tray = 3 trays.
+    expect(caseSeconds(36, 12)).toBe(setup + 36 * loop + 3 * close);
+  });
+
+  it('a bigger case costs more, and the loop dominates it', () => {
+    expect(caseSeconds(72, 12)).toBeGreaterThan(caseSeconds(36, 12));
+  });
+});
+
 describe('order is judged on dependencies, not on list position', () => {
   it('accepts a correct-but-different order', () => {
-    // Labelling before dressing the slack is fine: neither depends on the other.
     const swapped = CLEAN.slice();
     const li = swapped.indexOf('label');
     const di = swapped.indexOf('dress-slack');
@@ -63,20 +89,24 @@ describe('order is judged on dependencies, not on list position', () => {
     expect(validateOrder(swapped)).toEqual([]);
   });
 
-  it('catches stripping before the fibres were ribbonized', () => {
-    const bad: StepId[] = ['stage-sleeves', 'open-closure', 'anchor-cable', 'strip-tube', 'clean-fibres', 'heat-strip'];
-    const issues = validateOrder(bad);
-    expect(issues.some((i) => i.step === 'heat-strip' && i.missing === 'ribbonize')).toBe(true);
+  it('catches cleaving before the fibres were tapped apart', () => {
+    const bad: StepId[] = ['set-splice-mode', 'arc-test', 'stage-sleeves', 'strip-ribbon', 'clean-fibre', 'cleave'];
+    expect(validateOrder(bad).some((i) => i.step === 'cleave' && i.missing === 'tap-separate')).toBe(true);
   });
 
-  it('catches closing the closure before the slack is dressed', () => {
-    const bad = CLEAN.filter((s) => s !== 'dress-slack');
-    expect(validateOrder(bad).some((i) => i.step === 'close-closure' && i.missing === 'dress-slack')).toBe(true);
+  it('catches splicing before the machine was ever arc tested', () => {
+    const bad = CLEAN.filter((s) => s !== 'arc-test');
+    expect(omitted(bad)).toContain('arc-test');
+  });
+
+  it('catches seating the tray before the sleeve had cooled', () => {
+    const bad = CLEAN.filter((s) => s !== 'cool-sleeve');
+    expect(validateOrder(bad).some((i) => i.step === 'seat-in-tray' && i.missing === 'cool-sleeve')).toBe(true);
   });
 
   it('reports what was skipped entirely', () => {
-    const skipped = CLEAN.filter((s) => s !== 'clean-bare' && s !== 'label');
-    expect(omitted(skipped).sort()).toEqual(['clean-bare', 'label']);
+    const skipped = CLEAN.filter((s) => s !== 'clean-vgrooves' && s !== 'label');
+    expect(omitted(skipped).sort()).toEqual(['clean-vgrooves', 'label']);
   });
 });
 
@@ -86,7 +116,7 @@ describe('what the splicer reports', () => {
     expect(spliceLoss(7, 12, ['dull-blade'])).toEqual(spliceLoss(7, 12, ['dull-blade']));
   });
 
-  it('passes a clean job, and reports one reading per fibre', () => {
+  it('reads in hundredths on a calibrated machine, one reading per fibre', () => {
     for (let seed = 1; seed <= 40; seed++) {
       const r = spliceLoss(seed, 12, []);
       expect(r.lossDb).toHaveLength(12);
@@ -97,9 +127,16 @@ describe('what the splicer reports', () => {
   });
 
   it('still varies fibre to fibre when everything was done right', () => {
-    // One good reading proves nothing about the set — that is the lesson.
-    const r = spliceLoss(3, 12, []);
-    expect(new Set(r.lossDb).size).toBeGreaterThan(1);
+    expect(new Set(spliceLoss(3, 12, []).lossDb).size).toBeGreaterThan(1);
+  });
+
+  it('an uncalibrated arc lifts the whole case, which is why it is a setup step', () => {
+    const clean = spliceLoss(9, 12, []);
+    const noArc = spliceLoss(9, 12, ['no-arc-test']);
+    expect(noArc.meanDb).toBeGreaterThan(clean.meanDb);
+    // Uniform, not scattered: every fibre carries it.
+    const spread = Math.max(...noArc.lossDb) - Math.min(...noArc.lossDb);
+    expect(spread).toBeLessThan(0.1);
   });
 
   it('fails the set when the bare fibre was never cleaned', () => {
@@ -108,51 +145,49 @@ describe('what the splicer reports', () => {
     expect(r.failed.length).toBeGreaterThan(0);
   });
 
-  it('an uneven glue matrix hurts the EDGES of the ribbon, which is how you identify it', () => {
-    const r = spliceLoss(11, 12, ['uneven-matrix']);
-    const worstMiddle = Math.max(...r.lossDb.slice(1, -1));
-    expect(r.lossDb[0]).toBeGreaterThan(worstMiddle);
-    expect(r.lossDb[11]).toBeGreaterThan(worstMiddle);
-    // and the middle of the ribbon is untouched, which is the diagnostic half of it
-    expect(worstMiddle).toBeLessThan(0.1);
-  });
-
   it('a dull blade takes a scattered few, leaving the rest of the ribbon normal', () => {
-    // The signature: within one set, some fibres sit at the clean baseline and some are
-    // clearly elevated. That gap is what says "blade", not "contamination".
     const r = spliceLoss(11, 12, ['dull-blade']);
-    const lo = Math.min(...r.lossDb);
-    const hi = Math.max(...r.lossDb);
-    expect(hi - lo).toBeGreaterThan(0.15);
-    expect(lo).toBeLessThan(0.1);
+    expect(Math.max(...r.lossDb) - Math.min(...r.lossDb)).toBeGreaterThan(0.15);
+    expect(Math.min(...r.lossDb)).toBeLessThan(0.1);
   });
 
   it('contamination lifts the WHOLE set instead — the contrast that makes each readable', () => {
     const blade = spliceLoss(11, 12, ['dull-blade']);
     const dirt = spliceLoss(11, 12, ['skip-clean']);
     const spread = (a: { lossDb: number[] }) => Math.max(...a.lossDb) - Math.min(...a.lossDb);
-    // Dirt raises every fibre together, so its spread stays tight; the blade's does not.
     expect(spread(dirt)).toBeLessThan(spread(blade));
     expect(Math.min(...dirt.lossDb)).toBeGreaterThan(Math.min(...blade.lossDb));
   });
 
   it('stacks the cost of compounding mistakes', () => {
-    const one = spliceLoss(9, 12, ['gel-left']);
-    const two = spliceLoss(9, 12, ['gel-left', 'dirty-grooves']);
+    const one = spliceLoss(9, 12, ['no-arc-test']);
+    const two = spliceLoss(9, 12, ['no-arc-test', 'dirty-vgrooves']);
     expect(two.meanDb).toBeGreaterThan(one.meanDb);
   });
 });
 
-describe('time on the job', () => {
-  it('adds up the clean run', () => {
-    expect(elapsedSeconds(CLEAN, [])).toBeGreaterThan(0);
-  });
-
-  it('charges for rework only when the mistake actually forces it', () => {
+describe('the mistakes that cost time rather than loss', () => {
+  it('charges rework only when the mistake actually forces it', () => {
     const clean = elapsedSeconds(CLEAN, []);
-    // Forgetting the sleeves means cutting the splice out and starting the fibre again.
     expect(elapsedSeconds(CLEAN, ['no-sleeve'])).toBeGreaterThan(clean);
     // A missing label costs nothing today — that is precisely why it gets skipped.
     expect(elapsedSeconds(CLEAN, ['no-label'])).toBe(clean);
+  });
+
+  it('makes the sleeve mistakes expensive, because they are found after the fact', () => {
+    const clean = elapsedSeconds(CLEAN, []);
+    expect(elapsedSeconds(CLEAN, ['stowed-hot'])).toBeGreaterThan(clean + 500);
+    expect(elapsedSeconds(CLEAN, ['pushed-sleeve-centre'])).toBeGreaterThan(clean + 500);
+  });
+
+  it('makes mismatching the two sides the most expensive mistake in the procedure', () => {
+    const byId = Object.fromEntries(allMistakes().map((m) => [m.id, m]));
+    expect(byId['mismatched-sides'].reworkSeconds).toBeGreaterThan(byId['no-sleeve'].reworkSeconds!);
+  });
+
+  it('knows that clamping a site-glued ribbon costs a re-glue and a wait', () => {
+    const byId = Object.fromEntries(allMistakes().map((m) => [m.id, m]));
+    expect(byId['overclamped-stripper'].rework).toBe(true);
+    expect(byId['overclamped-stripper'].consequence).toMatch(/re-glue|dry/i);
   });
 });
