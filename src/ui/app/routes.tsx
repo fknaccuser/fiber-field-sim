@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { Dispatch } from '../dispatch/Dispatch';
 import { ScenarioPicker } from '../screens/ScenarioPicker';
@@ -6,11 +7,14 @@ import { PreTrip } from '../prep/PreTrip';
 import { Replay } from '../screens/Replay';
 import { History } from '../screens/History';
 import { DevOtdr } from '../screens/DevOtdr';
-import { TrayBench } from '../operations/TrayBench';
 import { SpliceBench } from '../operations/SpliceBench';
 import { AcceptanceBench } from '../operations/AcceptanceBench';
 import { SpliceRun } from '../operations/SpliceRun';
 import { LocateBench } from '../operations/LocateBench';
+
+// The only 3D left in the project. Kept out of the main chunk so nobody downloads three.js
+// to read a print.
+const SpliceTrayBench = lazy(() => import('../operations/SpliceTrayBench').then((m) => ({ default: m.SpliceTrayBench })));
 
 export function AppRoutes() {
   return (
@@ -22,11 +26,11 @@ export function AppRoutes() {
       <Route path="/replay/:sessionId" element={<Replay />} />
       <Route path="/history" element={<History />} />
       <Route path="/compare/:a/:b" element={<Replay />} />
-      <Route path="/bench/tray" element={<TrayBench />} />
       <Route path="/bench/splice" element={<SpliceBench />} />
       <Route path="/bench/test" element={<AcceptanceBench />} />
       <Route path="/bench/run" element={<SpliceRun />} />
       <Route path="/bench/locate" element={<LocateBench />} />
+      <Route path="/bench/tray" element={<Suspense fallback={<div style={{ padding: 16, color: 'var(--muted)' }}>Opening the case…</div>}><SpliceTrayBench /></Suspense>} />
       <Route path="/dev/otdr" element={<DevOtdr />} />
     </Routes>
   );

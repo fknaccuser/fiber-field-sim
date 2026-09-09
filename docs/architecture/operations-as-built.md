@@ -15,7 +15,7 @@ has to discover the gaps by clicking.
 | Bench | Route | What it teaches |
 | --- | --- | --- |
 | **Ribbon splice** | `/bench/splice` | The 22-step procedure. The loss chart's *shape* is the diagnosis. |
-| **Tray dressing** | `/bench/tray` | Bend radius, slack, capacity. Defect versus workmanship. |
+| **Tray dressing** | `/bench/tray` | A 3D tray you route the ribbon on. Radius against slack, and what holds it down. |
 | **Acceptance testing** | `/bench/test` | Gainers, and why one direction is not a measurement. |
 | **Locate and mark** | `/bench/locate` | Answering a DigAlert. You mark the cable, not the drawing. |
 | **Construction board** | `/` (under the fault queue) | Triage: kit, grade, locate — reported together. |

@@ -47,6 +47,16 @@ export interface FibrePlacement {
   slackMm: number;
   /** Whether the route crosses over another fibre rather than following its own path. */
   crossesOthers: boolean;
+  /**
+   * Came in through the tray's entry slot rather than over the wall.
+   *
+   * Optional, and true when absent, because a placement described in numbers rather than
+   * dressed by hand has no wall to go over — this only becomes a question once somebody is
+   * routing a ribbon on a model of the tray.
+   */
+  viaEntry?: boolean;
+  /** Held down by the moulded retention fingers. Same reasoning as `viaEntry` for the default. */
+  retained?: boolean;
 }
 
 export interface Tray {
@@ -114,6 +124,25 @@ export function inspectTray(tray: Tray, labelled: boolean, minBendRadiusMm: numb
         code: 'bad-holder',
         where: label(p),
         detail: `Holder ${p.holder} does not exist on this tray, which has ${tray.holders}.`,
+      });
+    }
+
+    if (p.viaEntry === false) {
+      issues.push({
+        severity: 'defect',
+        code: 'over-the-wall',
+        where: label(p),
+        detail: 'Routed over the tray wall instead of through the entry slot. The lid closes onto it: the loss appears when the closure is shut and vanishes when you open it to look.',
+        addedLossDb: 0.14,
+      });
+    }
+
+    if (p.retained === false) {
+      issues.push({
+        severity: 'defect',
+        code: 'unretained',
+        where: label(p),
+        detail: 'Not run under the retention fingers. It lies right until somebody lifts the tray, and then the splice takes the strain instead of the moulding.',
       });
     }
 
@@ -220,5 +249,5 @@ export function judgeTray(tray: Tray, labelled: boolean, minBendRadiusMm: number
 
 /** A correctly dressed placement, for tests and for showing a trainee the target. */
 export function goodPlacement(tube: string, fibre: number, holder: number): FibrePlacement {
-  return { tube: tube, fibre: fibre, holder: holder, bendRadiusMm: 40, slackMm: 1000, crossesOthers: false };
+  return { tube: tube, fibre: fibre, holder: holder, bendRadiusMm: 40, slackMm: 1000, crossesOthers: false, viaEntry: true, retained: true };
 }

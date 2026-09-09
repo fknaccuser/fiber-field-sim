@@ -138,3 +138,32 @@ describe('the verdict', () => {
     expect(codes).toEqual(['bend-radius', 'crossed-route', 'insufficient-slack', 'unlabelled', 'unseated-sleeve']);
   });
 });
+
+describe('what a hand-dressed route adds', () => {
+  const base = { id: 'TRAY-1', holders: 12 };
+
+  it('treats a ribbon over the wall as a defect that only shows with the lid on', () => {
+    const tray = { ...base, placements: [{ ...goodPlacement('blue', 1, 1), viaEntry: false }] };
+    const verdict = judgeTray(tray, true);
+    const issue = verdict.issues.find((i) => i.code === 'over-the-wall');
+    expect(issue?.severity).toBe('defect');
+    expect(verdict.addedLossDb).toBeGreaterThan(0);
+    expect(verdict.accepted).toBe(false);
+  });
+
+  it('treats a ribbon nothing is holding down as a defect, the same as an unseated sleeve', () => {
+    const tray = { ...base, placements: [{ ...goodPlacement('blue', 1, 1), retained: false }] };
+    const verdict = judgeTray(tray, true);
+    expect(verdict.issues.find((i) => i.code === 'unretained')?.severity).toBe('defect');
+    // It costs nothing today: the strain arrives when somebody lifts the tray.
+    expect(verdict.addedLossDb).toBe(0);
+  });
+
+  it('says nothing about either when the placement never described them', () => {
+    // A placement given as plain numbers has no wall to go over. Absent must not read as bad.
+    const numeric = { tube: 'blue', fibre: 1, holder: 1, bendRadiusMm: 40, slackMm: 1000, crossesOthers: false };
+    const verdict = judgeTray({ ...base, placements: [numeric] }, true);
+    expect(verdict.issues).toEqual([]);
+    expect(verdict.accepted).toBe(true);
+  });
+});

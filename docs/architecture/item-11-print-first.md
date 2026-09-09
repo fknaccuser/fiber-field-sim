@@ -183,7 +183,50 @@ and paint (a truck that answers these weekly carries them; the console cable is 
 deliberately absent so POP turn-up keeps the one honest kit gate), and two tests assert the
 board's distribution rather than trusting it.
 
+## Increment 6 — the tray, in 3D, dressed by hand
+
+The brief asked for ribbon splicing to be a 3D model of the terminal and the splice tray,
+with the ribbon dragged through the holes to dress it. The holes the crew named were the
+tray's own: the entry slot and the retention fingers.
+
+**The split that makes it safe.** The 3D bench is an *input device*. `dressing.ts` turns the
+path a finger dragged into numbers — slack, tightest bend, which features captured it, which
+holder it ends in — and `judgeTray` grades those, as it already did and still does without a
+renderer. A rendering bug can make the bench feel wrong; it cannot make it grade wrong.
+
+**Three hardware types, one tray.** The tray is the same job inside a FOSC 450, a HexDome and
+an FDH cabinet; what changes is the case around it and how you stand at it. So the tray model
+is shared and the shell is context, which made "all three" cheap. Only the minimum bend
+radius comes from the catalog — everything else about the shape is shape, and shape is not a
+specification.
+
+**The trade the bench is built on.** Slack is arc length; radius is curvature. Every extra
+lap round the limiters buys the 900 mm the next technician needs and costs you room, and
+winding tighter to fit more laps in is exactly how a tidy-looking tray ends up attenuating.
+That is not scored as two rules — it falls out of measuring one shape.
+
+**Smoothing is modelling, not forgiving.** Raw curvature on a dragged polyline reads as a
+2 mm bend every few samples, because fingers jitter and ribbon does not. The path is
+resampled to even spacing (otherwise curvature measures hand speed) and smoothed before it is
+measured, and the ends are held because the ends are held.
+
+**The design flaw the tests caught.** The entry slot started centred on the end wall, and the
+tray was quietly *unpassable*: a ribbon entering on the centreline has to S-bend across to the
+routing channel within the tray's width, and that S is tighter than the radius limit however
+carefully it is laid. Nothing in the app said so — you would simply never score well and
+never learn why. It only surfaced because there is a test asserting a passing dressing exists
+at all, which is now the most important test in the file. Real trays put the slot over the
+channel so the ribbon comes in already running the right way, and so does this one.
+
+`tray.ts` gained two optional facts a hand-dressed route can report and a typed placement
+cannot: `viaEntry` (over the wall, so the lid bears on it) and `retained` (nothing holding it
+down when somebody lifts the tray). Both default to true when absent, so a placement given as
+plain numbers is unaffected.
+
+The old checkbox tray bench is gone. It asked two questions per fibre and was honest about
+being a set of choices; dressing is a shape you make with your hands.
+
 ## Still to come
 
-Increments 6–7: the 3D tray bench, and backbone into a new terminal. This file grows as they
-land.
+Increment 7: backbone into a new terminal — chaining splice, dress and acceptance into one
+work order.

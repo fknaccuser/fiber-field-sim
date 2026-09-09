@@ -30,7 +30,7 @@ import { listBenchRuns } from '../store/persistence';
 /** Jobs that have somewhere to go. Everything else is honest about not being built yet. */
 const BENCH: Partial<Record<JobKind, { to: string; label: string }>> = {
   'ribbon-splice': { to: '/bench/run', label: 'Work the case →' },
-  'closure-dress': { to: '/bench/tray', label: 'Open the tray bench →' },
+  'closure-dress': { to: '/bench/tray', label: 'Open the case →' },
   'acceptance-test': { to: '/bench/test', label: 'Open the acceptance bench →' },
   'locate-mark': { to: '/bench/locate', label: 'Answer the ticket →' },
 };
