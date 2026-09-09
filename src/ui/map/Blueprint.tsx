@@ -12,7 +12,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { UiSessionState } from '../../session/runner';
 import type { DiagnosisClaim } from '../../session/types';
-import { layoutScene, type SceneLayout, PARKWAY_Z, SIDEWALK_Z, STREET_HALF_WIDTH, TRENCH_Z, HOUSE_D, HOUSE_W, type Placement, type PlacementKind } from '../scene/sceneLayout';
+import { layoutScene, type SceneLayout, PARKWAY_Z, SIDEWALK_Z, STREET_HALF_WIDTH, TRENCH_Z, HOUSE_D, HOUSE_W, type Placement, type PlacementKind } from './layout';
 import { useViewportState } from '../viewport/viewportStore';
 import { buildMapOverlay, dominantNodeMark, dominantSpanMark, type NodeMark } from './mapOverlay';
 import {

@@ -1,15 +1,18 @@
 /**
- * The dock. Four places a technician can be, not ten tabs: looking around, reading the
- * print, in the back of the truck, or on the phone. Everything else is reached by picking
- * something up off the shelf.
+ * The dock. Three places a technician can be, not ten tabs: on the print, in the back of
+ * the truck, or on the phone. Everything else is reached by picking something up off the
+ * shelf.
+ *
+ * The print leads because the print is where the job is read. There used to be a fourth
+ * slot, LOOK, holding a 3D street you could walk down; it was pretty and it was never how
+ * the work got done, and losing it gave the drawing the whole screen.
  */
 import type { TabId } from './navigation';
 import { SHELF_TABS } from './navigation';
 
-type Slot = { id: TabId; label: string; icon: 'compass' | 'map' | 'truck' | 'phone' };
+type Slot = { id: TabId; label: string; icon: 'map' | 'truck' | 'phone' };
 
 const SLOTS: Slot[] = [
-  { id: 'world', label: 'LOOK', icon: 'compass' },
   { id: 'map', label: 'PRINT', icon: 'map' },
   { id: 'shelf', label: 'TRUCK', icon: 'truck' },
   { id: 'phone', label: 'PHONE', icon: 'phone' },
@@ -20,12 +23,6 @@ function Icon({ kind, lit }: { kind: Slot['icon']; lit: boolean }) {
   const common = { fill: 'none', stroke, strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   return (
     <svg viewBox="0 0 24 24" width={22} height={22} aria-hidden style={{ filter: lit ? 'drop-shadow(0 0 6px rgba(59,232,216,.55))' : undefined }}>
-      {kind === 'compass' && (
-        <>
-          <circle cx="12" cy="12" r="9" {...common} />
-          <path d="M15.5 8.5 L10.5 10.5 L8.5 15.5 L13.5 13.5 Z" {...common} />
-        </>
-      )}
       {kind === 'map' && (
         <>
           <path d="M3 6 L9 4 L15 6 L21 4 V18 L15 20 L9 18 L3 20 Z" {...common} />

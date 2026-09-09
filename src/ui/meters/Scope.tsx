@@ -4,7 +4,6 @@ import type { Intent } from '../../session/types';
 import { Chip } from '../components/Chip';
 import { SoftKey } from '../components/SoftKey';
 import { HeldDevice } from '../instrument/HeldDevice';
-import { blocker, INITIAL_HELD, type HeldState } from '../instrument/deviceState';
 import { EndFaceCanvas } from '../scope/EndFaceCanvas';
 import { buildEndFaceModel, ZONE_LEGEND, ZONE_ORDER } from '../scope/endFaceModel';
 import { useViewportState } from '../viewport/viewportStore';
@@ -21,9 +20,7 @@ export function Scope({ ui, dispatch }: { ui: UiSessionState; dispatch(intent: I
   const inspections = ui.log.filter((a): a is Extract<UiActionEvent, { type: 'scope' }> => a.type === 'scope');
   const [selected, setSelected] = useViewportState<Selection | null>('scope.selected', null);
   const [showZones, setShowZones] = useViewportState<boolean>('scope.zones', true);
-  const [held, setHeld] = useViewportState<HeldState>('device.scope', INITIAL_HELD);
   // The probe is captive on this scope: there is no lead to land, only a tip cap to pull.
-  const block = blocker(held, false);
 
   const connectors = incident.flatMap((span) => span.events.filter((e) => CONNECTOR_KINDS.has(e.kind)).map((ev) => ({ span, ev })));
   const current = selected ?? (connectors[0] ? { spanId: connectors[0].span.id, eventId: connectors[0].ev.id } : null);
@@ -35,14 +32,11 @@ export function Scope({ ui, dispatch }: { ui: UiSessionState; dispatch(intent: I
   return (
     <HeldDevice
       ui={ui}
-      dispatch={dispatch}
-      state={held}
+      id="scope"
       name="Scope"
       status={inspected ? `Last: ${inspected.grade.toUpperCase()}` : undefined}
       model="FS-400"
       form="handheld"
-      needsLead={false}
-      onStateChange={setHeld}
       bootLines={['FiberOps FS-400', 'video inspection probe', 'IEC 61300-3-35 profile: SM-PC']}
       softKeys={[{ label: showZones ? 'Zones on' : 'Zones off', active: showZones, onClick: () => setShowZones((z) => !z) }]}
     >
@@ -82,7 +76,7 @@ export function Scope({ ui, dispatch }: { ui: UiSessionState; dispatch(intent: I
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 220, flex: 1 }}>
             <div style={{ display: 'flex', gap: 6 }}>
-              <SoftKey label={inspected ? 'Re-inspect' : 'Inspect'} disabled={block !== null || !reachable} onClick={() => dispatch({ type: 'scope', spanId: current.spanId, eventId: current.eventId })} />
+              <SoftKey label={inspected ? 'Re-inspect' : 'Inspect'} disabled={!reachable} onClick={() => dispatch({ type: 'scope', spanId: current.spanId, eventId: current.eventId })} />
               <SoftKey label={showZones ? 'Zones on' : 'Zones off'} active={showZones} onClick={() => setShowZones((z) => !z)} />
             </div>
             <table className="mono" style={{ fontSize: 12, borderCollapse: 'collapse', width: '100%' }}>

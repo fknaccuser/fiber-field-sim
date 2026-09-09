@@ -1,9 +1,9 @@
 # Fiber Field Simulator
 
 A training simulator for outside-plant fiber technicians. The trainee is dispatched to a
-fault they cannot see, and has to find it the way it is found in the field: talk to the
-customer, read the plant records, ask the OLT, measure light, shoot an OTDR, inspect a
-connector, and then commit to a diagnosis backed by cited evidence.
+fault they cannot see, and has to find it the way it is found in the field: read the print,
+pull the plant records, ask the OLT, measure light, shoot an OTDR, inspect a connector, and
+then commit to a diagnosis backed by cited evidence.
 
 React + TypeScript + Vite, offline-capable PWA, phone-first. No backend.
 
@@ -54,8 +54,8 @@ The important idea: **nothing is scripted**. There is no canned instrument outpu
 - `src/scenarios/` validates authored YAML scenarios *and* generates unlimited ones
   procedurally. Both go through a validator that replays the reference solution through the
   real runner and fails unless it scores 100.
-- `src/ui/` renders a 3D outside-plant world (React Three Fiber) with instruments you
-  physically hold.
+- `src/ui/` puts the trainee on the print — a scaled plan drawing of the plant at three
+  sheet scales — with instruments they raise and lower over it.
 
 ## The four rules
 
@@ -70,8 +70,15 @@ The important idea: **nothing is scripted**. There is no canned instrument outpu
 3. **Anything vendor-, model- or region-specific lives in `src/profiles/*.yaml`.** Engine
    code contains no such constants. Swapping the OLT vendor or the one-call region is a YAML
    change.
-4. **One WebGL context.** Viewports declare a mount policy; anything holding a canvas is
-   `'unmount'`, so only one is ever alive. See item-7.
+4. **Viewports declare a mount policy.** Anything holding a canvas is `'unmount'`, so its
+   resources are released when you switch away; cheap panels are `'keep-alive'` and keep
+   their scroll, focus and drafts. See item-7.
+
+   There used to be a fourth rule here about holding only one WebGL context, because the UI
+   rendered a 3D street you could walk down. That street is gone — see
+   [item-11](docs/architecture/item-11-print-first.md) — and nothing in the field session
+   holds a GL context any more. Three.js returns for the splice bench, which is the one
+   place a 3D model earns its cost.
 
 ## Layout
 
@@ -86,8 +93,8 @@ src/
   ui/
     store/       Session store (the trusted boundary) + Dexie persistence
     viewport/    Mount policy host + state that survives unmounting
-    scene/       Topology → street layout, cameras, 3D models
-    instrument/  Held-device chrome and its state machine
+    map/         The print: plant layout, sheet framing, the drawing itself
+    instrument/  Held-device chrome
 docs/
   architecture/  One document per build item — read the README there first
   reference/     Field photographs the world models (not committed — see HANDOFF.md)

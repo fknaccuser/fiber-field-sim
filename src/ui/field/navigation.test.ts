@@ -3,15 +3,15 @@ import { isStowSwipe, presentTool, pushPlace, type DockPlace } from './navigatio
 
 describe('instrument navigation', () => {
   it('returns from enlarged to raised before leaving the tool', () => {
-    const world: DockPlace = { tab: 'world', presentation: 'raised' };
+    const print: DockPlace = { tab: 'map', presentation: 'raised' };
     const tool: DockPlace = { tab: 'otdr', presentation: 'raised' };
-    let stack = pushPlace([world], tool);
+    let stack = pushPlace([print], tool);
     stack = presentTool(stack, 'enlarged');
-    expect(stack.slice(0, -1)).toEqual([world, tool]);
-    expect(stack[0]).toEqual(world);
+    expect(stack.slice(0, -1)).toEqual([print, tool]);
+    expect(stack[0]).toEqual(print);
   });
   it('stows and raises ten times without adding back steps', () => {
-    const initial: DockPlace[] = [{ tab: 'world', presentation: 'raised' }, { tab: 'power-meter', presentation: 'raised' }];
+    const initial: DockPlace[] = [{ tab: 'map', presentation: 'raised' }, { tab: 'power-meter', presentation: 'raised' }];
     let stack = initial;
     for (let i = 0; i < 10; i++) {
       stack = presentTool(stack, 'stowed');

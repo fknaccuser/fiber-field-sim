@@ -2,7 +2,6 @@ import type { UiActionEvent, UiSessionState } from '../../session/runner';
 import type { Intent } from '../../session/types';
 import { SoftKey } from '../components/SoftKey';
 import { HeldDevice } from '../instrument/HeldDevice';
-import { blocker, INITIAL_HELD, type HeldState } from '../instrument/deviceState';
 import { useViewportState } from '../viewport/viewportStore';
 
 export function Vfl({ ui, dispatch }: { ui: UiSessionState; dispatch(intent: Intent): void }) {
@@ -11,23 +10,18 @@ export function Vfl({ ui, dispatch }: { ui: UiSessionState; dispatch(intent: Int
   const last = runs[runs.length - 1] ?? null;
   const [mode, setMode] = useViewportState<'continuous' | 'pulse'>('vfl.mode', 'continuous');
   const [selected, setSelected] = useViewportState<string | null>('vfl.span', null);
-  const [held, setHeld] = useViewportState<HeldState>('device.vfl', INITIAL_HELD);
-
-  const block = blocker(held, true);
   const spanId = selected && incident.some((s) => s.id === selected) ? selected : incident[0]?.id ?? null;
-  const lit = block === null;
+  // A VFL has one job and no idle state: raised, it is emitting.
+  const lit = true;
 
   return (
     <HeldDevice
       ui={ui}
-      dispatch={dispatch}
-      state={held}
+      id="vfl"
       name="VFL"
       status={lit ? `650 nm · ${mode === 'pulse' ? '2 Hz' : 'continuous'}` : undefined}
       model="VL-7"
       form="pen"
-      leadLabel="pigtail"
-      onStateChange={setHeld}
       bootLines={['FiberOps VL-7', '650 nm visual fault locator', 'class 2 laser — do not view directly']}
       softKeys={[
         { label: 'CW', active: mode === 'continuous', onClick: () => setMode('continuous') },
@@ -75,7 +69,7 @@ export function Vfl({ ui, dispatch }: { ui: UiSessionState; dispatch(intent: Int
           {incident.length === 0 && <div style={{ fontSize: 12, color: 'var(--muted)' }}>No fiber at this location.</div>}
         </div>
 
-        <SoftKey label="Trace this fiber" disabled={block !== null || spanId === null} onClick={() => spanId && dispatch({ type: 'vfl', spanId, fromNodeId: ui.locationNodeId })} />
+        <SoftKey label="Trace this fiber" disabled={spanId === null} onClick={() => spanId && dispatch({ type: 'vfl', spanId, fromNodeId: ui.locationNodeId })} />
 
         {last && (
           <div className="bezel" style={{ padding: 10 }}>

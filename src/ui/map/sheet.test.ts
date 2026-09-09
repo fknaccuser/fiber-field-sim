@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getScenario, instantiateScenario } from '../../scenarios';
-import { layoutScene } from '../scene/sceneLayout';
+import { layoutScene } from './layout';
 import {
   fitFrame,
   formatMetres,

@@ -5,7 +5,6 @@ import { Chip } from '../components/Chip';
 import { SevenSeg } from '../components/SevenSeg';
 import { SoftKey } from '../components/SoftKey';
 import { HeldDevice } from '../instrument/HeldDevice';
-import { blocker, INITIAL_HELD, type HeldState } from '../instrument/deviceState';
 import { useViewportState } from '../viewport/viewportStore';
 
 export function PowerMeter({ ui, dispatch }: { ui: UiSessionState; dispatch(intent: Intent): void }) {
@@ -13,26 +12,21 @@ export function PowerMeter({ ui, dispatch }: { ui: UiSessionState; dispatch(inte
   const wavelengths = Array.from(new Set([network.wavelengths.serviceDownstreamNm, network.wavelengths.serviceUpstreamNm, ...network.wavelengths.otdrTestWavelengthsNm])).sort((a, b) => a - b);
   const [wavelengthNm, setWavelengthNm] = useViewportState<number>('pm.wavelength', network.wavelengths.serviceDownstreamNm);
   const [strand, setStrand] = useViewportState<{ tubeColor: FiberTubeColor; fiberColor: FiberTubeColor } | null>('pm.strand', null);
-  const [held, setHeld] = useViewportState<HeldState>('device.power-meter', INITIAL_HELD);
 
   const spanHere = ui.world.topology.spans.find((s) => s.strands && (s.fromNodeId === ui.locationNodeId || s.toNodeId === ui.locationNodeId));
   const readings = ui.log.filter((a): a is Extract<UiActionEvent, { type: 'power-meter' }> => a.type === 'power-meter');
   const last = readings[readings.length - 1] ?? null;
   const locationLabel = ui.world.topology.nodes.find((n) => n.id === ui.locationNodeId)?.label ?? ui.locationNodeId;
-  const block = blocker(held, true);
-  const showReading = last && !block;
+  const showReading = last !== null;
 
   return (
     <HeldDevice
       ui={ui}
-      dispatch={dispatch}
-      state={held}
+      id="power-meter"
       name="Power meter"
       status={last ? `Last: ${last.dbm === null ? 'no light' : `${last.dbm.toFixed(2)} dBm`}` : undefined}
       model="PM-320"
       form="handheld"
-      leadLabel="jumper"
-      onStateChange={setHeld}
       bootLines={['FiberOps PM-320', 'optical power meter', 'InGaAs detector ... ok', 'calibration 2026-04-11']}
       softKeys={wavelengths.map((nm) => ({ label: `${nm}`, active: wavelengthNm === nm, onClick: () => setWavelengthNm(nm) }))}
     >
@@ -60,7 +54,7 @@ export function PowerMeter({ ui, dispatch }: { ui: UiSessionState; dispatch(inte
             ))}
           </div>
         )}
-        <SoftKey label="Measure" disabled={block !== null} onClick={() => dispatch({ type: 'power-meter', nodeId: ui.locationNodeId, wavelengthNm, strand: strand ?? undefined })} />
+        <SoftKey label="Measure" onClick={() => dispatch({ type: 'power-meter', nodeId: ui.locationNodeId, wavelengthNm, strand: strand ?? undefined })} />
       </div>
     </HeldDevice>
   );

@@ -4,20 +4,12 @@ import type { UiSessionState } from '../../session/runner';
 import type { Intent } from '../../session/types';
 import type { NodeKind } from '../../world';
 import { Sheet } from '../components/Sheet';
+import { conditionsLabel, shiftOf } from './conditions';
 
 function formatClock(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600) % 24;
   const m = Math.floor((totalSeconds % 3600) / 60);
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-function shiftOf(timeOfDay: string): string {
-  const hour = Number(timeOfDay.split(':')[0]);
-  if (!Number.isFinite(hour)) return 'DAY SHIFT';
-  if (hour < 6) return 'NIGHT SHIFT';
-  if (hour < 12) return 'DAY SHIFT';
-  if (hour < 18) return 'SWING SHIFT';
-  return 'NIGHT SHIFT';
 }
 
 const KIND_LABELS: Partial<Record<NodeKind, string>> = {
@@ -112,6 +104,9 @@ export function LocationBar({ ui, dispatch, toast }: { ui: UiSessionState; dispa
           </button>
           <div className="mono" style={{ fontSize: 9.5, letterSpacing: 1.2, color: 'var(--ink-faint)', marginTop: 3 }}>
             TECH-0824 · {ui.meta.scenarioId.toUpperCase()} · SEED {ui.meta.seed}
+          </div>
+          <div className="mono" style={{ fontSize: 9.5, letterSpacing: 1.2, color: 'var(--ink-soft)', marginTop: 2 }}>
+            {conditionsLabel(ui.world.environment.timeOfDay, ui.world.environment.weather).toUpperCase()}
           </div>
         </div>
 

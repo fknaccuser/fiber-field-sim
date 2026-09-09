@@ -1,6 +1,6 @@
-export type TabId = 'world' | 'map' | 'shelf' | 'otdr' | 'power-meter' | 'vfl' | 'scope' | 'terminal' | 'phone' | 'records' | 'diagnose' | 'excavate';
+export type TabId = 'map' | 'shelf' | 'otdr' | 'power-meter' | 'vfl' | 'scope' | 'terminal' | 'phone' | 'records' | 'diagnose' | 'excavate';
 
-/** Everything you reach by opening the truck rather than by looking around you. */
+/** Everything you reach by opening the truck rather than off the print. */
 export const SHELF_TABS: readonly TabId[] = ['shelf', 'otdr', 'power-meter', 'vfl', 'scope', 'terminal', 'records', 'diagnose', 'excavate'];
 export type ToolPresentation = 'raised' | 'stowed' | 'enlarged';
 export interface DockPlace { tab: TabId; presentation: ToolPresentation }

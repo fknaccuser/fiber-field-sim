@@ -24,11 +24,9 @@ import { pendingComms } from '../../session/comms';
 
 export type { TabId } from './navigation';
 
-// three + R3F + drei are only ever needed by these two; keep them out of the main chunk.
-const WorldViewport = lazy(() => import('../scene/WorldViewport').then((m) => ({ default: m.WorldViewport })));
 const MapViewport = lazy(() => import('../map/MapViewport').then((m) => ({ default: m.MapViewport })));
 
-export function InstrumentDock({ ui, dispatch, initialTab = 'world' }: { ui: UiSessionState; dispatch(intent: Intent): void; initialTab?: TabId }) {
+export function InstrumentDock({ ui, dispatch, initialTab = 'map' }: { ui: UiSessionState; dispatch(intent: Intent): void; initialTab?: TabId }) {
   const location = useLocation();
   const navigate = useNavigate();
   const runKey = `${ui.meta.scenarioId}:${ui.meta.seed}`;
@@ -50,7 +48,7 @@ export function InstrumentDock({ ui, dispatch, initialTab = 'world' }: { ui: UiS
     const nextStack = presentTool(stack, presentation);
     navigate(`${location.pathname}${location.search}`, { replace: true, state: { ...location.state, fiberDock: { runKey, stack: nextStack } } });
   };
-  const back = () => stack.length > 1 ? navigate(-1) : setTab('world');
+  const back = () => stack.length > 1 ? navigate(-1) : setTab('map');
   const [prefill, setPrefill] = useViewportState<DiagnosePrefill | null>('diagnose.prefill', null);
   // The badge counts what is actually waiting on an answer. Counting the customer reports
   // instead made it a constant, and a number that never changes is not a notification.
@@ -58,19 +56,9 @@ export function InstrumentDock({ ui, dispatch, initialTab = 'world' }: { ui: UiS
 
   const viewports: Array<ViewportDef<TabId>> = [
     {
-      id: 'world',
-      label: 'World',
-      policy: 'unmount',
-      render: () => (
-        <Suspense fallback={<div style={{ padding: 16, color: 'var(--muted)' }}>Loading the plant…</div>}>
-          <WorldViewport ui={ui} dispatch={dispatch} />
-        </Suspense>
-      ),
-    },
-    {
       id: 'map',
-      // The print is SVG, not WebGL. It holds no GL context, so it can stay mounted and
-      // keep its sheet, pan and selection while you go and take a reading.
+      // The print is SVG, so it costs nothing to leave mounted: it keeps its sheet and its
+      // selection while you go and take a reading, and comes back exactly as you left it.
       label: 'Print',
       policy: 'keep-alive',
       render: () => (
@@ -95,8 +83,8 @@ export function InstrumentDock({ ui, dispatch, initialTab = 'world' }: { ui: UiS
         />
       ),
     },
-    // Power, VFL and Scope each render the equipment behind the held device, so each owns a
-    // WebGL context while active and must release it on the way out.
+    // Power, VFL and Scope each hold a 2D canvas while active (the scope's end face, the
+    // meter's needle), so they unmount on the way out rather than idling in the DOM.
     { id: 'power-meter', label: 'Power', policy: 'unmount', render: () => <PowerMeter ui={ui} dispatch={dispatch} /> },
     { id: 'vfl', label: 'VFL', policy: 'unmount', render: () => <Vfl ui={ui} dispatch={dispatch} /> },
     { id: 'scope', label: 'Scope', policy: 'unmount', render: () => <Scope ui={ui} dispatch={dispatch} /> },
@@ -148,19 +136,17 @@ export function InstrumentDock({ ui, dispatch, initialTab = 'world' }: { ui: UiS
 
   return (
     <DockNavigation.Provider value={{ presentation: place.presentation, present, back }}>
-      {(stack.length > 1 || tab !== 'world') && (
+      {(stack.length > 1 || tab !== 'map') && (
         <div className="dock-back"><button type="button" onClick={back}>← Back</button><span>{viewports.find((v) => v.id === tab)?.label}{place.presentation !== 'raised' ? ` · ${place.presentation}` : ''}</span></div>
       )}
-      {/* Tier 1 and 2 guidance. "Show me where" focuses the object in the world without
-          moving the truck or spending simulated time. */}
+      {/* Tier 1 and 2 guidance. "Show me where" puts the object under your finger on the
+          print, on the tightest sheet, without moving the truck or spending simulated time. */}
       <TeachingRail
         ui={ui}
         onShow={(nodeId) => {
-          writeViewportState('world.selected', nodeId);
-          writeViewportState('world.mode', 'equipment');
-          writeViewportState('world.card', true);
-          writeViewportState('world.list', false);
-          setTab('world');
+          writeViewportState('map.selected', nodeId);
+          writeViewportState('map.zoom', 'site');
+          setTab('map');
         }}
       />
       <ViewportHost<TabId> viewports={viewports} active={tab} onActivate={setTab} nav={<DockBar active={tab} onGo={setTab} phoneBadge={waiting} />} />

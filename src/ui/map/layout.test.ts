@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getScenario, instantiateScenario, listScenarios } from '../../scenarios';
-import { layoutScene, napGroupOf, pointAlongRoute, TRENCH_Y } from './sceneLayout';
+import { layoutScene, napGroupOf, pointAlongRoute, TRENCH_Y } from './layout';
 
 function layoutFor(id: string, seed = 1) {
   const def = getScenario(id, seed);

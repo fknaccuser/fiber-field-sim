@@ -8,7 +8,6 @@ import type { Intent } from '../../session/types';
 import { SoftKey } from '../components/SoftKey';
 import { HeldDevice } from '../instrument/HeldDevice';
 import { useDockNavigation } from '../field/dockNavigation';
-import { blocker, INITIAL_HELD, type HeldState } from '../instrument/deviceState';
 import { useViewportState } from '../viewport/viewportStore';
 import { AccessPicker, type AccessSelection } from './AccessPicker';
 import { EventTable } from './EventTable';
@@ -61,8 +60,6 @@ export function OtdrPanel({
   const navigation = useDockNavigation();
   const expanded = navigation.presentation === 'enlarged';
   const setExpanded = (value: boolean) => value ? navigation.present('enlarged') : navigation.back();
-  const [held, setHeld] = useViewportState<HeldState>('device.otdr', INITIAL_HELD);
-  const block = blocker(held, true);
 
   const otdrActions = ui.log.filter((a): a is Extract<UiActionEvent, { type: 'otdr-shot' }> => a.type === 'otdr-shot');
   const lastAction = otdrActions[otdrActions.length - 1] ?? null;
@@ -75,7 +72,7 @@ export function OtdrPanel({
     setViewport(null);
   }, [lastAction?.id]);
 
-  const canStart = access !== null && !acquiring && block === null;
+  const canStart = access !== null && !acquiring;
 
   const start = () => {
     if (!access) return;
@@ -167,14 +164,11 @@ export function OtdrPanel({
   return (
     <HeldDevice
       ui={ui}
-      dispatch={dispatch}
-      state={held}
+      id="otdr"
       name="OTDR"
       status={acquiring ? 'Acquiring…' : lastAction ? 'Trace stored' : undefined}
       model="MX-730"
       form="tablet"
-      leadLabel="launch cable"
-      onStateChange={setHeld}
       bootLines={['FiberOps MX-730', 'OTDR / PON metro tester', 'laser class 1M', 'self-test ... pass']}
       softKeys={[
         { label: 'Start', onClick: start, disabled: !canStart },

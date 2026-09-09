@@ -12,7 +12,7 @@
 import { useRef, type PointerEvent, type ReactNode } from 'react';
 import { useDockNavigation } from './dockNavigation';
 import { isStowSwipe } from './navigation';
-import { minutesOf } from '../scene/ambient';
+import { minutesOf } from './conditions';
 
 /** Fallback only: the scenario's own time of day is used when it parses. */
 const DEFAULT_START_MINUTES = 7 * 60 + 40;

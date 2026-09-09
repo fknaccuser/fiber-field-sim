@@ -1,8 +1,11 @@
 /**
- * Physical scene layout: turns the real topology into a believable South-OC street. Every
- * placement and cable route is bound to an actual node or span id -- there is no second
- * topology for visuals. Pure and deterministic (no React, no three.js) so it can be
- * unit-tested and so the same plant always looks the same.
+ * Plant layout: turns the topology into ground. Every placement and cable route is bound to
+ * an actual node or span id -- there is no second topology for drawing. Pure and
+ * deterministic (no React, no renderer) so it can be unit-tested and so the same plant
+ * always draws the same.
+ *
+ * This is the only source of position in the session. The print reads it, the truck-roll
+ * distances read it, and anything that comes later reads it too.
  *
  * Coordinates are metres-ish: x runs along the street, z across it (street centre at
  * z = 0, houses on the north side at larger z), y is up. Cable lengths are *not* to

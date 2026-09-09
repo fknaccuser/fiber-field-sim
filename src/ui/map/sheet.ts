@@ -2,9 +2,10 @@
  * The print. A field technician does not carry a 3D model of the plant — they carry a
  * paper drawing, and the whole skill of reading one is knowing which sheet you are on.
  *
- * So this is a plan view (top-down) of the *same* scene layout the 3D world is built
- * from, at three drawing scales. That identity matters: what you measure on the sheet is
- * where you walk. There is no second topology and no second set of coordinates.
+ * So this is a plan view (top-down) of the plant layout, at three drawing scales. The
+ * layout is the single source of position for everything in the session — what you measure
+ * on the sheet is where you roll. There is no second topology and no second set of
+ * coordinates.
  *
  * Pure geometry — no React, no SVG — so every framing rule is unit-testable.
  *
@@ -12,7 +13,7 @@
  * world's +z (across the street, toward the houses) is north. So paper y = -z and north
  * is up, the way every drawing you will ever be handed is oriented.
  */
-import type { SceneLayout, Vec3 } from '../scene/sceneLayout';
+import type { SceneLayout, Vec3 } from './layout';
 
 export type ZoomLevel = 'site' | 'neighbourhood' | 'branch';
 
