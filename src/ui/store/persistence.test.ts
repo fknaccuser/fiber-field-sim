@@ -4,6 +4,7 @@ import { getScenario, instantiateScenario } from '../../scenarios';
 import { resolveProfileSet } from '../../profiles';
 import { startSession, perform } from '../../session/runner';
 import type { SessionState } from '../../session/types';
+import { clearSetting, readSetting, writeSetting } from './localSettings';
 import { _useDatabase, getOrCreateTraineeId, getPersonalBest, getSession, loadUnfinished, migrateStored, saveBenchRun, saveSession, type StoredSession } from './persistence';
 
 function runReference(seed = 1): { session: SessionState; report: import('../../scoring/types').ScoreReport } {
@@ -151,5 +152,27 @@ describe('when there is nowhere to write', () => {
       id: 'r1', traineeId: 't1', kind: 'tray-dress', at: new Date().toISOString(), seed: 1,
       mistakes: [], omitted: [], seconds: 60, passed: true, score: 100, domains: ['splicing'],
     })).resolves.toBeUndefined();
+  });
+});
+
+describe('local settings where there is no local storage', () => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const hostile = () => Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    get() { throw new DOMException('The document is sandboxed and lacks the allow-same-origin flag.'); },
+  });
+  const restore = () => { if (original) Object.defineProperty(globalThis, 'localStorage', original); };
+
+  it('reads null and writes nothing rather than throwing', () => {
+    // A sandboxed iframe throws on property ACCESS, before any method is called. The dispatch
+    // screen reads the day seed during its first render, so this threw before anything painted.
+    hostile();
+    try {
+      expect(readSetting('fiberops.daySeed')).toBeNull();
+      expect(() => writeSetting('fiberops.daySeed', '1')).not.toThrow();
+      expect(() => clearSetting('fiberops.daySeed')).not.toThrow();
+    } finally {
+      restore();
+    }
   });
 });

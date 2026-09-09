@@ -63,11 +63,26 @@ const css = cssFile ? inlineFonts(fs.readFileSync(path.join(assets, cssFile), 'u
  * that threw `Unexpected identifier` and rendered two megabytes of source code as a wall of
  * text. A function replacement disables that substitution entirely.
  */
+/**
+ * The script goes at the END OF THE BODY, not where Vite left it.
+ *
+ * Vite emits the tag in the head, which is correct for a module: modules are deferred and do
+ * not run until the document has parsed. A classic script is not deferred -- `defer` is
+ * ignored on an inline script -- so left in the head it runs before `<div id="root">` exists
+ * and React throws "target container is not a DOM element" into a console nobody has open.
+ * The page paints its background and does nothing, which is exactly the symptom this build
+ * was changed to fix.
+ */
 let single = html
-  .replace(/<script[^>]*\bsrc="[^"]*"[^>]*><\/script>/i, () => `<script type="module">${escapeForTag(js, 'script')}</script>`)
-  .replace(/<link[^>]*rel="stylesheet"[^>]*>/i, () => (css ? `<style>${escapeForTag(css, 'style')}</style>` : ''));
+  .replace(/<script[^>]*\bsrc="[^"]*"[^>]*><\/script>\s*/i, '')
+  .replace(/<link[^>]*rel="stylesheet"[^>]*>/i, () => (css ? `<style>${escapeForTag(css, 'style')}</style>` : ''))
+  .replace(/<\/body>/i, () => `  <script>${escapeForTag(js, 'script')}</script>\n  </body>`);
 
 if (single.includes(jsFile)) throw new Error('the script tag was not replaced — the bundle is still a separate file');
+// A module script is the one thing that stops this file working where it is meant to work.
+if (/<script[^>]*type="module"/i.test(single)) throw new Error('the bundle is still a module script — Safari, Firefox and sandboxed previews will not run it from file://');
+// An inline classic script in the head runs before the body exists and React finds no root.
+if (single.indexOf('<script>') < single.indexOf('id="root"')) throw new Error('the script runs before #root exists — it has to sit at the end of the body');
 
 // Anything still pointing at a file beside it would 404 from a filesystem; there is nothing
 // beside it. Drop the icon links rather than ship a broken reference.

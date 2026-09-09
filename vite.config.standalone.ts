@@ -29,7 +29,21 @@ export default defineConfig({
     assetsInlineLimit: Number.MAX_SAFE_INTEGER,
     rollupOptions: {
       input: 'standalone.html',
-      output: { codeSplitting: false },
+      output: {
+        codeSplitting: false,
+        /**
+         * A classic script, not an ES module.
+         *
+         * Module scripts are subject to origin rules that `file://` cannot satisfy: Safari
+         * and Firefox refuse them outright from a local file, and sandboxed HTML previews
+         * refuse them too. The page then paints its CSS and runs nothing -- a dark background
+         * and no app, with no error anywhere a person would look.
+         *
+         * An IIFE has none of that. It is the whole reason this build exists, so it is not
+         * optional here.
+         */
+        format: 'iife',
+      },
     },
   },
 });

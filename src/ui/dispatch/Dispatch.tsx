@@ -13,6 +13,7 @@ import { SoftKey } from '../components/SoftKey';
 import { DEFAULT_ROLE, isRole, ROLE_ORDER, ROLE_POLICY, unlockedRoles, type Role } from '../../session/roles';
 import { buildDay, committedMinutes, networkStability, SHIFT_MINUTES, type Priority, type WorkKind, type WorkOrder } from './day';
 import { ConstructionBoard } from './ConstructionBoard';
+import { clearSetting, readSetting, writeSetting } from '../store/localSettings';
 
 const DAY_SEED_KEY = 'fiberops.daySeed';
 const STARTED_KEY = 'fiberops.dayStarted';
@@ -126,17 +127,17 @@ export function Dispatch() {
   const [sessions, setSessions] = useState<StoredSession[]>([]);
   const [unfinished, setUnfinished] = useState<StoredSession | null>(null);
   const [daySeed, setDaySeed] = useState<number>(() => {
-    const stored = Number(localStorage.getItem(DAY_SEED_KEY));
+    const stored = Number(readSetting(DAY_SEED_KEY));
     if (Number.isInteger(stored) && stored > 0) return stored;
     const fresh = 1 + Math.floor(Math.random() * 999_999);
-    localStorage.setItem(DAY_SEED_KEY, String(fresh));
+    writeSetting(DAY_SEED_KEY, String(fresh));
     return fresh;
   });
   const [role, setRole] = useState<Role>(() => {
-    const stored = localStorage.getItem(ROLE_KEY);
+    const stored = readSetting(ROLE_KEY);
     return isRole(stored) ? stored : DEFAULT_ROLE;
   });
-  const [started, setStarted] = useState(() => localStorage.getItem(STARTED_KEY) === String(localStorage.getItem(DAY_SEED_KEY)));
+  const [started, setStarted] = useState(() => readSetting(STARTED_KEY) === String(readSetting(DAY_SEED_KEY)));
 
   useEffect(() => {
     void loadUnfinished().then((s) => setUnfinished(s ?? null));
@@ -158,13 +159,13 @@ export function Dispatch() {
   const leadTicket = day.orders.find((o) => !closed.includes(o.ticket))?.ticket ?? null;
 
   const startDay = () => {
-    localStorage.setItem(STARTED_KEY, String(daySeed));
+    writeSetting(STARTED_KEY, String(daySeed));
     setStarted(true);
   };
   const newDay = () => {
     const fresh = 1 + Math.floor(Math.random() * 999_999);
-    localStorage.setItem(DAY_SEED_KEY, String(fresh));
-    localStorage.removeItem(STARTED_KEY);
+    writeSetting(DAY_SEED_KEY, String(fresh));
+    clearSetting(STARTED_KEY);
     setDaySeed(fresh);
     setStarted(false);
   };
@@ -236,7 +237,7 @@ export function Dispatch() {
                   title={unlocked ? ROLE_POLICY[r].blurb : `Suggested after ${ROLE_POLICY[r].unlockAfterSessions} completed work orders`}
                   onClick={() => {
                     setRole(r);
-                    localStorage.setItem(ROLE_KEY, r);
+                    writeSetting(ROLE_KEY, r);
                   }}
                   style={unlocked ? undefined : { opacity: 0.5 }}
                 >

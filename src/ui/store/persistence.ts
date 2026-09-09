@@ -161,12 +161,12 @@ export function migrateStored<T extends StoredSession | undefined>(session: T): 
 }
 
 export async function getSession(id: string): Promise<StoredSession | undefined> {
-  return migrateStored(await db.sessions.get(id));
+  return migrateStored(await readOrEmpty(() => db.sessions.get(id), undefined));
 }
 
 /** The most recently started session still in progress (no diagnosis/strike yet), if any -- powers Home's "Continue". */
 export async function loadUnfinished(): Promise<StoredSession | undefined> {
-  const all = await db.sessions.orderBy('startedAt').reverse().toArray();
+  const all = await readOrEmpty(() => db.sessions.orderBy('startedAt').reverse().toArray(), []);
   return migrateStored(all.find((s) => s.endedAt === null));
 }
 
@@ -177,7 +177,7 @@ export interface SessionFilter {
 }
 
 export async function listSessions(filter: SessionFilter = {}): Promise<StoredSession[]> {
-  let results = await db.sessions.orderBy('startedAt').reverse().toArray();
+  let results = await readOrEmpty(() => db.sessions.orderBy('startedAt').reverse().toArray(), []);
   if (filter.scenarioId) results = results.filter((s) => s.scenarioId === filter.scenarioId);
   if (filter.tier !== undefined) results = results.filter((s) => s.tier === filter.tier);
   if (filter.limit !== undefined) results = results.slice(0, filter.limit);
@@ -185,7 +185,7 @@ export async function listSessions(filter: SessionFilter = {}): Promise<StoredSe
 }
 
 export async function getPersonalBest(scenarioId: string, seed: number): Promise<PersonalBest | undefined> {
-  return db.personalBests.get(`${scenarioId}:${seed}`);
+  return readOrEmpty(() => db.personalBests.get(`${scenarioId}:${seed}`), undefined);
 }
 
 export async function getSetting<T>(key: string): Promise<T | undefined> {
@@ -211,6 +211,23 @@ export async function setSetting(key: string, value: unknown): Promise<void> {
  * told the session failed, which teaches nothing except not to trust the tool.
  */
 let ephemeralTraineeId: string | null = null;
+
+/**
+ * Read from the database, or hand back the empty answer.
+ *
+ * The write side already degrades (see below). Reads have to as well, and for a sharper
+ * reason: a read runs while a screen is rendering, so a rejected one takes the screen with it.
+ * The training record with nothing in it is a true and useful thing to show when there is no
+ * database to read; a blank page where the record should be is not.
+ */
+async function readOrEmpty<T>(read: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    console.warn('[persistence] could not read stored history; showing none.', error);
+    return fallback;
+  }
+}
 
 /** The local trainee id, created once on first launch and reused thereafter. */
 export async function getOrCreateTraineeId(): Promise<string> {
@@ -245,6 +262,6 @@ export async function saveBenchRun(runRecord: BenchRun): Promise<void> {
 
 /** Most recent first. */
 export async function listBenchRuns(limit = 50): Promise<BenchRun[]> {
-  const all = await db.benchRuns.toArray();
+  const all = await readOrEmpty(() => db.benchRuns.toArray(), []);
   return all.sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
 }
