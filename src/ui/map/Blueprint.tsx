@@ -28,6 +28,8 @@ import {
   scaleBarMetres,
   scaleDenominator,
   sheetLabel,
+  stackLabels,
+  type LabelBox,
   ZOOM_ORDER,
   ZOOM_LABEL,
   type Frame,
@@ -41,6 +43,11 @@ const INK_GHOST = 'rgba(127,212,232,0.09)';
 const REDLINE = '#ff6b00';
 const ALARM = '#ff4d5e';
 const HERE = '#34d399';
+
+/** Height of the viewport's own furniture along the bottom edge, in pixels. */
+const CHROME_BOTTOM = 80;
+/** Where north can sit without landing under the sheet's own controls. */
+const CHROME_TOP_RIGHT = 74;
 
 const MARK_INK: Record<NodeMark, string> = {
   current: HERE,
@@ -139,9 +146,14 @@ function Symbol({ kind, r, stroke }: { kind: PlacementKind; r: number; stroke: s
   }
 }
 
+/** Title blocks are a fixed size on a real sheet; a long id gets abbreviated, not printed over the border. */
+function fitToBlock(text: string, max = 18): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
+}
+
 function TitleBlock({ ui, level, frame, w, h }: { ui: UiSessionState; level: ZoomLevel; frame: Frame; w: number; h: number }) {
   const rows: Array<[string, string]> = [
-    ['DRAWING', ui.meta.scenarioId.toUpperCase()],
+    ['DRAWING', fitToBlock(ui.meta.scenarioId.toUpperCase())],
     ['SCALE', `1:${scaleDenominator(frame)}`],
     ['SHEET', `${ZOOM_ORDER.indexOf(level) + 1} OF ${ZOOM_ORDER.length}`],
     ['REV', `SEED ${ui.meta.seed}`],
@@ -149,7 +161,7 @@ function TitleBlock({ ui, level, frame, w, h }: { ui: UiSessionState; level: Zoo
   const bw = 168;
   const bh = 16 + rows.length * 13;
   const x = w - bw - 10;
-  const y = h - bh - 10;
+  const y = h - bh - CHROME_BOTTOM;
   if (w < 260 || h < 190) return null;
   return (
     <g transform={`translate(${x},${y})`} style={{ pointerEvents: 'none' }}>
@@ -238,6 +250,10 @@ export function Blueprint({
     () => layoutScene(ui.world.topology.nodes, ui.world.topology.spans, ui.world.hosts),
     [ui.world.topology.nodes, ui.world.topology.spans, ui.world.hosts],
   );
+  // The site sheet frames whatever you are looking at, which is the selection when there is
+  // one and where you are standing otherwise. Framing the truck while the reader is asking
+  // about a closure two blocks away is how a drawing loses somebody.
+  const focusNodeId = selectedNodeId ?? ui.locationNodeId;
   const [draftClaims] = useViewportState<DiagnosisClaim[]>('diagnose.claims', []);
   const overlay = useMemo(() => buildMapOverlay(ui, draftClaims), [ui, draftClaims]);
 
@@ -246,9 +262,9 @@ export function Blueprint({
   // viewport. Rotation is chosen from the drawing's own proportions, not hard-coded.
   const oriented = useMemo(() => {
     if (w <= 0 || h <= 0) return null;
-    const o = orientation(frameFor(level, layout, ui.locationNodeId), w / h);
+    const o = orientation(frameFor(level, layout, focusNodeId), w / h);
     return { rotate: o.rotate, frame: fitFrame(o.frame, w / h) };
-  }, [level, layout, ui.locationNodeId, w, h]);
+  }, [level, layout, focusNodeId, w, h]);
   const frame = oriented?.frame ?? null;
   const rotate = oriented?.rotate ?? false;
   const project = useMemo(() => (frame ? makeProjector(frame, w, h, rotate) : null), [frame, w, h, rotate]);
@@ -259,6 +275,10 @@ export function Blueprint({
     const step = gridStep(frame);
     const showGround = level !== 'branch';
     const labelKinds = LABELS_AT[level];
+
+    // Lettering is collected while the symbols are laid out and drawn afterwards in its own
+    // layer, so a label can be nudged clear of its neighbours and never sits under a symbol.
+    const labels: Array<LabelBox & { ink: string }> = [];
 
     // Grid, snapped to whole metres so it reads as a survey grid rather than screen pixels.
     const gridLines: React.ReactElement[] = [];
@@ -385,17 +405,15 @@ export function Blueprint({
             const target = ped.portNodeIds[0] ?? null;
             const selected = target !== null && selectedNodeId === target;
             const r = Math.max(5, Math.min(1.1 * k, 26));
+            if (LABELS_AT[level].includes('pedestal')) {
+              labels.push({ key: ped.groupId, x: c.x, y: c.y + r + 11, text: sheetLabel(ped.label, level).toUpperCase(), ink: mark ? MARK_INK[mark] : 'rgba(127,212,232,0.75)' });
+            }
             return (
               <g key={ped.groupId} transform={`translate(${c.x.toFixed(1)},${c.y.toFixed(1)})`} onClick={() => target && onSelectNode(target)} style={{ cursor: 'pointer' }}>
-                <circle cx={0} cy={0} r={Math.max(r + 8, 16)} fill="transparent" />
+                <circle cx={0} cy={0} r={Math.max(r + 10, 22)} fill="transparent" />
                 {mark === 'current' && <circle cx={0} cy={0} r={r + 7} fill="none" stroke={HERE} strokeWidth={1.1} className="pulse-ring" />}
                 {selected && <circle cx={0} cy={0} r={r + 5} fill="none" stroke="#ffffff" strokeWidth={0.9} strokeDasharray="3 3" />}
                 <Symbol kind="pedestal" r={r} stroke={selected ? '#ffffff' : mark ? MARK_INK[mark] : INK} />
-                {LABELS_AT[level].includes('pedestal') && (
-                  <text x={0} y={r + 11} fill={mark ? MARK_INK[mark] : 'rgba(127,212,232,0.75)'} fontSize={8} textAnchor="middle" letterSpacing={0.6} fontFamily="var(--font-display)">
-                    {sheetLabel(ped.label, level).toUpperCase()}
-                  </text>
-                )}
               </g>
             );
           })}
@@ -410,25 +428,41 @@ export function Blueprint({
               const selected = selectedNodeId === p.nodeId;
               const stroke = selected ? '#ffffff' : mark ? MARK_INK[mark] : INK;
               const r = symbolRadius(p, k);
+              if (labelKinds.includes(p.kind)) {
+                labels.push({ key: p.nodeId, x: c.x, y: c.y + r + 11, text: sheetLabel(p.node.label, level).toUpperCase(), ink: mark ? MARK_INK[mark] : 'rgba(127,212,232,0.75)' });
+              }
               return (
                 <g key={p.nodeId} transform={`translate(${c.x.toFixed(1)},${c.y.toFixed(1)})`} onClick={() => onSelectNode(p.nodeId)} style={{ cursor: 'pointer' }}>
                   {/* Generous invisible target: this is a phone, and a 9 px symbol is not a tap target. */}
-                  <circle cx={0} cy={0} r={Math.max(r + 8, 16)} fill="transparent" />
+                  <circle cx={0} cy={0} r={Math.max(r + 10, 22)} fill="transparent" />
                   {mark === 'current' && <circle cx={0} cy={0} r={r + 7} fill="none" stroke={HERE} strokeWidth={1.1} opacity={0.85} className="pulse-ring" />}
                   {selected && <circle cx={0} cy={0} r={r + 5} fill="none" stroke="#ffffff" strokeWidth={0.9} strokeDasharray="3 3" />}
                   <Symbol kind={p.kind} r={r} stroke={stroke} />
-                  {labelKinds.includes(p.kind) && (
-                    <text x={0} y={r + 11} fill={mark ? MARK_INK[mark] : 'rgba(127,212,232,0.75)'} fontSize={8} textAnchor="middle" letterSpacing={0.6} fontFamily="var(--font-display)">
-                      {sheetLabel(p.node.label, level).toUpperCase()}
-                    </text>
-                  )}
                 </g>
               );
             })}
         </g>
 
-        <NorthArrow x={w - 26} y={30} rotated={rotate} />
-        <ScaleBar frame={frame} k={k} x={16} y={h - 18} />
+        {/* Lettering, de-collided. */}
+        <g style={{ pointerEvents: 'none' }}>
+          {stackLabels(labels).map((label) => (
+            <text
+              key={label.key}
+              x={label.x.toFixed(1)}
+              y={label.y.toFixed(1)}
+              fill={label.ink}
+              fontSize={8}
+              textAnchor="middle"
+              letterSpacing={0.6}
+              fontFamily="var(--font-display)"
+            >
+              {label.text}
+            </text>
+          ))}
+        </g>
+
+        <NorthArrow x={w - 26} y={CHROME_TOP_RIGHT} rotated={rotate} />
+        <ScaleBar frame={frame} k={k} x={16} y={h - CHROME_BOTTOM - 8} />
         <TitleBlock ui={ui} level={level} frame={frame} w={w} h={h} />
       </>
     );

@@ -194,13 +194,61 @@ export function orientation(frame: Frame, viewportAspect: number): { rotate: boo
 }
 
 /**
- * Lettering for a symbol. Full detail on the site sheet, where there is room; on the wider
- * sheets only the identifier, because "NAP B-3, PORT TO 301 PASEO VISTA" printed eight
- * times over one pedestal is not a drawing, it is a smudge.
+ * Lettering for a symbol: the designation, and only the designation.
+ *
+ * The site sheet used to print the full label — "FDH A — CAMINO DEL AVION & VIA LADERA"
+ * beside "CLOSURE A1 — VIA LADERA", eleven metres apart — and the two ran straight through
+ * each other into an unreadable smudge. Which is exactly what a real sheet avoids by
+ * lettering the *symbol* with its designation and putting the address in the schedule. Here
+ * the schedule is the footer card and the plant index, so the drawing gets the short form
+ * at every scale and the full label is one tap away.
  */
-export function sheetLabel(label: string, level: ZoomLevel): string {
-  if (level === 'site') return label;
+export function sheetLabel(label: string, _level: ZoomLevel): string {
   return label.split(/\s+[—–-]\s+|,/)[0].trim();
+}
+
+/** A label placed on the page, before anything has been done about collisions. */
+export interface LabelBox {
+  key: string;
+  x: number;
+  y: number;
+  text: string;
+}
+
+/**
+ * Stack labels that would print on top of each other.
+ *
+ * Two nodes at one address — an ONT and the NID on the same wall — land within a couple of
+ * pixels of each other, and their lettering overprints. A draughtsman moves the second one
+ * down a line. This does the same, greedily and deterministically: work in reading order,
+ * and push anything that collides with an already-placed label down by one line until it
+ * clears.
+ *
+ * Width is estimated from the character count because the caller has no text metrics and
+ * does not need them — being approximately right about a monospaced 8px label is enough to
+ * decide whether two of them touch.
+ */
+export function stackLabels<T extends LabelBox>(labels: readonly T[], lineHeight = 10, charWidth = 4.6): T[] {
+  const placed: T[] = [];
+  const ordered = [...labels].sort((a, b) => a.y - b.y || a.x - b.x || a.key.localeCompare(b.key));
+
+  for (const label of ordered) {
+    const halfWidth = (label.text.length * charWidth) / 2;
+    let y = label.y;
+    // A bounded walk: past this many lines the drawing is too crowded to letter anyway, and
+    // an unbounded loop on degenerate input would hang the render.
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const clash = placed.some((other) => {
+        const otherHalf = (other.text.length * charWidth) / 2;
+        return Math.abs(other.x - label.x) < halfWidth + otherHalf && Math.abs(other.y - y) < lineHeight;
+      });
+      if (!clash) break;
+      y += lineHeight;
+    }
+    placed.push({ ...label, y });
+  }
+
+  return placed;
 }
 
 /** Cable lengths are engineering data: printed the way the records print them. */

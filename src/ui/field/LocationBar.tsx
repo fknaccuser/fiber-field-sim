@@ -5,26 +5,13 @@ import type { Intent } from '../../session/types';
 import type { NodeKind } from '../../world';
 import { Sheet } from '../components/Sheet';
 import { conditionsLabel, shiftOf } from './conditions';
+import { kindLabel } from './nodeLabels';
 
 function formatClock(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600) % 24;
   const m = Math.floor((totalSeconds % 3600) / 60);
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
-
-const KIND_LABELS: Partial<Record<NodeKind, string>> = {
-  olt: 'OLT',
-  fdh: 'FDH',
-  splitter: 'Splitters',
-  'splice-closure': 'Closures',
-  terminal: 'Terminals / NAPs',
-  fat: 'FATs',
-  ont: 'ONTs',
-  'customer-premise': 'Customer premises',
-  'network-device': 'Network devices',
-  yard: 'Yard',
-  pop: 'POP',
-};
 
 /** Decorative HUD telemetry across the header. Never scenario data. */
 const TRACE_POINTS = '0,26 60,24 130,22 138,9 146,23 300,19 308,6 316,20 470,16 600,12 640,10 641,2 720,2';
@@ -154,7 +141,7 @@ export function LocationBar({ ui, dispatch, toast }: { ui: UiSessionState; dispa
         {Array.from(grouped.entries()).map(([kind, nodes]) => (
           <div key={kind} style={{ marginBottom: 14 }}>
             <div className="eyebrow" style={{ color: 'var(--cyan)', marginBottom: 6 }}>
-              {KIND_LABELS[kind] ?? kind}
+              {kindLabel(kind)}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               {nodes.map((node) => (
