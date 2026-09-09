@@ -1,12 +1,27 @@
 # Handoff — paste this into the new session
 
-## Update after the first Codex increment
+## Where the project actually is
 
-Stow/raise and Back are implemented. Current baseline: **49 files / 623 tests** and clean
-TypeScript. Read `docs/architecture/item-9-stow-raise.md` for implementation details,
-browser verification and limits. Continue with **§3.1–3.2 truck and tool shelf** next.
-The instructions below describe the original incoming handoff; its test counts and
-"Start with" section are historical.
+The active work is **[item 11, the print-first revamp](docs/architecture/item-11-print-first.md)**.
+Read it before anything else: it changed the shape of the product rather than adding to it,
+and several instructions further down this file describe a version that no longer exists.
+
+Current baseline: **70 files / 973 tests**, clean TypeScript, 21 pre-existing lint warnings.
+
+What item 11 changed, in one paragraph each:
+
+- **The 3D world view is gone.** The dock is three slots and the print leads. `src/ui/scene/`
+  no longer exists; its geometry moved to `src/ui/map/layout.ts` and is the only source of
+  position in the session. Three.js survives for exactly one route, the tray bench.
+- **The instruments have no gates.** No dust cap, no jumper, no press-and-hold power.
+- **There are no customers to talk to.** Infrastructure talks to NOC; `noc-contact` returns
+  the whole alarm list in one call, and the fifth scoring axis is `serviceImpact`.
+- **Four benches were added or rebuilt:** locate-and-mark (incoming DigAlerts), the 3D tray
+  bench, the backbone cut-in, and acceptance now records like the others.
+
+The sections below still describe the original incoming handoff. Their test counts, their
+"one WebGL context" invariant and their "Start with" section are **historical** — see item 11
+for what replaced them.
 
 You are picking up an in-progress project: a training simulator for outside-plant fiber
 technicians. React + TypeScript + Vite, offline PWA, phone-first, no backend. There is a
@@ -46,8 +61,12 @@ If that baseline is not green before you start, stop and say so. Do not build on
 2. **Determinism.** `scenarioId + seed` reproduces a run exactly. Resume, replay and share
    codes depend on it. All randomness goes through `createRng(deriveSeed(...))` in
    `src/world/random.ts`. Never call `Math.random()` in engine, scenario or event code.
-3. **One WebGL context.** Viewports declare a mount policy; anything holding a *WebGL*
-   canvas must be `'unmount'`, so only one GL context is ever alive.
+3. **Viewports declare a mount policy.** Anything holding a canvas is `'unmount'` so its
+   resources are released on the way out.
+
+   *(Historical: this was "one WebGL context". Since item 11 nothing in the field session
+   holds a GL context at all — the only one in the project is the tray bench, on its own
+   route. The rule is now about mount policy, which is what it always was underneath.)*
 
    This is about **GL contexts, not `<canvas>` elements.** A 2D canvas — the OTDR trace, the
    fiber-scope end-face — is cheap and does not count. It is normal and correct for a held
@@ -82,7 +101,8 @@ If that baseline is not green before you start, stop and say so. Do not build on
 
 ## Your work order
 
-**The active brief is [`docs/architecture/item-10-SPEC-the-experience.md`](docs/architecture/item-10-SPEC-the-experience.md).**
+*(Historical — superseded by item 11.)* The previous brief was
+[`docs/architecture/item-10-SPEC-the-experience.md`](docs/architecture/item-10-SPEC-the-experience.md).
 It supersedes item 9. Read it in full before writing anything — it is a *visual and
 experiential* brief first and a technical one second, because the previous spec described
 behaviour without ever describing the look, and the UI consequently went three build items
