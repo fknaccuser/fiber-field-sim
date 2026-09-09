@@ -19,9 +19,11 @@ has to discover the gaps by clicking.
 | **Acceptance testing** | `/bench/test` | Gainers, and why one direction is not a measurement. |
 | **Locate and mark** | `/bench/locate` | Answering a DigAlert. You mark the cable, not the drawing. |
 | **Backbone cut-in** | `/bench/cut-in` | How you get into a live cable, and whose fibres are whose. |
+| **Emergency restoration** | `/bench/restore` | How far the damage really goes, against whether the ends reach. |
+| **POP turn-up** | `/bench/turnup` | Redundancy you paid for and did not get. |
 | **Construction board** | `/` (under the fault queue) | Triage: kit, grade, locate — reported together. |
 
-All five benches record. A run is scored, written to IndexedDB against the same trainee as
+All seven benches record. A run is scored, written to IndexedDB against the same trainee as
 a field session, and surfaces on dispatch and in the training record. Practice that leaves
 no trace teaches only whoever happens to be watching.
 
@@ -38,6 +40,8 @@ no trace teaches only whoever happens to be watching.
 | `locate.ts` — incoming tickets, the wand, mark judging | locate bench |
 | `dressing.ts` — tray geometry, route measurement | tray bench (3D) |
 | `backbone.ts` — cut-in method, fibre assignment | cut-in bench |
+| `restoration.ts` — damage reach, cut-back against slack | restoration bench |
+| `popTurnup.ts` — power and path diversity, bonding, load | turn-up bench |
 | `benchRecord.ts` — scoring and standings | all benches, dispatch, history |
 | `crew.ts` — stretch, fatigue, morale, crew flags | **nothing.** See below. |
 
@@ -54,15 +58,14 @@ Stated plainly rather than left to be discovered.
 - **FDH build, IDF prep, POP turn-up, outgoing locate requests.** Job templates, durations,
   kit and grade gates all exist and the board schedules them. None has a bench. Their cards say
   "bench not built yet — engine only" rather than offering a button that goes nowhere.
-- **POP equipment turn-up.** The crew named building and repairing POPs as one of the big
-  jobs. What is built is the *terminal* half of that — windowing a backbone and cutting a new
-  terminal onto it. Racking, grounding and turning up POP gear is still a job template with
-  no bench, and it blocks honestly on the console cable rather than pretending otherwise.
-- **Repairing a damaged terminal.** The build path exists; the repair path (assess, cut back
-  to good fibre, restore) does not, and it is a different job.
-- **The shift still does not accumulate** beyond the cut-in chain. That chain ticks its
-  stages off recorded bench runs, so it is real, but a day of work orders is not yet one
-  continuous shift and the drive back to the yard does not exist.
+- **Nothing carries between work orders.** The cut-in and restoration chains tick their
+  stages off recorded bench runs, so those are real, but a day of work orders is still not
+  one continuous shift and the drive back to the yard does not exist.
+- **Configuration.** The POP bench plans the physical turn-up — power, bonding, paths — and
+  stops where the console session would start. The CLI engine exists and the field session
+  uses it; nothing connects the two.
+- **Aerial work.** Everything here is underground or in a room. Strand, lashing, sag and
+  clearance are in the fault taxonomy and have no bench.
 
 ---
 
@@ -89,6 +92,15 @@ These are not engineering gaps. They need information this project does not have
    bleed-over from a parallel utility and no null over a deep line. Those are real and each
    needs a number somebody measured; inventing them would teach a trainee to distrust a
    reading for the wrong reason, so the model stays honest about being simple.
+6. **How far each kind of damage reaches.** `DAMAGE_REACH` in `restoration.ts` is inference.
+   The *ordering* is sound — water wicks further than a dragged tooth, which reaches further
+   than a rodent bite — and that ordering is what the bench teaches. The metre figures are
+   placeholders and every line says so. The crew has seen how far back they actually had to
+   cut; this project has not.
+7. **Electrical figures.** `popTurnup.ts` encodes the shape of continuous-load derating and
+   nothing more. Breaker sizing and conductor selection are code territory and an electrician's
+   job; what a technician needs from this bench is the habit of asking what is already on the
+   circuit and what is behind it, which is what it teaches.
 
 ---
 

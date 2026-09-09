@@ -27,6 +27,7 @@ export type JobKind =
   | 'locate-request'
   | 'locate-mark'
   | 'terminal-build'
+  | 'terminal-repair'
   | 'outage';
 
 export interface JobTemplate {
@@ -70,6 +71,16 @@ export const JOB_TEMPLATES: readonly JobTemplate[] = [
     minRole: 'l1',
     breaksGround: false,
     domains: ['diagnosis', 'testing'],
+  },
+  {
+    kind: 'terminal-repair',
+    title: 'Emergency restoration — cable down',
+    brief: 'Something has been through it. Find how far the damage really goes, cut back past it, and get the right people back first.',
+    minutes: 360,
+    kit: ['mass-fusion-splicer', 'mass-cleaver', 'heat-jacket-stripper', 'cleaning-kit', 'otdr', 'power-meter', 'hand-tools'],
+    minRole: 'l2',
+    breaksGround: false,
+    domains: ['restoration', 'splicing', 'diagnosis'],
   },
   {
     kind: 'terminal-build',
@@ -165,11 +176,14 @@ export const STANDARD_RIG: readonly string[] = [
   'mass-fusion-splicer', 'mass-cleaver', 'heat-jacket-stripper', 'ribbonizing-jig',
   'cleaning-kit', 'otdr', 'power-meter', 'vfl', 'inspection-scope',
   'launch-cable-500m', 'laptop', 'labels', 'hand-tools',
-  // A truck that answers DigAlert tickets every week carries the wand and the paint. Adding
-  // them is not softening the readiness gate: the console cable is still deliberately absent,
-  // so POP turn-up still blocks on kit, and one honest gate teaches more than two contrived
-  // ones.
+  // A truck that answers DigAlert tickets every week carries the wand and the paint.
   'locator', 'paint',
+  // The console cable used to be deliberately absent so that POP turn-up blocked on kit and
+  // the readiness gate had something honest to fire on. It had a bench built for it in item
+  // 11, and a gate in front of a real job is a locked door rather than a lesson -- so the
+  // cable is on the truck and the readiness check keeps earning its place on grade and on
+  // locates, which are the gates that stop real mornings.
+  'console-cable',
 ];
 
 export function templateFor(kind: JobKind): JobTemplate {
@@ -261,6 +275,7 @@ export function buildConstructionDay(daySeed: number, now: Date, count = 3): Wor
     // splicing, and a board that never shows one teaches the wrong shape of week.
     'locate-mark', 'locate-mark', 'locate-mark',
     'terminal-build', 'terminal-build',
+    'terminal-repair', 'terminal-repair',
     'outage', 'outage',
     'closure-dress', 'closure-dress',
     'acceptance-test',

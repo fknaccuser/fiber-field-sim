@@ -23,7 +23,7 @@ import type { LocateVerdict } from './locate';
 import { allMistakes, PROCEDURE, type StepId } from './ribbon';
 import type { TrayVerdict } from './tray';
 
-export type BenchKind = 'ribbon-splice' | 'tray-dress' | 'locate-mark' | 'acceptance';
+export type BenchKind = 'ribbon-splice' | 'tray-dress' | 'locate-mark' | 'acceptance' | 'restoration' | 'pop-turnup';
 
 export interface BenchRun {
   id: string;
@@ -126,12 +126,48 @@ export function scoreAcceptanceRun(args: { events: number; acceptedBad: number; 
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
+/**
+ * Score a restoration plan.
+ *
+ * A latent fault is the heaviest thing this project scores, heavier even than a strike risk
+ * on a locate. A strike risk is caught by the excavator hitting something and everybody knows
+ * immediately what happened. A splice onto stressed fibre passes acceptance, gets signed off,
+ * and surfaces months later as an intermittent nobody can attribute to anything -- so the
+ * technician who made it never learns they made it. The arithmetic has to carry that, because
+ * nothing else in the job does.
+ */
+export function scoreRestorationRun(verdict: { latent: number; blocking: number; workmanship: number }): number {
+  let score = 100;
+  score -= verdict.latent * 60;
+  score -= verdict.blocking * 30;
+  score -= verdict.workmanship * 8;
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+/**
+ * Score a turn-up plan.
+ *
+ * Redundancy that was paid for and not delivered is scored above the things that stop the
+ * job, which is the opposite of how it feels in the room. A circuit that will not carry the
+ * load announces itself the first time you close the breaker. A chassis on one feed comes up
+ * green, stays green for two years, and is only ever wrong once.
+ */
+export function scoreTurnupRun(verdict: { notRedundant: number; blocking: number; workmanship: number }): number {
+  let score = 100;
+  score -= verdict.notRedundant * 34;
+  score -= verdict.blocking * 22;
+  score -= verdict.workmanship * 8;
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
 /** The competencies each bench exercises, for the record to roll up. */
 export const BENCH_DOMAINS: Record<BenchKind, string[]> = {
   'ribbon-splice': ['splicing', 'testing'],
   'tray-dress': ['splicing', 'records'],
   'locate-mark': ['locating', 'compliance', 'records'],
   acceptance: ['testing', 'records'],
+  restoration: ['restoration', 'splicing', 'testing'],
+  'pop-turnup': ['construction', 'configuration', 'records'],
 };
 
 export const BENCH_LABEL: Record<BenchKind, string> = {
@@ -139,6 +175,8 @@ export const BENCH_LABEL: Record<BenchKind, string> = {
   'tray-dress': 'Tray dressing',
   'locate-mark': 'Locate and mark',
   acceptance: 'Acceptance testing',
+  restoration: 'Emergency restoration',
+  'pop-turnup': 'POP turn-up',
 };
 
 /** Steps in the procedure that a run never touched. */

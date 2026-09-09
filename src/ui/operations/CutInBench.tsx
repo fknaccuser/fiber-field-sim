@@ -12,7 +12,7 @@
  *
  * Judging is `judgeCutIn`, pure and tested. This file collects a plan and draws a cable.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createRng, deriveSeed } from '../../world';
 import {
@@ -25,8 +25,7 @@ import {
   type CutInPlan,
   type FibreStatus,
 } from '../../operations/backbone';
-import { listBenchRuns } from '../store/persistence';
-import type { BenchKind, BenchRun } from '../../operations/benchRecord';
+import { JobChain } from './JobChain';
 import { SoftKey } from '../components/SoftKey';
 import { Chip } from '../components/Chip';
 
@@ -38,13 +37,6 @@ const FIBRE_HEX: Record<string, string> = {
 
 const STATUS_MARK: Record<FibreStatus, string> = { live: '●', reserved: '◐', spare: '' };
 const STATUS_WORD: Record<FibreStatus, string> = { live: 'in service', reserved: 'held', spare: 'spare' };
-
-/** The rest of the job, once the plan is sound. Each stage is a bench that already exists. */
-const STAGES: Array<{ kind: BenchKind; to: string; title: string; why: string }> = [
-  { kind: 'ribbon-splice', to: '/bench/run', title: 'Splice the set', why: 'Ribbonize from the tube and mass-fusion the fibres you planned for.' },
-  { kind: 'tray-dress', to: '/bench/tray', title: 'Dress the tray', why: 'Route it so the next person can re-enter this terminal and work in it.' },
-  { kind: 'acceptance', to: '/bench/test', title: 'Prove it', why: 'Bidirectional acceptance before anybody signs the terminal off.' },
-];
 
 export function CutInBench() {
   const [seed, setSeed] = useState(() => 1 + Math.floor(Math.random() * 9999));
@@ -59,7 +51,6 @@ export function CutInBench() {
   const [fibreColors, setFibreColors] = useState<string[]>([]);
   const [recorded, setRecorded] = useState(false);
   const [committedAt, setCommittedAt] = useState<string | null>(null);
-  const [runs, setRuns] = useState<BenchRun[]>([]);
 
   const plan: CutInPlan = useMemo(
     () => ({ method, tubeColor, fibreColors, recorded }),
@@ -67,14 +58,6 @@ export function CutInBench() {
   );
   const verdict = useMemo(() => judgeCutIn(job.cable, job.terminal, plan), [job, plan]);
   const tube = tubeOf(job.cable, tubeColor);
-
-  // Stage progress is read off the bench record, not remembered here: the work counts because
-  // it was actually done, and it counts whether you did it from this screen or not.
-  useEffect(() => {
-    if (!committedAt) return;
-    void listBenchRuns(60).then(setRuns);
-  }, [committedAt]);
-  const doneSince = (kind: BenchKind) => runs.some((r) => r.kind === kind && r.at > (committedAt ?? ''));
 
   const toggleFibre = (color: string) => {
     if (committedAt) return;
@@ -90,7 +73,6 @@ export function CutInBench() {
     setFibreColors([]);
     setRecorded(false);
     setCommittedAt(null);
-    setRuns([]);
   };
 
   const live = liveFibres(job.cable).length;
@@ -225,29 +207,13 @@ export function CutInBench() {
 
       {/* Only now does the rest of the job open. Planning is a gate, which is the point. */}
       {committedAt && (
-        <div className="bezel" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div className="eyebrow" style={{ color: 'var(--cyan)' }}>Work the terminal</div>
-          <div style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.5 }}>
-            {method === 'mid-span-window' ? 'Mid-span window' : 'Full cut'} on the {tubeColor} tube, {fibreColors.join(', ')} to {job.terminal.label}.
-          </div>
-          {STAGES.map((stage, i) => {
-            const done = doneSince(stage.kind);
-            return (
-              <div key={stage.to} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span className="mono" style={{ fontSize: 12, width: 20, color: done ? 'var(--led-ok)' : 'var(--ink-faint)' }}>{done ? '✓' : i + 1}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600 }}>{stage.title}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{stage.why}</div>
-                </div>
-                <Link to={stage.to} className="hud-btn" style={{ textDecoration: 'none', flexShrink: 0 }}>Open →</Link>
-              </div>
-            );
-          })}
-          <div style={{ fontSize: 11, color: 'var(--ink-faint)', fontStyle: 'italic' }}>
-            Stages tick when a run of that kind is recorded, so the work counts because it was done — not because you came back here and said it was.
-          </div>
-          <SoftKey label="Next terminal" tone="cyan" onClick={reset} />
-        </div>
+        <JobChain
+          title="Work the terminal"
+          summary={`${method === 'mid-span-window' ? 'Mid-span window' : 'Full cut'} on the ${tubeColor} tube, ${fibreColors.join(', ')} to ${job.terminal.label}.`}
+          committedAt={committedAt}
+          onNext={reset}
+          nextLabel="Next terminal"
+        />
       )}
     </div>
   );

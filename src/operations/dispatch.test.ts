@@ -6,9 +6,11 @@ import {
   committedMinutes,
   JOB_TEMPLATES,
   readiness,
+  STANDARD_RIG,
   templateFor,
   type WorkOrder,
 } from './dispatch';
+import { applyReadiness, readinessFor } from '../session/readiness';
 
 const MON = new Date(2026, 8, 7); // Monday 2026-09-07
 const FULL_KIT = [
@@ -122,15 +124,16 @@ describe('the construction board', () => {
   });
 
   it('leans on the work the crew named biggest', () => {
-    // This used to assert splicing and outages alone were most of the board. The crew has
-    // since named the big four: ribbon splicing, DigAlerts, and building terminals off the
+    // This used to assert splicing and outages alone were most of the board. The crew named
+    // the big ones: ribbon splicing, DigAlerts, and building AND REPAIRING terminals off the
     // backbone -- with outages as the bad days on top. The weighting follows what they said,
     // and so does the assertion, rather than the assertion following the old weighting.
     const kinds: string[] = [];
     for (let seed = 1; seed <= 120; seed++) {
       for (const o of buildConstructionDay(seed, MON, 3)) kinds.push(o.kind);
     }
-    const named = kinds.filter((k) => k === 'ribbon-splice' || k === 'locate-mark' || k === 'terminal-build' || k === 'outage').length;
+    const big = ['ribbon-splice', 'locate-mark', 'terminal-build', 'terminal-repair', 'outage'];
+    const named = kinds.filter((k) => big.includes(k)).length;
     expect(named / kinds.length).toBeGreaterThan(0.5);
   });
 
@@ -182,5 +185,35 @@ describe('what a week actually looks like', () => {
       if (kinds.size === 1) allSame++;
     }
     expect(allSame).toBeLessThan(8);
+  });
+});
+
+describe('the kit gate, after the console cable went on the truck', () => {
+  it('leaves no job permanently unworkable from a properly stocked truck', () => {
+    // The console cable was deliberately absent so the gate had something to fire on. Once
+    // POP turn-up had a bench, that stopped being a lesson and became a locked door: a card
+    // on the board that could never be taken, ever, by anybody. Every job must be workable
+    // from a full rig, or the board is advertising work that does not exist.
+    for (const t of JOB_TEMPLATES) {
+      const missing = t.kit.filter((k) => !STANDARD_RIG.includes(k));
+      expect(missing).toEqual([]);
+    }
+  });
+
+  it('still fires, because a full truck is not what leaves the yard every morning', () => {
+    // The gate is alive on the mornings the readiness model is short of something -- the same
+    // model, the same seeds, as a field session. A blocker that can never happen is a lie to
+    // the trainee; so is a blocker that always happens.
+    let blockedSomewhere = 0;
+    let readySomewhere = 0;
+    for (let daySeed = 1; daySeed <= 200; daySeed++) {
+      const rig = applyReadiness(STANDARD_RIG, readinessFor(daySeed, 'l1', []));
+      for (const order of buildConstructionDay(daySeed, new Date(2026, 4, 14), 4)) {
+        if (readiness(order, 'senior', rig, new Date(2026, 4, 14)).blocked.includes('kit')) blockedSomewhere++;
+        else readySomewhere++;
+      }
+    }
+    expect(blockedSomewhere).toBeGreaterThan(0);
+    expect(readySomewhere).toBeGreaterThan(blockedSomewhere);
   });
 });

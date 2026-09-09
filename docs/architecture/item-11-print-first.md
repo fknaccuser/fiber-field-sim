@@ -259,6 +259,52 @@ Which exposed that the acceptance bench was the one bench that never recorded an
 lesson it teaches best, that one direction is not a measurement, was the one lesson that
 never reached anybody's training record. It records now.
 
+## Increment 8 — repairing what somebody else hit
+
+The brief said building **and repairing**. `restoration.ts` is the repair half, and it closes
+a loop: the callout it deals you is usually a dig-in, which is the failure the locate bench
+exists to prevent, arriving from the other direction.
+
+The whole job is one number. Damage extends past what you can see — a backhoe tooth drags,
+and the sheath twenty inches back looks sound while the glass inside it is stressed — so how
+far you cut back is pulled two ways at once. Short of the damage and you splice onto stressed
+glass, which passes acceptance, gets signed off, and fails in six months on somebody else's
+night shift with no attributable cause. Far past it and the ends will not reach, which you
+discover after the cable is cut.
+
+The correct answer is never "cut back a lot": it is find out how far it goes, cut past that,
+and if that exceeds your slack then insert a section *on purpose*. The generator deals both
+mornings deliberately and a test asserts it, because a trainee who only ever sees one of them
+learns a habit instead of a decision.
+
+Skipping the check on the exposed fibre is scored as workmanship when the fibre happens to be
+sound and as a blocker when it is not — the same act, judged by what it was covering, because
+that is the difference between a shortcut and luck.
+
+## Increment 9 — POPs
+
+The last of the four. Nothing in a turn-up is difficult and everything in it is skippable,
+which is exactly why it needs a bench: none of these mistakes bites while you are standing in
+the room.
+
+It is about redundancy that was paid for and not delivered. Two power supplies on one feed is
+one feed and a spare supply. Two breakers in different panels off one transfer switch read as
+diverse on a drawing and are not. Two uplinks through two vaults and one duct are one uplink.
+A chassis that is not bonded works perfectly until the first storm. So the bench shows the
+*source* behind every circuit and the *duct* behind every route — the things a drawing hides
+and a phone call reveals — and scores the diversity failures **above** the ones that stop the
+job, which is the opposite of how they feel: an overloaded circuit announces itself the first
+time you close the breaker, and a single-fed chassis comes up green and stays green for years.
+
+**A knock-on worth recording.** The console cable had been deliberately left off
+`STANDARD_RIG` so the readiness gate had one job to fire on. Once POP turn-up had a bench,
+that stopped being a lesson and became a locked door — a card on the board nobody could ever
+take. The cable went on the truck, and the gate needed a truthful reason to exist instead. It
+has one: the board now builds the day's rig from the **same seeded morning readiness** the
+field session uses, so the morning that leaves the VFL on the bench leaves it off this board
+too. One model of a short truck, read in both places. Two tests hold the line — no job is
+unworkable from a full rig, and the gate still fires on the mornings it should.
+
 ## What the brief asked for, and where it landed
 
 | Asked | Where |
@@ -270,7 +316,10 @@ never reached anybody's training record. It records now.
 | Drop cap / jumper / hold-to-power | Increment 2 |
 | Ribbon splicing as a 3D terminal and tray, dragged to dress | Increment 6 |
 | Building terminals with backbone | Increment 7 |
+| Repairing terminals with backbone | Increment 8 |
+| Building POPs | Increment 9 |
 
-Still open, and stated rather than left to be found: **repairing** a damaged terminal (the
-build path exists, the repair path does not), and POP equipment turn-up, which remains a job
-template with an honest kit blocker and no bench.
+Every item in the brief has landed. What is open now is stated in
+[`operations-as-built.md`](operations-as-built.md) and is not part of it: a shift that
+accumulates across work orders, configuration after the physical turn-up, and aerial work,
+which has faults in the taxonomy and no bench anywhere.

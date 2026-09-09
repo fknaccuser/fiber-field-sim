@@ -23,6 +23,7 @@ import {
   type WorkOrder,
 } from '../../operations/dispatch';
 import { canExcavate, LEGAL_BASIS } from '../../operations/digalert';
+import { applyReadiness, readinessFor } from '../../session/readiness';
 import type { Role } from '../../session/roles';
 import { BENCH_LABEL, standings, type BenchRun } from '../../operations/benchRecord';
 import { listBenchRuns } from '../store/persistence';
@@ -34,6 +35,8 @@ const BENCH: Partial<Record<JobKind, { to: string; label: string }>> = {
   'acceptance-test': { to: '/bench/test', label: 'Open the acceptance bench →' },
   'locate-mark': { to: '/bench/locate', label: 'Answer the ticket →' },
   'terminal-build': { to: '/bench/cut-in', label: 'Plan the cut-in →' },
+  'terminal-repair': { to: '/bench/restore', label: 'Take the callout →' },
+  'pop-equipment': { to: '/bench/turnup', label: 'Plan the turn-up →' },
 };
 
 const KIND_TAG: Record<JobKind, string> = {
@@ -46,6 +49,7 @@ const KIND_TAG: Record<JobKind, string> = {
   'locate-request': 'PLAN',
   'locate-mark': 'LOCATE',
   'terminal-build': 'BUILD',
+  'terminal-repair': 'RESTORE',
   outage: 'OUTAGE',
 };
 
@@ -76,8 +80,8 @@ function LocateChip({ order, now }: { order: WorkOrder; now: Date }) {
   );
 }
 
-function Card({ order, role, now }: { order: WorkOrder; role: Role; now: Date }) {
-  const r = readiness(order, role, STANDARD_RIG, now);
+function Card({ order, role, rig, now }: { order: WorkOrder; role: Role; rig: readonly string[]; now: Date }) {
+  const r = readiness(order, role, rig, now);
   const bench = BENCH[order.kind];
 
   return (
@@ -195,7 +199,22 @@ export function ConstructionBoard({ daySeed, role }: { daySeed: number; role: Ro
   const now = useMemo(() => new Date(), []);
   const orders = useMemo(() => buildConstructionDay(daySeed, now, 4), [daySeed, now]);
 
-  const blocked = orders.filter((o) => !readiness(o, role, STANDARD_RIG, now).ready).length;
+  /**
+   * The truck as it actually left the yard this morning, not as it is supposed to be stocked.
+   *
+   * This used to be `STANDARD_RIG` flat, with the console cable deliberately left off it so
+   * that the kit gate had one job to fire on. POP turn-up has a bench now, and a permanent
+   * blocker in front of a real job is a locked door rather than a lesson — so the cable went
+   * on the truck and the gate needed a truthful reason to exist instead.
+   *
+   * It has one: the same seeded morning that leaves the VFL on the bench in a field session
+   * leaves it off this board too. One model of a short truck, read in both places, firing on
+   * the mornings it actually fires. No reference steps here, so nothing is protected — which
+   * is the point, because on the board finding out is free and on site it is a wasted roll.
+   */
+  const rig = useMemo(() => applyReadiness(STANDARD_RIG, readinessFor(daySeed, role, [])), [daySeed, role]);
+
+  const blocked = orders.filter((o) => !readiness(o, role, rig, now).ready).length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -210,7 +229,7 @@ export function ConstructionBoard({ daySeed, role }: { daySeed: number; role: Ro
       <BenchRecord />
 
       <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
-        {orders.map((o) => <Card key={o.ticket} order={o} role={role} now={now} />)}
+        {orders.map((o) => <Card key={o.ticket} order={o} role={role} rig={rig} now={now} />)}
       </div>
 
       <p className="mono" style={{ fontSize: 9.5, lineHeight: 1.75, color: 'var(--ink-faint)', letterSpacing: 0.6, margin: '2px 0 0' }}>

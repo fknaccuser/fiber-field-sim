@@ -6,7 +6,7 @@ The active work is **[item 11, the print-first revamp](docs/architecture/item-11
 Read it before anything else: it changed the shape of the product rather than adding to it,
 and several instructions further down this file describe a version that no longer exists.
 
-Current baseline: **70 files / 973 tests**, clean TypeScript, 21 pre-existing lint warnings.
+Current baseline: **72 files / 1018 tests**, clean TypeScript, 21 pre-existing lint warnings.
 
 What item 11 changed, in one paragraph each:
 
@@ -16,8 +16,11 @@ What item 11 changed, in one paragraph each:
 - **The instruments have no gates.** No dust cap, no jumper, no press-and-hold power.
 - **There are no customers to talk to.** Infrastructure talks to NOC; `noc-contact` returns
   the whole alarm list in one call, and the fifth scoring axis is `serviceImpact`.
-- **Four benches were added or rebuilt:** locate-and-mark (incoming DigAlerts), the 3D tray
-  bench, the backbone cut-in, and acceptance now records like the others.
+- **Six benches were added or rebuilt:** locate-and-mark (incoming DigAlerts), the 3D tray
+  bench, the backbone cut-in, emergency restoration, POP turn-up — and acceptance, which was
+  the one bench that had never recorded anything.
+- **The construction board's rig is the morning readiness**, not a static list, so the kit
+  gate fires on the same mornings a field session is short of something.
 
 The sections below still describe the original incoming handoff. Their test counts, their
 "one WebGL context" invariant and their "Start with" section are **historical** — see item 11
