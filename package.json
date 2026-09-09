@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:pwa": "node scripts/check-pwa.mjs"
+    "check:pwa": "node scripts/check-pwa.mjs",
+    "build:standalone": "node scripts/build-standalone.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",

@@ -1,3 +1,4 @@
+import type { ComponentType, ReactNode } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { SessionStoreProvider } from '../store/sessionStore';
 import { AppRoutes } from './routes';
@@ -5,10 +6,18 @@ import { BootScreen, useBootHold } from './BootScreen';
 import { ServiceWorkerBridge } from './ServiceWorkerBridge';
 import './theme.css';
 
-export function App() {
+/**
+ * The router is a parameter with a default, for one reason: the standalone build.
+ *
+ * `npm run build:standalone` produces a single HTML file that runs from `file://` with no
+ * server behind it, and path routing needs a server to rewrite unknown paths back to the
+ * app. That build passes `HashRouter`. Everything served over HTTP -- dev, Pages, the PWA --
+ * takes the default and behaves exactly as before.
+ */
+export function App({ Router = BrowserRouter }: { Router?: ComponentType<{ children: ReactNode }> } = {}) {
   const booted = useBootHold();
   return (
-    <BrowserRouter>
+    <Router>
       <SessionStoreProvider>
         <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <AppRoutes />
@@ -17,6 +26,6 @@ export function App() {
         {!booted && <BootScreen />}
         <ServiceWorkerBridge />
       </SessionStoreProvider>
-    </BrowserRouter>
+    </Router>
   );
 }

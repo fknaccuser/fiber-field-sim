@@ -197,21 +197,50 @@ export async function setSetting(key: string, value: unknown): Promise<void> {
   await db.settings.put({ key, value });
 }
 
+/**
+ * Somewhere to put a trainee id when there is nowhere to put it.
+ *
+ * IndexedDB is not always available: Safari and Firefox refuse it on `file://`, private
+ * windows refuse it, and a browser set to block site data refuses it. That matters because
+ * this app is deliberately runnable from a single file off a USB stick, which is exactly the
+ * case where storage is least likely to work.
+ *
+ * A training record is worth having and it is not worth a bench refusing to finish over. So
+ * the record degrades and the work does not: the run is scored and shown, and only the
+ * writing-down is lost. Anything else would mean a trainee doing everything right and being
+ * told the session failed, which teaches nothing except not to trust the tool.
+ */
+let ephemeralTraineeId: string | null = null;
+
 /** The local trainee id, created once on first launch and reused thereafter. */
 export async function getOrCreateTraineeId(): Promise<string> {
-  const existing = await getSetting<string>('traineeId');
-  if (existing) return existing;
-  const id = crypto.randomUUID();
-  await setSetting('traineeId', id);
-  return id;
+  try {
+    const existing = await getSetting<string>('traineeId');
+    if (existing) return existing;
+    const id = crypto.randomUUID();
+    await setSetting('traineeId', id);
+    return id;
+  } catch (error) {
+    console.warn('[persistence] no durable storage; this session is not being recorded.', error);
+    ephemeralTraineeId ??= crypto.randomUUID();
+    return ephemeralTraineeId;
+  }
 }
 
 /**
  * Bench work is recorded against the same trainee as a field session, so practice and
  * performance sit in one history rather than two.
+ *
+ * Resolves either way. See `getOrCreateTraineeId` for why a failure here is a warning rather
+ * than an error: the bench has already scored the run and shown the verdict by the time this
+ * is called, and there is nothing useful for the trainee to do about a storage refusal.
  */
 export async function saveBenchRun(runRecord: BenchRun): Promise<void> {
-  await db.benchRuns.put(runRecord);
+  try {
+    await db.benchRuns.put(runRecord);
+  } catch (error) {
+    console.warn('[persistence] bench run not saved; storage is unavailable.', error);
+  }
 }
 
 /** Most recent first. */

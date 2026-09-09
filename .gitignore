@@ -26,3 +26,8 @@ dist-ssr
 # Field photographs of real plant — kept locally, never published.
 docs/reference/*.jpg
 docs/reference/*.png
+
+# Output of `npm run build:standalone`. The single HTML file is a build artefact like
+# dist/ -- rebuild it, do not commit it.
+dist-standalone
+fiber-field-sim.html

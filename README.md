@@ -13,11 +13,17 @@ React + TypeScript + Vite, offline-capable PWA, phone-first. No backend.
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
-npm test           # 49 files, 623 tests
-npx tsc -b         # type-check
-npm run build      # production build + PWA precache
+npm run dev              # http://localhost:5173
+npm test                 # 72 files, 1020 tests
+npx tsc -b               # type-check
+npm run build            # production build + PWA precache
+npm run build:standalone # one self-contained HTML file, no server needed
 ```
+
+`build:standalone` writes `fiber-field-sim.html`: the whole simulator — every chunk,
+stylesheet and font — inlined into a single file that runs off a filesystem, a USB stick or
+an email attachment with no server and no network. It uses a hash router, since there is no
+server to rewrite paths, and it is how you show somebody the thing without deploying it.
 
 Then read **`docs/architecture/README.md`** — it indexes every build item and states the
 invariants. If you only read two documents, read

@@ -4,7 +4,7 @@ import { getScenario, instantiateScenario } from '../../scenarios';
 import { resolveProfileSet } from '../../profiles';
 import { startSession, perform } from '../../session/runner';
 import type { SessionState } from '../../session/types';
-import { _useDatabase, getPersonalBest, getSession, loadUnfinished, migrateStored, saveSession, type StoredSession } from './persistence';
+import { _useDatabase, getOrCreateTraineeId, getPersonalBest, getSession, loadUnfinished, migrateStored, saveBenchRun, saveSession, type StoredSession } from './persistence';
 
 function runReference(seed = 1): { session: SessionState; report: import('../../scoring/types').ScoreReport } {
   const def = getScenario('t1-dark-ont-vista-court');
@@ -129,5 +129,27 @@ describe('carrying an older row forward', () => {
     const unscored = { scores: null } as unknown as StoredSession;
     expect(migrateStored(unscored)).toBe(unscored);
     expect(migrateStored(undefined)).toBeUndefined();
+  });
+});
+
+describe('when there is nowhere to write', () => {
+  it('still hands back a trainee id, and the same one twice', async () => {
+    // Safari and Firefox refuse IndexedDB on file://, and this app is deliberately runnable
+    // as a single file off a USB stick. A bench must not fail because the record cannot.
+    const broken = { settings: { get: () => Promise.reject(new Error('storage disabled')) } };
+    _useDatabase(broken as never);
+    const first = await getOrCreateTraineeId();
+    const second = await getOrCreateTraineeId();
+    expect(first).toMatch(/[0-9a-f-]{36}/);
+    expect(second).toBe(first);
+  });
+
+  it('resolves rather than rejecting when a bench run cannot be stored', async () => {
+    const broken = { benchRuns: { put: () => Promise.reject(new Error('storage disabled')) } };
+    _useDatabase(broken as never);
+    await expect(saveBenchRun({
+      id: 'r1', traineeId: 't1', kind: 'tray-dress', at: new Date().toISOString(), seed: 1,
+      mistakes: [], omitted: [], seconds: 60, passed: true, score: 100, domains: ['splicing'],
+    })).resolves.toBeUndefined();
   });
 });
