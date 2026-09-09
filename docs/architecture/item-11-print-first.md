@@ -226,7 +226,51 @@ plain numbers is unaffected.
 The old checkbox tray bench is gone. It asked two questions per fibre and was honest about
 being a set of choices; dressing is a shape you make with your hands.
 
-## Still to come
+## Increment 7 — a terminal off the backbone
 
-Increment 7: backbone into a new terminal — chaining splice, dress and acceptance into one
-work order.
+The crew named "building and repairing POPs and terminals with backbone" as one of the big
+jobs. The splice bench already teaches the twenty-two steps and the tray bench teaches the
+dressing; neither covers the hour before anybody switches a splicer on, and that hour is
+where the outages come from.
+
+`backbone.ts` judges a cut-in **as a plan**, before any glass is cut, because every mistake
+in it is knowable from the records and the cable in front of you and every one is cheaper to
+catch now than after thirty-six splices:
+
+- **How you get in.** A mid-span window brings out one tube and leaves the rest up. A full
+  cut on a live cable takes down every circuit in it — the verdict counts them, because that
+  is the number a foreman asks for first. On a dead cable a full cut is fine; the mistake is
+  not knowing which cable you are standing at.
+- **Which fibres.** A live fibre is somebody's service, it fuses perfectly while you
+  disconnect them, and nothing on the splicer says so.
+- **How many.** Short is a second trip with a second crew; long burns spares somebody was
+  keeping.
+
+Colour order is reported as *workmanship*, explicitly because it is convention rather than
+physics — a scattered set splices exactly as well and reads as a mess for twenty years.
+Everything scored service-affecting is physics.
+
+The generator is asserted to always admit a clean plan. A trainer that can deal an
+unwinnable hand teaches that the right answer is sometimes to give up.
+
+Committing a sound plan opens the rest of the job — splice, dress, prove — and those stages
+tick off **recorded bench runs**, not a local flag, so the work counts because it was done.
+Which exposed that the acceptance bench was the one bench that never recorded anything: the
+lesson it teaches best, that one direction is not a measurement, was the one lesson that
+never reached anybody's training record. It records now.
+
+## What the brief asked for, and where it landed
+
+| Asked | Where |
+| --- | --- |
+| Remove the 3D world view | Increment 1 — gone, with the instrument backdrop |
+| Focus on the print, topology working, roll truck from it | Increment 3 |
+| Eliminate customer contact | Increment 4 — NOC ticket, `serviceImpact` |
+| Make DigAlerts a bigger part, implement the tasks | Increment 5 — incoming locate-and-mark |
+| Drop cap / jumper / hold-to-power | Increment 2 |
+| Ribbon splicing as a 3D terminal and tray, dragged to dress | Increment 6 |
+| Building terminals with backbone | Increment 7 |
+
+Still open, and stated rather than left to be found: **repairing** a damaged terminal (the
+build path exists, the repair path does not), and POP equipment turn-up, which remains a job
+template with an honest kit blocker and no bench.

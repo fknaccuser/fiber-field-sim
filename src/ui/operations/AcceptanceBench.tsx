@@ -22,6 +22,8 @@ import {
   judgeSplice,
   type Verdict,
 } from '../../operations/acceptance';
+import { BENCH_DOMAINS, scoreAcceptanceRun } from '../../operations/benchRecord';
+import { getOrCreateTraineeId, saveBenchRun } from '../store/persistence';
 
 type Call = 'pass' | 'fail';
 
@@ -63,6 +65,35 @@ export function AcceptanceBench() {
   const wrong = results.filter((r) => r.wrong);
   const acceptedBad = wrong.filter((r) => r.called === 'pass');
   const rejectedGood = wrong.filter((r) => r.called === 'fail');
+
+  /**
+   * Shooting the far end is the end of the run, so it is where the run is recorded.
+   *
+   * Every other bench writes its result against the trainee; this one did not, which meant
+   * the lesson it teaches best -- that one direction is not a measurement -- was the one
+   * lesson that never showed up in anybody's training record.
+   */
+  const shootTheFarEnd = async () => {
+    setRevealed(true);
+    const traineeId = await getOrCreateTraineeId();
+    await saveBenchRun({
+      id: `acceptance-${seed}-${Date.now()}`,
+      traineeId,
+      kind: 'acceptance',
+      at: new Date().toISOString(),
+      seed,
+      mistakes: [
+        ...acceptedBad.map((r) => `accepted-bad:${r.event.id}`),
+        ...rejectedGood.map((r) => `rejected-good:${r.event.id}`),
+      ],
+      omitted: [],
+      // Both directions on a six-event link, with the drive to the far end.
+      seconds: 70 * 60,
+      passed: wrong.length === 0,
+      score: scoreAcceptanceRun({ events: link.length, acceptedBad: acceptedBad.length, rejectedGood: rejectedGood.length }),
+      domains: BENCH_DOMAINS.acceptance,
+    });
+  };
 
   const reset = () => {
     setSeed(1 + Math.floor(Math.random() * 9999));
@@ -148,7 +179,7 @@ export function AcceptanceBench() {
 
         {!revealed && (
           <div style={{ display: 'flex', gap: 10, marginTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button type="button" className="hud-btn hud-btn--cyan" disabled={!allCalled} onClick={() => setRevealed(true)}>
+            <button type="button" className="hud-btn hud-btn--cyan" disabled={!allCalled} onClick={() => void shootTheFarEnd()}>
               Shoot from the far end →
             </button>
             {!allCalled && (

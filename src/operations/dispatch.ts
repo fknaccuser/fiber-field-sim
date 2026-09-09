@@ -26,6 +26,7 @@ export type JobKind =
   | 'acceptance-test'
   | 'locate-request'
   | 'locate-mark'
+  | 'terminal-build'
   | 'outage';
 
 export interface JobTemplate {
@@ -69,6 +70,16 @@ export const JOB_TEMPLATES: readonly JobTemplate[] = [
     minRole: 'l1',
     breaksGround: false,
     domains: ['diagnosis', 'testing'],
+  },
+  {
+    kind: 'terminal-build',
+    title: 'Build a terminal off the backbone',
+    brief: 'Window the backbone, take the fibres nobody is using, splice the terminal, dress it and prove it. The cable stays up the whole time.',
+    minutes: 300,
+    kit: ['mass-fusion-splicer', 'mass-cleaver', 'heat-jacket-stripper', 'ribbonizing-jig', 'cleaning-kit', 'otdr', 'labels'],
+    minRole: 'l2',
+    breaksGround: false,
+    domains: ['construction', 'splicing', 'records'],
   },
   {
     kind: 'fdh-build',
@@ -249,6 +260,7 @@ export function buildConstructionDay(daySeed: number, now: Date, count = 3): Wor
     // DigAlerts land constantly. The crew answers more of these than anything except
     // splicing, and a board that never shows one teaches the wrong shape of week.
     'locate-mark', 'locate-mark', 'locate-mark',
+    'terminal-build', 'terminal-build',
     'outage', 'outage',
     'closure-dress', 'closure-dress',
     'acceptance-test',

@@ -121,13 +121,17 @@ describe('the construction board', () => {
     }
   });
 
-  it('leans on splicing and outages, because the real week does', () => {
+  it('leans on the work the crew named biggest', () => {
+    // This used to assert splicing and outages alone were most of the board. The crew has
+    // since named the big four: ribbon splicing, DigAlerts, and building terminals off the
+    // backbone -- with outages as the bad days on top. The weighting follows what they said,
+    // and so does the assertion, rather than the assertion following the old weighting.
     const kinds: string[] = [];
     for (let seed = 1; seed <= 120; seed++) {
       for (const o of buildConstructionDay(seed, MON, 3)) kinds.push(o.kind);
     }
-    const splicey = kinds.filter((k) => k === 'ribbon-splice' || k === 'outage').length;
-    expect(splicey / kinds.length).toBeGreaterThan(0.3);
+    const named = kinds.filter((k) => k === 'ribbon-splice' || k === 'locate-mark' || k === 'terminal-build' || k === 'outage').length;
+    expect(named / kinds.length).toBeGreaterThan(0.5);
   });
 
   it('sometimes issues a dig with the locate already served, and sometimes without', () => {
@@ -167,13 +171,16 @@ describe('what a week actually looks like', () => {
   });
 
   it('draws each order independently rather than repeating one kind down the board', () => {
-    // Measured, not guessed: across 400 seeds the generator produces no day whose four
-    // orders are all the same kind. Asserting the measured behaviour rather than a loose
-    // bound is the point -- a generator that had quietly stopped advancing its rng would
-    // sail past "most days vary" and be caught here.
+    // The bar is "as varied as independent draws", not "never repeats". An earlier version
+    // of this asserted that no day in 400 seeds comes up all-one-kind, which happened to be
+    // true of the pool at the time and is not a property of anything -- with the current
+    // weights roughly one day in 400 legitimately does. What must never happen is a
+    // generator that stopped advancing its rng, which would make it every day.
+    let allSame = 0;
     for (let seed = 1; seed <= 400; seed++) {
       const kinds = new Set(buildConstructionDay(seed, new Date(2026, 4, 14), 4).map((o) => o.kind));
-      expect(kinds.size).toBeGreaterThan(1);
+      if (kinds.size === 1) allSame++;
     }
+    expect(allSame).toBeLessThan(8);
   });
 });

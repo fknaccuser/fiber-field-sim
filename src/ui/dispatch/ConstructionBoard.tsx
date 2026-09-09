@@ -33,6 +33,7 @@ const BENCH: Partial<Record<JobKind, { to: string; label: string }>> = {
   'closure-dress': { to: '/bench/tray', label: 'Open the case →' },
   'acceptance-test': { to: '/bench/test', label: 'Open the acceptance bench →' },
   'locate-mark': { to: '/bench/locate', label: 'Answer the ticket →' },
+  'terminal-build': { to: '/bench/cut-in', label: 'Plan the cut-in →' },
 };
 
 const KIND_TAG: Record<JobKind, string> = {
@@ -44,6 +45,7 @@ const KIND_TAG: Record<JobKind, string> = {
   'acceptance-test': 'TEST',
   'locate-request': 'PLAN',
   'locate-mark': 'LOCATE',
+  'terminal-build': 'BUILD',
   outage: 'OUTAGE',
 };
 

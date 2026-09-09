@@ -23,7 +23,7 @@ import type { LocateVerdict } from './locate';
 import { allMistakes, PROCEDURE, type StepId } from './ribbon';
 import type { TrayVerdict } from './tray';
 
-export type BenchKind = 'ribbon-splice' | 'tray-dress' | 'locate-mark';
+export type BenchKind = 'ribbon-splice' | 'tray-dress' | 'locate-mark' | 'acceptance';
 
 export interface BenchRun {
   id: string;
@@ -110,17 +110,35 @@ export function scoreLocateRun(verdict: LocateVerdict): number {
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
+/**
+ * Score an acceptance run.
+ *
+ * The two ways of being wrong are not the same size. Passing a splice that should have
+ * failed puts a bad joint into the plant and somebody finds it on a night shift; failing one
+ * that was fine costs a re-burn this afternoon. Both are errors, one is expensive later, and
+ * the arithmetic says so rather than counting "mistakes".
+ */
+export function scoreAcceptanceRun(args: { events: number; acceptedBad: number; rejectedGood: number }): number {
+  if (args.events === 0) return 0;
+  let score = 100;
+  score -= (args.acceptedBad / args.events) * 140;
+  score -= (args.rejectedGood / args.events) * 60;
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
 /** The competencies each bench exercises, for the record to roll up. */
 export const BENCH_DOMAINS: Record<BenchKind, string[]> = {
   'ribbon-splice': ['splicing', 'testing'],
   'tray-dress': ['splicing', 'records'],
   'locate-mark': ['locating', 'compliance', 'records'],
+  acceptance: ['testing', 'records'],
 };
 
 export const BENCH_LABEL: Record<BenchKind, string> = {
   'ribbon-splice': 'Ribbon splice',
   'tray-dress': 'Tray dressing',
   'locate-mark': 'Locate and mark',
+  acceptance: 'Acceptance testing',
 };
 
 /** Steps in the procedure that a run never touched. */

@@ -11,6 +11,7 @@ import { SpliceBench } from '../operations/SpliceBench';
 import { AcceptanceBench } from '../operations/AcceptanceBench';
 import { SpliceRun } from '../operations/SpliceRun';
 import { LocateBench } from '../operations/LocateBench';
+import { CutInBench } from '../operations/CutInBench';
 
 // The only 3D left in the project. Kept out of the main chunk so nobody downloads three.js
 // to read a print.
@@ -30,6 +31,7 @@ export function AppRoutes() {
       <Route path="/bench/test" element={<AcceptanceBench />} />
       <Route path="/bench/run" element={<SpliceRun />} />
       <Route path="/bench/locate" element={<LocateBench />} />
+      <Route path="/bench/cut-in" element={<CutInBench />} />
       <Route path="/bench/tray" element={<Suspense fallback={<div style={{ padding: 16, color: 'var(--muted)' }}>Opening the case…</div>}><SpliceTrayBench /></Suspense>} />
       <Route path="/dev/otdr" element={<DevOtdr />} />
     </Routes>
