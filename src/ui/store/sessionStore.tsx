@@ -46,8 +46,8 @@ function intentFromActionEvent(action: UiActionEvent): Intent {
       return { type: 'truck-roll', toNodeId: action.toNodeId };
     case 'records':
       return { type: 'records', nodeId: action.nodeId, spanId: action.spanId };
-    case 'customer-contact':
-      return { type: 'customer-contact', customerId: action.customerId };
+    case 'noc-contact':
+      return { type: 'noc-contact' };
     case 'hint':
       return { type: 'hint' };
     case 'excavate':

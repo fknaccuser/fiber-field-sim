@@ -1,7 +1,13 @@
 /**
- * The day talking back. A real outage is not a quiet lab: customers keep calling, a senior
- * tech wants to know what you are seeing, and at the higher grades an executive wants a
- * status while you are still holding a meter.
+ * The day talking back. A real outage is not a quiet lab: NOC keeps updating the ticket, a
+ * senior tech wants to know what you are seeing, and at the higher grades somebody upstairs
+ * wants a status while you are still holding a meter.
+ *
+ * Nobody here is a customer. Infrastructure talks to NOC about outages and escalations and
+ * to their own people about everything else; the subscriber's own phone call reached NOC
+ * hours ago and is on the ticket. So the interruptions come from the people who actually
+ * interrupt: NOC, a senior, dispatch, an ops manager, and — because the day does not stop
+ * for the outage — somebody at home.
  *
  * Seeded from the run, so a replay reproduces the same day with the same interruptions at
  * the same moments. Nothing here can leak the answer: a reply option is only offered when
@@ -13,8 +19,8 @@ import type { WorldState } from '../world';
 import { ROLE_POLICY, type Role } from './roles';
 
 
-export type CommsKind = 'customer-call' | 'text' | 'phone-call' | 'email' | 'field-note';
-export type CommsFrom = 'customer' | 'senior' | 'manager' | 'tech' | 'exec' | 'personal';
+export type CommsKind = 'noc-update' | 'text' | 'phone-call' | 'email' | 'field-note';
+export type CommsFrom = 'noc' | 'senior' | 'manager' | 'tech' | 'exec' | 'personal';
 
 /** What a reply may claim. Each is checked against the log before the option is shown. */
 export type ClaimKey = 'none' | 'saw-los' | 'metered' | 'ruled-out-drop' | 'on-site' | 'shot-otdr';
@@ -71,8 +77,13 @@ const TEMPLATES: Template[] = [
     replies: [{ id: 'ack', text: 'Copy. Pulling records now.', requires: 'none', seconds: 20 }],
   },
   {
-    kind: 'text', from: 'manager', fromName: 'Delgado (Ops Manager)', subject: 'ETA?',
-    body: 'customer escalated to the account team. i need an ETA i can give them.', minIntensity: 2, blocking: true, replies: STATUS_REPLIES,
+    kind: 'phone-call', from: 'noc', fromName: 'NOC — outage bridge', subject: 'ETA for the bridge',
+    body: 'We have the bridge open on this ticket and the account team is asking. Give me something I can put on it.', minIntensity: 2, blocking: true, replies: STATUS_REPLIES,
+  },
+  {
+    kind: 'noc-update', from: 'noc', fromName: 'NOC — ticket update', subject: 'two more just dropped',
+    body: 'Two more ONTs went to LOS on the same PON in the last ten minutes. Same branch as the ones you already have.', minIntensity: 1,
+    replies: [{ id: 'ack', text: 'Copy — that fits what I am looking at.', requires: 'none', seconds: 25 }],
   },
   {
     kind: 'phone-call', from: 'exec', fromName: 'CTO office', subject: 'status on the outage',
@@ -153,8 +164,8 @@ export function scheduleComms(seed: number, role: Role, timeBudgetMinutes: numbe
   const eligible = TEMPLATES.filter((t) => t.minIntensity <= intensity);
   const count = Math.min(eligible.length, 1 + intensity);
 
-  // Extra customers calling in, drawn from premises that are not already reporting.
-  const reporting = new Set(world.customerReports.map((r) => r.premiseNodeId));
+  // An extra premise NOC has heard from, drawn from those not already on the ticket.
+  const reporting = new Set(world.nocReports.map((r) => r.premiseNodeId));
   const quiet = world.topology.nodes.filter((n) => n.kind === 'customer-premise' && !reporting.has(n.id));
 
   const events: CommsEvent[] = [];
@@ -179,19 +190,21 @@ export function scheduleComms(seed: number, role: Role, timeBudgetMinutes: numbe
     const premise = quiet[rng.int(0, quiet.length - 1)];
     const useful = rng.next() < 0.5;
     events.push({
-      id: 'cm-cust',
+      id: 'cm-noc-extra',
       atSimSeconds: Math.round(180 + rng.next() * Math.max(240, span - 300)),
-      kind: 'customer-call',
-      from: 'customer',
-      fromName: premise.label,
-      subject: useful ? 'my neighbour is out too' : 'slow in the evenings',
+      kind: 'noc-update',
+      from: 'noc',
+      fromName: 'NOC — ticket update',
+      subject: useful ? 'another address on the ticket' : 'unrelated report, same street',
+      // One of these is scope and one is noise, and NOC cannot tell you which. That is the
+      // point: a report arriving is not evidence that it belongs to your outage.
       body: useful
-        ? `Calling from ${premise.label}. My neighbour says theirs went out at the same time as mine.`
-        : `Calling from ${premise.label}. It is not out exactly, it just goes slow around eight most nights.`,
+        ? `Adding ${premise.label} to the ticket — reported out at the same time as the others.`
+        : `Separate report from ${premise.label}: not out, just slow around eight most nights. Logging it against its own ticket unless you say otherwise.`,
       blocking: false,
       replies: [
-        { id: 'log', text: 'Thanks — logging that. It helps narrow where I look.', requires: 'none', seconds: 60 },
-        { id: 'later', text: 'Understood. I will raise a separate ticket for that.', requires: 'none', seconds: 30 },
+        { id: 'log', text: 'Copy — noted. It helps narrow where I look.', requires: 'none', seconds: 40 },
+        { id: 'later', text: 'Keep that on its own ticket. It is not this outage.', requires: 'none', seconds: 30 },
       ],
     });
   }

@@ -51,7 +51,7 @@ export type Intent =
   | { type: 'cli'; endpoint: Endpoint; command: string }
   | { type: 'truck-roll'; toNodeId: string }
   | { type: 'records'; nodeId?: string; spanId?: string }
-  | { type: 'customer-contact'; customerId: string }
+  | { type: 'noc-contact' }
   | { type: 'hint' }
   | { type: 'excavate'; nodeId: string; method: 'hand' | 'machine'; distanceFromMarksInches: number }
   | { type: 'comms'; eventId: string; replyId: string; seconds: number }
@@ -99,7 +99,7 @@ export type ActionEvent = ActionEventBase &
     | { type: 'cli'; endpoint: Endpoint; command: string; recognized: boolean; handlerId: string | null; facts: CliFact[]; outputRef: string }
     | { type: 'truck-roll'; fromNodeId: string; toNodeId: string }
     | { type: 'records'; nodeId?: string; spanId?: string; recordIds: string[] }
-    | { type: 'customer-contact'; customerId: string; symptom: string }
+    | { type: 'noc-contact'; ticketId: string; reports: Array<{ customerId: string; premiseNodeId: string; symptom: string }> }
     | { type: 'hint'; level: number; cost: number; text: string; refused: boolean }
     | { type: 'excavate'; nodeId: string; method: 'hand' | 'machine'; distanceFromMarksInches: number; strike: boolean }
     | { type: 'comms'; eventId: string; replyId: string; from: string; subject: string; reply: string }

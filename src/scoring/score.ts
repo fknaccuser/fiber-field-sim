@@ -4,7 +4,7 @@ import type { ScoreReport } from './types';
 import { computeAccuracy } from './accuracy';
 import { computeEvidence } from './evidence';
 import { computeEfficiency } from './efficiency';
-import { computeCustomerImpact } from './customerImpact';
+import { computeServiceImpact } from './serviceImpact';
 import { computeSafety } from './safety';
 import { computeReplay } from './replay';
 import { average } from './util';
@@ -16,7 +16,7 @@ export function scoreSession(state: SessionState): ScoreReport {
   const accuracy = computeAccuracy(state);
   const evidence = computeEvidence(state, accuracy);
   const efficiency = computeEfficiency(state);
-  const customerImpact = computeCustomerImpact(state);
+  const serviceImpact = computeServiceImpact(state);
   const safety = computeSafety(state);
 
   const trueFaults = state.initialWorld.appliedFaults.filter((f) => !f.isRedHerring);
@@ -26,7 +26,7 @@ export function scoreSession(state: SessionState): ScoreReport {
     diagnosticAccuracy: accuracy.score,
     evidenceQuality: evidence,
     efficiency: efficiency.score,
-    customerImpact,
+    serviceImpact,
     safetyCompliance: safety,
   };
 

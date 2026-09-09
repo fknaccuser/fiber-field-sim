@@ -58,8 +58,8 @@ function labelForIntent(world: SessionState['initialWorld'], intent: Intent): st
       return `Truck roll to ${nodeLabel(world, intent.toNodeId)}`;
     case 'records':
       return `Records lookup${intent.nodeId ? ` at ${nodeLabel(world, intent.nodeId)}` : ''}${intent.spanId ? ` for ${spanLabel(world, intent.spanId)}` : ''}`;
-    case 'customer-contact':
-      return `Customer contact: ${intent.customerId}`;
+    case 'noc-contact':
+      return 'Called NOC for the alarm picture';
     case 'hint':
       return 'Hint requested';
     case 'excavate':

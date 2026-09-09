@@ -11,7 +11,7 @@ import { resolveProfileSet } from '../profiles';
 import type { ProfileSet } from '../profiles';
 import { perform, startSession } from '../session/runner';
 import type { Intent, ScenarioMeta } from '../session/types';
-import { affectedCustomerIds } from '../scoring/customerImpact';
+import { affectedCustomerIds } from '../scoring/serviceImpact';
 import { ScenarioDefinitionSchema } from './schema';
 import type { ScenarioDefinition, ScenarioIntent } from './schema';
 import { resolveRandomization } from './randomize';
@@ -165,7 +165,7 @@ export function instantiateScenario(def: ScenarioDefinition, seed: number): { wo
   world.links = cloned.links;
   world.hosts = cloned.hosts;
   world.plantRecords = cloned.plantRecords;
-  world.customerReports = cloned.customerReports.map((r) => ({
+  world.nocReports = cloned.nocReports.map((r) => ({
     customerId: r.customerId,
     premiseNodeId: r.premiseNodeId,
     reportedSymptom: resolved.customerSymptoms.get(r.customerId) ?? r.reportedSymptom,

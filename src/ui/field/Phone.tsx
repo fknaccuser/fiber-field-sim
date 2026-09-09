@@ -1,12 +1,26 @@
-import { HINT_POLICY } from '../../session/costs';
+/**
+ * The phone.
+ *
+ * It used to have a list of customers with a Call button beside each one, and that was the
+ * wrong shape for this job. An outside-plant technician does not phone subscribers — the NOC
+ * takes the reports, watches the ONTs drop off the PON, and hands over the picture. Infra
+ * talks to NOC for outages and escalations, and to their own people for everything else.
+ *
+ * So there is one call to make, it costs one conversation, and it returns the whole alarm
+ * list at once, red herrings included. NOC reports what it observed; deciding whether those
+ * premises share an upstream path is still the trainee's work, and it is the work the old
+ * per-customer calls were only pretending to be.
+ */
 import { availableReplies, pendingComms } from '../../session/comms';
+import { HINT_POLICY, NOC_CONTACT_SECONDS } from '../../session/costs';
 import type { UiActionEvent, UiSessionState } from '../../session/runner';
 import type { Intent } from '../../session/types';
 import { Chip } from '../components/Chip';
 import { SoftKey } from '../components/SoftKey';
 
 export function Phone({ ui, dispatch }: { ui: UiSessionState; dispatch(intent: Intent): void }) {
-  const calls = ui.log.filter((a): a is Extract<UiActionEvent, { type: 'customer-contact' }> => a.type === 'customer-contact');
+  const nocCalls = ui.log.filter((a): a is Extract<UiActionEvent, { type: 'noc-contact' }> => a.type === 'noc-contact');
+  const latest = nocCalls[nocCalls.length - 1] ?? null;
   const hints = ui.log.filter((a): a is Extract<UiActionEvent, { type: 'hint' }> => a.type === 'hint');
   const policy = HINT_POLICY[ui.meta.tier];
   const hintsRemaining = Number.isFinite(policy.max) ? Math.max(0, policy.max - ui.hintsUsed) : Infinity;
@@ -71,20 +85,36 @@ export function Phone({ ui, dispatch }: { ui: UiSessionState; dispatch(intent: I
         </>
       )}
 
-      <div className="eyebrow" style={{ color: 'var(--cyan)' }}>Customer reports</div>
-      {ui.world.customerReports.map((report) => {
-        const called = calls.find((c) => c.customerId === report.customerId);
-        return (
-          <div key={report.customerId} className="bezel" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ fontWeight: 600, fontSize: 13 }}>{report.customerId}</div>
-            {called ? (
-              <div style={{ fontSize: 13 }}>{called.symptom}</div>
-            ) : (
-              <SoftKey label="Call" onClick={() => dispatch({ type: 'customer-contact', customerId: report.customerId })} />
-            )}
+      <div className="eyebrow" style={{ color: 'var(--cyan)' }}>Network Operations Centre</div>
+      {latest ? (
+        <div className="bezel" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="mono" style={{ fontSize: 9.5, letterSpacing: 1.4, color: 'var(--ink-faint)' }}>
+            TICKET {latest.ticketId} · {latest.reports.length} PREMISE{latest.reports.length === 1 ? '' : 'S'} ON THE ALARM LIST
           </div>
-        );
-      })}
+          {latest.reports.length === 0 ? (
+            <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>NOC has nothing alarming on this ticket. Whatever is wrong, it is not taking anybody down.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {latest.reports.map((report) => (
+                <div key={report.customerId} style={{ borderLeft: '2px solid var(--cyan-line)', paddingLeft: 9 }}>
+                  <div className="mono" style={{ fontSize: 10, color: 'var(--cyan)', letterSpacing: 0.8 }}>{report.customerId}</div>
+                  <div style={{ fontSize: 12.5, lineHeight: 1.45 }}>{report.symptom}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: 11, color: 'var(--ink-faint)', fontStyle: 'italic' }}>
+            NOC reports what it sees. Whether these share an upstream path is your call, not theirs.
+          </div>
+        </div>
+      ) : (
+        <div className="bezel" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>
+            NOC is holding the ticket. One call gets you the whole alarm list — who is down, and what was reported.
+          </div>
+          <SoftKey label={`Call NOC (${NOC_CONTACT_SECONDS}s)`} onClick={() => dispatch({ type: 'noc-contact' })} />
+        </div>
+      )}
 
       <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 8 }}>{ui.meta.tier <= 2 ? 'Ask dispatch for the next question' : ui.meta.tier === 3 ? 'Ask dispatch to confirm your observations' : 'Ask a senior tech'}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

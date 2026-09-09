@@ -10,7 +10,7 @@ export interface TeachingStep {
   completedActionId: string | null;
 }
 
-type TeachingWorld = Pick<WorldState, 'topology' | 'devices' | 'hosts' | 'customerReports'>;
+type TeachingWorld = Pick<WorldState, 'topology' | 'devices' | 'hosts' | 'nocReports'>;
 
 export function stepTarget(step: Intent, world: TeachingWorld): string | undefined {
   switch (step.type) {
@@ -20,7 +20,6 @@ export function stepTarget(step: Intent, world: TeachingWorld): string | undefin
     case 'scope': return world.topology.spans.find((s) => s.id === step.spanId)?.toNodeId;
     case 'vfl': return step.fromNodeId;
     case 'records': return step.nodeId ?? world.topology.spans.find((s) => s.id === step.spanId)?.toNodeId;
-    case 'customer-contact': return world.customerReports.find((r) => r.customerId === step.customerId)?.premiseNodeId;
     case 'cli': {
       const endpoint = step.endpoint;
       return endpoint.kind === 'device' ? world.devices.find((d) => d.id === endpoint.deviceId)?.topologyNodeId : world.hosts.find((h) => h.id === endpoint.hostId)?.premiseNodeId;
@@ -30,7 +29,7 @@ export function stepTarget(step: Intent, world: TeachingWorld): string | undefin
 }
 
 const METHOD: Record<Intent['type'], string> = {
-  'customer-contact': 'Establish the scope of the reported problem.',
+  'noc-contact': 'Establish the scope of the outage from what NOC is seeing.',
   'truck-roll': 'Move to the next accessible test boundary.',
   'power-meter': 'Establish whether usable light reaches the test boundary.',
   'otdr-shot': 'Locate loss and reflection events along the path.',
@@ -56,7 +55,6 @@ export function stepTitle(step: Intent, world: TeachingWorld): string {
     case 'vfl': return `Trace ${step.spanId} with the VFL from ${node}.`;
     case 'truck-roll': return `Roll to ${node}.`;
     case 'records': return `Read the plant records${node ? ` for ${node}` : ''}.`;
-    case 'customer-contact': return `Call ${step.customerId}${node ? ` at ${node}` : ''}.`;
     default: return METHOD[step.type];
   }
 }

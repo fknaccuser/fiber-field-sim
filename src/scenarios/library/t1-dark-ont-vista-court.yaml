@@ -170,7 +170,7 @@ hosts:
     vlan: 100
     addressing: { mode: dhcp }
 
-customerReports:
+nocReports:
   - customerId: cust-114
     premiseNodeId: prem-vista-114
     reportedSymptom: "All the lights on the fiber box are off and the internet's out."
@@ -186,7 +186,7 @@ faults:
 
 referenceSolution:
   rationales:
-    - "You compare the ONT state reported by the OLT with the customer report. The status helps distinguish loss of power, loss of light and registration trouble before you touch the drop."
+    - "You compare the ONT state reported by the OLT with what NOC has on the ticket. The status helps distinguish loss of power, loss of light and registration trouble before you touch the drop."
     - "You measure whether usable downstream light reaches the ONT. Compare this independent optical observation with the OLT status to decide whether the fiber path explains the outage."
     - "You state the cause and its location, citing both the network status and the light measurement. Your conclusion must explain both observations, not just one symptom."
   steps:

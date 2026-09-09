@@ -31,8 +31,8 @@ function describeResult(result: PerformResult): string {
       return 'Truck rolled';
     case 'records':
       return `Records: ${result.records.length} found`;
-    case 'customer-contact':
-      return `Called ${result.report.customerId}`;
+    case 'noc-contact':
+      return `NOC: ${result.reports.length} premise(s) on the ticket`;
     case 'hint':
       return result.text ? 'Hint received' : 'No hint available';
     case 'excavate':

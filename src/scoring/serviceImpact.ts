@@ -1,7 +1,15 @@
 /**
- * Customer impact: how many premises were actually affected, and for how long relative
- * to the reference solution. Evaluated on the frozen `initialWorld` -- Stage 1 has no
- * mid-session repairs, so a customer's affected status never changes over the session.
+ * Service impact: how many premises were actually out, and for how long relative to the
+ * reference solution.
+ *
+ * This used to be called customer impact, which read as though the technician's relationship
+ * with those subscribers were being scored. It never was. A field technician does not speak
+ * to them — NOC does — and the axis measures the only thing the technician controls: how
+ * long service stayed down while they worked. The subscribers are still counted, because
+ * they are still out; the number is derived from the world, not from anybody being phoned.
+ *
+ * Evaluated on the frozen `initialWorld` -- Stage 1 has no mid-session repairs, so a
+ * premise's affected status never changes over the session.
  */
 import type { HostConfig, NetworkDeviceConfig, OntRecord, PonPortState, WorldState } from '../world';
 import type { ProfileSet } from '../profiles';
@@ -51,18 +59,18 @@ export function affectedCustomerIds(world: WorldState, profiles: ProfileSet, met
   return affected;
 }
 
-export function computeCustomerImpact(state: SessionState): AxisScore {
+export function computeServiceImpact(state: SessionState): AxisScore {
   const affected = affectedCustomerIds(state.initialWorld, state.profiles, state.meta);
   if (affected.length === 0) {
-    return { axis: 'customerImpact', score: 100, details: ['No customers affected.'] };
+    return { axis: 'serviceImpact', score: 100, details: ['No premises out of service.'] };
   }
 
   const customerMinutes = affected.length * (state.clockSeconds / 60);
   const refMinutes = state.meta.referenceSolution.affectedCustomerMinutes;
   const score = 100 * clamp(refMinutes / customerMinutes, 0, 1);
   return {
-    axis: 'customerImpact',
+    axis: 'serviceImpact',
     score,
-    details: [`${affected.length} customer(s) affected for ${customerMinutes.toFixed(1)} minute(s) vs a ${refMinutes.toFixed(1)}-minute reference.`],
+    details: [`${affected.length} premise(s) out for ${customerMinutes.toFixed(1)} minute(s) vs a ${refMinutes.toFixed(1)}-minute reference.`],
   };
 }

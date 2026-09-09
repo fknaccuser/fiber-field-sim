@@ -66,7 +66,7 @@ function checkUniqueIds(def: ScenarioDefinition): ValidationIssue[] {
   checkGroup('hosts', def.hosts.map((h) => h.id));
   checkGroup('links', def.links.map((l) => l.id));
   checkGroup('plantRecords', def.plantRecords.map((r) => r.id));
-  checkGroup('customerReports', def.customerReports.map((r) => r.customerId));
+  checkGroup('nocReports', def.nocReports.map((r) => r.customerId));
   checkGroup('faults', [...def.faults, ...(def.redHerringPool?.from ?? [])].map((f) => f.instanceId));
   return issues;
 }

@@ -37,7 +37,7 @@ export function createEmptyWorld(seed: number, activeProfiles: ActiveProfileSet)
     links: [],
     hosts: [],
     plantRecords: [],
-    customerReports: [],
+    nocReports: [],
     environment: { weather: 'clear', timeOfDay: 'day' },
     truckInventory: [],
     appliedFaults: [],

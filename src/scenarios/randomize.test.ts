@@ -19,7 +19,7 @@ describe('3. red-herring pool picking', () => {
 describe('4. customer phrasing selection', () => {
   it('matches an independently recomputed pick for cust-b-301 under seed 7', () => {
     const resolved = resolveRandomization(t4, 7);
-    const report = t4.customerReports.find((r) => r.customerId === 'cust-b-301')!;
+    const report = t4.nocReports.find((r) => r.customerId === 'cust-b-301')!;
     const choices = [report.reportedSymptom, ...(report.phrasingVariants ?? [])];
     const expected = createRng(deriveSeed(7, 'scenario', 't4-wrong-roll-closure-7', 'report:cust-b-301')).pick(choices);
     expect(resolved.customerSymptoms.get('cust-b-301')).toBe(expected);

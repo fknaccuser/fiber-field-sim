@@ -364,7 +364,7 @@ plantRecords:
     lines:
       - "OLT-POP1-E72-1 uplinks: Te1/1 active -> DIST-RTR-1 Te1/0/1; Te1/2 spare (unpatched, admin down)."
 
-customerReports:
+nocReports:
   - customerId: cust-a-201
     premiseNodeId: prem-a-201
     reportedSymptom: "Internet says connected but nothing loads."
@@ -407,8 +407,7 @@ redHerringPool:
 
 referenceSolution:
   rationales:
-    - "You establish the reported service failure at the first premise without assuming that an internet complaint means an optical outage."
-    - "You compare a customer on another branch. Similar symptoms across branches help you decide whether a shared service needs investigation."
+    - "You take the alarm picture from NOC. Premises failing on more than one branch points at a shared service rather than one fibre path — and nothing on the ticket says an internet complaint is an optical outage, which is what every check after this one is for."
     - "You inspect ONT status across the PON. Compare the physical access state with the application complaint before travelling to the plant."
     - "You inspect the host address, gateway and resolver configuration. You need that baseline before interpreting reachability or name-resolution tests."
     - "You test the local gateway by IP address. This establishes whether the first routing boundary is reachable without involving name resolution."
@@ -418,10 +417,7 @@ referenceSolution:
     - "You test the configured resolver address from the router. A second vantage point helps distinguish service response from basic reachability."
     - "You cite the observations that separate physical access, forwarding and service behavior. Escalate work outside your authority with a specific, evidence-backed explanation."
   steps:
-    - type: customer-contact
-      customerId: cust-a-201
-    - type: customer-contact
-      customerId: cust-b-402
+    - type: noc-contact
     - type: cli
       endpoint: { kind: device, deviceId: olt-1-dev }
       command: "show ont status"
@@ -448,10 +444,10 @@ referenceSolution:
         claims:
           - faultKind: dns-server-unresponsive
             target: { type: device-global, deviceId: dns-1 }
-            evidenceActionIds: ["$7", "$5"]
+            evidenceActionIds: ["$6", "$4"]
         escalate:
           reason: "DNS service down on DNS-1; hosts resolve nothing, IP connectivity intact, all ONTs online. Needs NOC/IT."
-          evidenceActionIds: ["$2", "$5", "$7", "$8"]
+          evidenceActionIds: ["$1", "$4", "$6", "$7"]
   expectedClaims:
     - faultKind: dns-server-unresponsive
       target: { type: device-global, deviceId: dns-1 }

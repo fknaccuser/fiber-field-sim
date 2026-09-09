@@ -50,7 +50,7 @@ export function InstrumentDock({ ui, dispatch, initialTab = 'map' }: { ui: UiSes
   };
   const back = () => stack.length > 1 ? navigate(-1) : setTab('map');
   const [prefill, setPrefill] = useViewportState<DiagnosePrefill | null>('diagnose.prefill', null);
-  // The badge counts what is actually waiting on an answer. Counting the customer reports
+  // The badge counts what is actually waiting on an answer. Counting the NOC ticket rows
   // instead made it a constant, and a number that never changes is not a notification.
   const waiting = pendingComms(ui.commsEvents, ui.clockSeconds, ui.commsHandled).length;
 

@@ -352,7 +352,15 @@ export interface FaultInstance {
 
 // --- World state ----------------------------------------------------------------
 
-export interface CustomerReport {
+/**
+ * What the NOC is holding on this ticket.
+ *
+ * The subscriber is real and their outage is real; the field technician just never speaks
+ * to them. NOC takes the report, watches the ONT drop off the PON, and hands the picture to
+ * whoever is rolling. So this is the NOC's record, read off their ticket, not a phone call
+ * the trainee makes.
+ */
+export interface NocReport {
   customerId: string;
   premiseNodeId: string;
   reportedSymptom: string;
@@ -393,7 +401,7 @@ export interface WorldState {
   links: NetworkLink[];
   hosts: HostConfig[];
   plantRecords: PlantRecord[];
-  customerReports: CustomerReport[];
+  nocReports: NocReport[];
   environment: {
     weather: string;
     timeOfDay: string;

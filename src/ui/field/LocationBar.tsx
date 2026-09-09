@@ -124,8 +124,6 @@ export function LocationBar({ ui, dispatch, toast }: { ui: UiSessionState; dispa
         </div>
       </div>
 
-      <div style={{ height: 34 }} />
-
       {overBudget && (
         <div className="mono" style={{ position: 'relative', fontSize: 10, letterSpacing: 1, color: 'var(--red)', paddingBottom: 6 }}>
           OVER BUDGET — EFFICIENCY IS NOW 0. THE SESSION CONTINUES.
@@ -136,6 +134,8 @@ export function LocationBar({ ui, dispatch, toast }: { ui: UiSessionState; dispa
           &gt; {toast}
         </div>
       )}
+
+      <div style={{ height: 34 }} />
 
       <Sheet open={pickerOpen} onClose={() => setPickerOpen(false)} title="Truck roll">
         {Array.from(grouped.entries()).map(([kind, nodes]) => (

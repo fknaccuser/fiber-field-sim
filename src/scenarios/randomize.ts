@@ -83,7 +83,7 @@ export function resolveRandomization(def: ScenarioDefinition, seed: number): Res
   }
 
   const customerSymptoms = new Map<string, string>();
-  for (const report of def.customerReports) {
+  for (const report of def.nocReports) {
     const choices = [report.reportedSymptom, ...(report.phrasingVariants ?? [])];
     customerSymptoms.set(report.customerId, scenarioRng(seed, def.id, `report:${report.customerId}`).pick(choices));
   }

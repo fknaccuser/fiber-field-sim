@@ -143,14 +143,31 @@ export async function saveSession(identity: SessionIdentity, session: SessionSta
   }
 }
 
+/**
+ * Carry an older row forward.
+ *
+ * The fifth axis was called `customerImpact` until it was renamed `serviceImpact`, and rows
+ * written before that are already on trainees' devices. Reading one back unmigrated would
+ * show a blank where their score used to be — the run happened, the number is right there,
+ * and the training record would quietly lose it over a rename. So the old key is read and
+ * carried across on the way out; nothing rewrites the stored row.
+ */
+export function migrateStored<T extends StoredSession | undefined>(session: T): T {
+  if (!session?.scores) return session;
+  const scores = session.scores as Record<string, number>;
+  if ('serviceImpact' in scores || !('customerImpact' in scores)) return session;
+  const { customerImpact, ...rest } = scores;
+  return { ...session, scores: { ...rest, serviceImpact: customerImpact } as Record<AxisName, number> };
+}
+
 export async function getSession(id: string): Promise<StoredSession | undefined> {
-  return db.sessions.get(id);
+  return migrateStored(await db.sessions.get(id));
 }
 
 /** The most recently started session still in progress (no diagnosis/strike yet), if any -- powers Home's "Continue". */
 export async function loadUnfinished(): Promise<StoredSession | undefined> {
   const all = await db.sessions.orderBy('startedAt').reverse().toArray();
-  return all.find((s) => s.endedAt === null);
+  return migrateStored(all.find((s) => s.endedAt === null));
 }
 
 export interface SessionFilter {
@@ -164,7 +181,7 @@ export async function listSessions(filter: SessionFilter = {}): Promise<StoredSe
   if (filter.scenarioId) results = results.filter((s) => s.scenarioId === filter.scenarioId);
   if (filter.tier !== undefined) results = results.filter((s) => s.tier === filter.tier);
   if (filter.limit !== undefined) results = results.slice(0, filter.limit);
-  return results;
+  return results.map((row) => migrateStored(row));
 }
 
 export async function getPersonalBest(scenarioId: string, seed: number): Promise<PersonalBest | undefined> {

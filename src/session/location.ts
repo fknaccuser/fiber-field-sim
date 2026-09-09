@@ -43,7 +43,7 @@ export function checkPresence(world: WorldState, meta: ScenarioMeta, locationNod
       return locationNodeId === host.premiseNodeId ? { ok: true } : { ok: false, reason: 'must be at the customer premise' };
     }
     default:
-      return { ok: true }; // truck-roll, records, customer-contact, hint, diagnosis carry no presence requirement
+      return { ok: true }; // truck-roll, records, noc-contact, hint, diagnosis carry no presence requirement
   }
 }
 

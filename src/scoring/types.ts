@@ -1,4 +1,4 @@
-export type AxisName = 'diagnosticAccuracy' | 'evidenceQuality' | 'efficiency' | 'customerImpact' | 'safetyCompliance';
+export type AxisName = 'diagnosticAccuracy' | 'evidenceQuality' | 'efficiency' | 'serviceImpact' | 'safetyCompliance';
 
 export interface AxisScore {
   axis: AxisName;

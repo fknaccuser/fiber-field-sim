@@ -6,7 +6,7 @@
  */
 import { buildTeachingSteps, dispatchAdvice } from './teaching';
 import { cloneWorld, findNode } from '../world';
-import type { CustomerReport, PlantRecord, WorldState } from '../world';
+import type { PlantRecord, WorldState } from '../world';
 import { trace } from '../instruments/otdr';
 import type { OtdrTraceResult, PublicOtdrTraceResult } from '../instruments/otdr';
 import { read as powerMeterRead } from '../instruments/powerMeter/powerMeter';
@@ -18,7 +18,7 @@ import type { CliResult, CliSession } from '../instruments/cli';
 import { scoreSession } from '../scoring/score';
 import type { ScoreReport } from '../scoring/types';
 import { scheduleComms } from './comms';
-import { CUSTOMER_CONTACT_SECONDS, EXCAVATE_SECONDS, HINT_POLICY, HINT_SECONDS, RECORDS_SECONDS } from './costs';
+import { NOC_CONTACT_SECONDS, EXCAVATE_SECONDS, HINT_POLICY, HINT_SECONDS, RECORDS_SECONDS } from './costs';
 import { DEFAULT_ROLE, effectiveHintPolicy, ROLE_POLICY } from './roles';
 import { checkPresence, travelTimeSeconds } from './location';
 import { lookupRecords } from './records';
@@ -32,7 +32,7 @@ export type PerformResult =
   | { type: 'cli'; result: CliResult }
   | { type: 'truck-roll' }
   | { type: 'records'; records: PlantRecord[] }
-  | { type: 'customer-contact'; report: CustomerReport }
+  | { type: 'noc-contact'; reports: Array<{ customerId: string; premiseNodeId: string; symptom: string }> }
   | { type: 'hint'; text: string | null }
   | { type: 'excavate'; strike: boolean }
   | { type: 'comms'; replyId: string }
@@ -131,8 +131,8 @@ export function perform(state: SessionState, intent: Intent): { state: SessionSt
       return performTruckRoll(state, intent);
     case 'records':
       return performRecords(state, intent);
-    case 'customer-contact':
-      return performCustomerContact(state, intent);
+    case 'noc-contact':
+      return performNocContact(state);
     case 'hint':
       return performHint(state, intent);
     case 'excavate':
@@ -263,11 +263,30 @@ function performRecords(state: SessionState, intent: Extract<Intent, { type: 're
   return { state: appendAction(state, action), result: { type: 'records' as const, records } };
 }
 
-function performCustomerContact(state: SessionState, intent: Extract<Intent, { type: 'customer-contact' }>) {
-  const report = state.world.customerReports.find((r) => r.customerId === intent.customerId);
-  if (!report) return refuse(state, intent, `no customer report for ${intent.customerId}`);
-  const action: ActionEvent = { ...nextActionBase(state), durationSeconds: CUSTOMER_CONTACT_SECONDS, type: 'customer-contact', customerId: intent.customerId, symptom: report.reportedSymptom };
-  return { state: appendAction(state, action), result: { type: 'customer-contact' as const, report } };
+/**
+ * Call NOC and take down what they are seeing.
+ *
+ * There is no argument, because there is nothing to choose. Infrastructure does not phone
+ * subscribers — NOC does, and NOC watches the PON — so what a technician gets is one
+ * conversation and the whole alarm picture at once, red herrings included. NOC reports
+ * observations, never causes: the trainee still has to work out whether the affected
+ * premises share an upstream path, which is the reasoning the old per-customer calls were
+ * standing in for.
+ */
+function performNocContact(state: SessionState) {
+  const reports = state.world.nocReports.map((r) => ({
+    customerId: r.customerId,
+    premiseNodeId: r.premiseNodeId,
+    symptom: r.reportedSymptom,
+  }));
+  const action: ActionEvent = {
+    ...nextActionBase(state),
+    durationSeconds: NOC_CONTACT_SECONDS,
+    type: 'noc-contact',
+    ticketId: `NOC-${state.meta.scenarioId.toUpperCase()}`,
+    reports,
+  };
+  return { state: appendAction(state, action), result: { type: 'noc-contact' as const, reports } };
 }
 
 function performHint(state: SessionState, _intent: Extract<Intent, { type: 'hint' }>) {

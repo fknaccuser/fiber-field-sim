@@ -2,7 +2,7 @@
  * Procedural scenario generator. Given `GeneratorParams` (encoded in the scenario id) and
  * a seed, builds a complete, valid `ScenarioDefinition`: a South-OC PON plant sized to
  * the request, one fault plan drawn from the taxonomy families appropriate to the tier,
- * customer reports, plant records, red herrings, hints, and -- crucially -- a reference
+ * NOC ticket rows, plant records, red herrings, hints, and -- crucially -- a reference
  * solution that the validator (item 5) can replay to a perfect score. Everything is
  * derived from one RNG stream, so id + seed reproduces the definition exactly.
  */
@@ -24,7 +24,7 @@ type DraftDevice = NonNullable<Draft['devices']>[number];
 type DraftLink = NonNullable<Draft['links']>[number];
 type DraftHost = NonNullable<Draft['hosts']>[number];
 type DraftRecord = NonNullable<Draft['plantRecords']>[number];
-type DraftReport = NonNullable<Draft['customerReports']>[number];
+type DraftReport = NonNullable<Draft['nocReports']>[number];
 type DraftFault = NonNullable<Draft['faults']>[number];
 type DraftStep = Draft['referenceSolution']['steps'][number];
 type DraftClaim = NonNullable<Extract<DraftStep, { type: 'diagnosis' }>['diagnosis']['claims']>[number];
@@ -528,8 +528,15 @@ class Steps {
     this.push({ type: 'truck-roll', toNodeId: nodeId });
     this.location = nodeId;
   }
-  contact(custId: string): string {
-    return this.push({ type: 'customer-contact', customerId: custId });
+  /**
+   * Ask NOC what they are seeing. Idempotent on purpose: NOC hands over the whole alarm
+   * picture in one conversation, so a reference solution that asked twice would be teaching
+   * a wasted step rather than a method.
+   */
+  nocContact(): string {
+    const existing = this.steps.findIndex((s) => s.type === 'noc-contact');
+    if (existing >= 0) return `$${existing}`;
+    return this.push({ type: 'noc-contact' });
   }
   cli(deviceId: string, command: string): string {
     return this.push({ type: 'cli', endpoint: { kind: 'device', deviceId }, command });
@@ -612,7 +619,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
     }
     case 'connector-dirty': {
       const instanceId = `f-${port.dropSpanId}-dirty-nid`;
-      S.contact(port.custId);
+      S.nocContact();
       S.cli(OLT_DEV, 'show ont status');
       const sc = S.scope(port.dropSpanId, instanceId, port.ontId);
       S.powerMeter(port.ontId);
@@ -641,7 +648,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
     case 'macrobend': {
       const p = clearPosition(rng, port.nidPos, [0, port.nidPos], 8, 0.3, 0.75);
       const instanceId = `f-${port.dropSpanId}-bend`;
-      S.contact(port.custId);
+      S.nocContact();
       S.cli(OLT_DEV, 'show ont status');
       const v = S.vfl(port.dropSpanId, port.termId);
       const claims: DraftClaim[] = [{ faultKind: 'macrobend', target: { type: 'fiber-span', spanId: port.dropSpanId }, positionMeters: p, evidenceActionIds: [v] }];
@@ -663,7 +670,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
       const avoid = [0, ...(port.distSpliceAt !== null ? [port.distSpliceAt] : [])];
       const p = clearPosition(rng, port.distLen, avoid, 60);
       const instanceId = `f-${port.distSpanId}-break`;
-      S.contact(port.custId);
+      S.nocContact();
       S.cli(OLT_DEV, 'show ont status');
       const pm = S.powerMeter(port.termId);
       const v = S.vfl(port.distSpanId, hub.splitterId);
@@ -700,8 +707,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
       const feeder = plant.spans.find((s) => s.id === hub.feederInSpanId)!;
       const p = clearPosition(rng, feeder.lengthMeters, [feeder.lengthMeters], 80, 0.15, 0.75);
       const instanceId = `f-${hub.feederInSpanId}-break`;
-      S.contact(hub.ports[0].custId);
-      if (hub.ports.length > 1) S.contact(hub.ports[1].custId);
+      S.nocContact();
       S.cli(OLT_DEV, 'show ont status');
       const pm = S.powerMeter(hub.splitterId);
       const v = S.vfl(hub.feederInSpanId, hub.closureId!);
@@ -723,7 +729,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
       const avoid = [0, ...(port.distSpliceAt !== null ? [port.distSpliceAt] : []), port.distLen];
       const p = clearPosition(rng, port.distLen, avoid, 120, 0.25, 0.75);
       const instanceId = `f-${port.distSpanId}-splice`;
-      S.contact(port.custId);
+      S.nocContact();
       S.cli(OLT_DEV, 'show ont status');
       const o = S.otdr(hub.splitterId, port.distSpanId, 5000);
       const claims: DraftClaim[] = [{ faultKind: 'fusion-splice-degraded', target: { type: 'fiber-span', spanId: port.distSpanId }, positionMeters: p, evidenceActionIds: [o] }];
@@ -743,8 +749,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
     case 'wrong-tube-continuity': {
       const roll = plant.roll!;
       const hubB = plant.hubs.find((h) => h.letter === 'B')!;
-      S.contact(hubB.ports[0].custId);
-      if (hubB.ports.length > 1) S.contact(hubB.ports[1].custId);
+      S.nocContact();
       S.records(hubB.splitterId);
       const rec = S.records(roll.closureId);
       S.cli(OLT_DEV, 'show ont status');
@@ -800,7 +805,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
     }
     case 'ont-serial-mismatch': {
       const wrongSerial = serialFor(rng);
-      S.contact(port.custId);
+      S.nocContact();
       const c = S.cli(OLT_DEV, 'show ont status');
       const claims: DraftClaim[] = [{ faultKind: 'ont-serial-mismatch', target: { type: 'device-global', deviceId: OLT_DEV }, evidenceActionIds: [c] }];
       S.diagnose(claims);
@@ -834,7 +839,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
       };
     }
     case 'dhcp-scope-exhausted': {
-      S.contact(port.custId);
+      S.nocContact();
       S.cli(OLT_DEV, 'show ont status');
       const h = S.host(port.hostId, 'ipconfig');
       const r = S.cli(DIST_RTR, 'show ip route');
@@ -855,9 +860,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
     }
     case 'rogue-ont': {
       const rogue = pick(rng, hub.ports);
-      const others = hub.ports.filter((p) => p !== rogue);
-      S.contact((others[0] ?? rogue).custId);
-      if (others.length > 1) S.contact(others[1].custId);
+      S.nocContact();
       const c = S.cli(OLT_DEV, 'show ont status');
       const claims: DraftClaim[] = [{ faultKind: 'rogue-ont', target: { type: 'device-global', deviceId: OLT_DEV }, evidenceActionIds: [c] }];
       S.diagnose(claims);
@@ -875,8 +878,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
     }
     case 'dns-server-unresponsive': {
       const first = hub.ports[0];
-      S.contact(first.custId);
-      if (hub.ports.length > 1) S.contact(hub.ports[1].custId);
+      S.nocContact();
       const ont = S.cli(OLT_DEV, 'show ont status');
       S.host(first.hostId, 'ipconfig');
       S.host(first.hostId, 'ping 10.100.0.1');
@@ -897,7 +899,7 @@ function buildPlan(rng: Rng, plan: PlanKind, plant: Plant): Built {
         symptomPool: SYMPTOMS.dns,
         hints: HINTS['dns-server-unresponsive'],
         title: "Everyone's down, nothing's broken",
-        description: 'Every customer reports the internet as dead at once, but every ONT is online and every fiber path checks out. The DNS server itself is down -- outside a field tech\'s authority, but recognizing that (and escalating instead of rolling a truck) is the whole test.',
+        description: 'NOC has the whole street on one ticket -- internet dead everywhere at once -- but every ONT is online and every fiber path checks out. The DNS server itself is down -- outside a field tech\'s authority, but recognizing that (and escalating instead of rolling a truck) is the whole test.',
       };
     }
   }
@@ -1007,7 +1009,7 @@ export function generateScenario(params: GeneratorParams, seed: number): Scenari
     links,
     hosts,
     plantRecords: records,
-    customerReports: reports,
+    nocReports: reports,
     faults: [...built.faults, ...herrings.faults],
     redHerringPool: herrings.pool,
     referenceSolution: { steps: built.steps, rationales: built.rationales, expectedClaims: built.expectedClaims },

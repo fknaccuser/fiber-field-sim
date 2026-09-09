@@ -4,7 +4,7 @@ import { getScenario, instantiateScenario } from '../../scenarios';
 import { resolveProfileSet } from '../../profiles';
 import { startSession, perform } from '../../session/runner';
 import type { SessionState } from '../../session/types';
-import { _useDatabase, getPersonalBest, getSession, loadUnfinished, saveSession } from './persistence';
+import { _useDatabase, getPersonalBest, getSession, loadUnfinished, migrateStored, saveSession, type StoredSession } from './persistence';
 
 function runReference(seed = 1): { session: SessionState; report: import('../../scoring/types').ScoreReport } {
   const def = getScenario('t1-dark-ont-vista-court');
@@ -43,7 +43,7 @@ describe('2. saveSession / getSession round-trip', () => {
         diagnosticAccuracy: report.axes.diagnosticAccuracy.score,
         evidenceQuality: report.axes.evidenceQuality.score,
         efficiency: report.axes.efficiency.score,
-        customerImpact: report.axes.customerImpact.score,
+        serviceImpact: report.axes.serviceImpact.score,
         safetyCompliance: report.axes.safetyCompliance.score,
       },
       total: report.total,
@@ -104,5 +104,30 @@ describe('personalBests upsert', () => {
     best = await getPersonalBest(scenarioId, seed);
     expect(best?.total).toBe(80);
     expect(best?.sessionId).toBe('s3');
+  });
+});
+
+describe('carrying an older row forward', () => {
+  it('reads a pre-rename customerImpact score as serviceImpact', () => {
+    const legacy = {
+      scores: { diagnosticAccuracy: 90, evidenceQuality: 80, efficiency: 70, customerImpact: 60, safetyCompliance: 100 },
+    } as unknown as StoredSession;
+    const migrated = migrateStored(legacy)!;
+    expect(migrated.scores).toEqual({ diagnosticAccuracy: 90, evidenceQuality: 80, efficiency: 70, serviceImpact: 60, safetyCompliance: 100 });
+    // The old key does not survive alongside the new one, or the record has two fifth axes.
+    expect('customerImpact' in migrated.scores!).toBe(false);
+  });
+
+  it('leaves a current row exactly as it is', () => {
+    const current = {
+      scores: { diagnosticAccuracy: 90, evidenceQuality: 80, efficiency: 70, serviceImpact: 60, safetyCompliance: 100 },
+    } as unknown as StoredSession;
+    expect(migrateStored(current)).toBe(current);
+  });
+
+  it('passes through a row with no scores and an absent row', () => {
+    const unscored = { scores: null } as unknown as StoredSession;
+    expect(migrateStored(unscored)).toBe(unscored);
+    expect(migrateStored(undefined)).toBeUndefined();
   });
 });

@@ -13,7 +13,7 @@ function fixtureSession(overrides: Partial<StoredSession>): StoredSession {
     endedAt: '2026-01-01T10:05:00.000Z',
     endedBy: 'diagnosis',
     simulatedSeconds: 300,
-    scores: { diagnosticAccuracy: 100, evidenceQuality: 100, efficiency: 100, customerImpact: 100, safetyCompliance: 100 },
+    scores: { diagnosticAccuracy: 100, evidenceQuality: 100, efficiency: 100, serviceImpact: 100, safetyCompliance: 100 },
     total: 100,
     faultDomains: ['cpe'],
     matchedFaultKinds: ['ont-unpowered'],
@@ -70,8 +70,8 @@ describe('3. competency map', () => {
 
   it('averages accuracy/evidence over each domain\'s own last-10 window and ranks weakest first', () => {
     const sessions = [
-      fixtureSession({ id: 'a', faultDomains: ['optical'], scores: { diagnosticAccuracy: 100, evidenceQuality: 100, efficiency: 100, customerImpact: 100, safetyCompliance: 100 } }),
-      fixtureSession({ id: 'b', faultDomains: ['network'], scores: { diagnosticAccuracy: 40, evidenceQuality: 40, efficiency: 100, customerImpact: 100, safetyCompliance: 100 } }),
+      fixtureSession({ id: 'a', faultDomains: ['optical'], scores: { diagnosticAccuracy: 100, evidenceQuality: 100, efficiency: 100, serviceImpact: 100, safetyCompliance: 100 } }),
+      fixtureSession({ id: 'b', faultDomains: ['network'], scores: { diagnosticAccuracy: 40, evidenceQuality: 40, efficiency: 100, serviceImpact: 100, safetyCompliance: 100 } }),
     ];
     const map = competencyMap(sessions);
     expect(map[0].domain).toBe('network');

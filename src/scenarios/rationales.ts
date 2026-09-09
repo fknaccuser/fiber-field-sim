@@ -3,9 +3,7 @@ import type { Intent } from '../session/types';
 /** Method explanations only. No symptom results, diagnosis claims, or fault parameters. */
 export function rationaleForStep(step: Intent, previous: Intent[] = []): string {
   switch (step.type) {
-    case 'customer-contact': return previous.some((s) => s.type === 'customer-contact')
-      ? 'You compare another customer report with the first to establish whether the affected premises share an upstream path before you spend a truck roll.'
-      : 'You establish what stopped working and when. Compare the report with later measurements instead of assuming that a customer description identifies the cause.';
+    case 'noc-contact': return 'You take the alarm picture from NOC: which premises are down and when they dropped. Scope before travel — whether the affected premises share an upstream path is what decides where the first truck roll goes. NOC is reporting what it observed; it is not a diagnosis.';
     case 'clean-probe': return 'You clean the probe tip before you trust what it shows you. A contaminated tip prints the same debris onto every endface, and condemning a good connector on that evidence costs a splice crew a trip.';
     case 'comms': return 'You answer the message. Handling people is part of the job at this grade, and an unanswered escalation costs more than the minute it takes to reply.';
     case 'truck-roll': return 'You move to the next test boundary so you can inspect or measure equipment you can physically reach. Remote status alone cannot establish conditions at this point.';

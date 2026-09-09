@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CUSTOMER_CONTACT_SECONDS, EXCAVATE_SECONDS, HINT_POLICY, HINT_SECONDS, POWER_METER_SECONDS, RECORDS_SECONDS, REFUSED_SECONDS, SCOPE_SECONDS, VFL_SECONDS } from './costs';
+import { NOC_CONTACT_SECONDS, EXCAVATE_SECONDS, HINT_POLICY, HINT_SECONDS, POWER_METER_SECONDS, RECORDS_SECONDS, REFUSED_SECONDS, SCOPE_SECONDS, VFL_SECONDS } from './costs';
 
 describe('cost constants', () => {
   it('match the architecture doc', () => {
@@ -7,7 +7,7 @@ describe('cost constants', () => {
     expect(VFL_SECONDS).toBe(120);
     expect(SCOPE_SECONDS).toBe(90);
     expect(RECORDS_SECONDS).toBe(60);
-    expect(CUSTOMER_CONTACT_SECONDS).toBe(120);
+    expect(NOC_CONTACT_SECONDS).toBe(150);
     expect(HINT_SECONDS).toBe(0);
     expect(EXCAVATE_SECONDS).toBe(1800);
     expect(REFUSED_SECONDS).toBe(0);

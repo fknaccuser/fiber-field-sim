@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PonPortState, WorldState } from '../world';
-import { computeCustomerImpact } from './customerImpact';
+import { computeServiceImpact } from './serviceImpact';
 import { baseMeta, emptyWorld, makeSession } from './testFixtures';
 
 /** `n` customer premises, each behind its own unpowered ONT -- deriveOntStatus returns 'offline' before touching any path-loss physics, so no fiber topology is needed. */
@@ -44,13 +44,13 @@ describe('18. customer impact', () => {
   it('4 affected customers for 30 simulated minutes vs a 40-minute total reference scores 33', () => {
     const meta = baseMeta({ referenceSolution: { rationales: [], steps: [], totalSeconds: 0, affectedCustomerMinutes: 40 } });
     const state = makeSession({ world: worldWithAffectedCustomers(4), log: [], meta, clockSeconds: 30 * 60 });
-    const result = computeCustomerImpact(state);
+    const result = computeServiceImpact(state);
     expect(result.score).toBeCloseTo((100 * 40) / 120, 1);
   });
 
   it('a world with no affected customers scores 100', () => {
     const state = makeSession({ world: emptyWorld(), log: [], clockSeconds: 1800 });
-    const result = computeCustomerImpact(state);
+    const result = computeServiceImpact(state);
     expect(result.score).toBe(100);
   });
 });

@@ -6,7 +6,7 @@ import { competencyMap, type CompetencyDomain } from '../store/progress';
 import type { ScoreReport, AxisName } from '../../scoring/types';
 import './debrief.css';
 
-const AXES: Record<AxisName, string> = { diagnosticAccuracy: 'Diagnostic accuracy', evidenceQuality: 'Evidence quality', efficiency: 'Efficiency', customerImpact: 'Customer impact', safetyCompliance: 'Safety & compliance' };
+const AXES: Record<AxisName, string> = { diagnosticAccuracy: 'Diagnostic accuracy', evidenceQuality: 'Evidence quality', efficiency: 'Efficiency', serviceImpact: 'Service impact', safetyCompliance: 'Safety & compliance' };
 const VERDICTS = { correct: 'Diagnosis confirmed', partial: 'Partially correct', incorrect: 'Diagnosis needs review', escalated: 'Appropriate escalation' };
 function duration(seconds: number) { return seconds < 60 ? `${Math.round(seconds)}s` : `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`; }
 

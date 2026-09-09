@@ -13,7 +13,7 @@ export function stepKey(step: Intent | ObservedAction): string {
     case 'vfl': return JSON.stringify(['vfl', step.spanId, step.fromNodeId]);
     case 'truck-roll': return JSON.stringify(['truck-roll', step.toNodeId]);
     case 'records': return JSON.stringify(['records', step.nodeId, step.spanId]);
-    case 'customer-contact': return JSON.stringify(['customer-contact', step.customerId]);
+    case 'noc-contact': return JSON.stringify(['noc-contact']);
     case 'excavate': return JSON.stringify(['excavate', step.nodeId, step.method, step.distanceFromMarksInches]);
     default: return step.type;
   }

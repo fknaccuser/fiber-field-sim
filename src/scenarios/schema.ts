@@ -184,7 +184,7 @@ const PlantRecordSchema = z.object({
   lines: z.array(z.string()),
 });
 
-// --- Faults, customer reports ---------------------------------------------------------
+// --- Faults, NOC ticket rows ----------------------------------------------------------
 
 const FaultInstanceSchema = z.object({
   instanceId: z.string(),
@@ -196,7 +196,7 @@ const FaultInstanceSchema = z.object({
   randomize: z.record(z.string(), z.union([NumberRangeSchema, z.array(z.unknown())])).optional(),
 });
 
-const CustomerReportSchema = z.object({
+const NocReportSchema = z.object({
   customerId: z.string(),
   premiseNodeId: z.string(),
   reportedSymptom: z.string(),
@@ -243,7 +243,7 @@ const IntentSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('cli'), endpoint: EndpointSchema, command: z.string() }),
   z.object({ type: z.literal('truck-roll'), toNodeId: z.string() }),
   z.object({ type: z.literal('records'), nodeId: z.string().optional(), spanId: z.string().optional() }),
-  z.object({ type: z.literal('customer-contact'), customerId: z.string() }),
+  z.object({ type: z.literal('noc-contact') }),
   z.object({ type: z.literal('hint') }),
   z.object({ type: z.literal('excavate'), nodeId: z.string(), method: z.enum(['hand', 'machine']), distanceFromMarksInches: z.number() }),
   z.object({ type: z.literal('diagnosis'), diagnosis: DiagnosisSchema }),
@@ -285,7 +285,7 @@ export const ScenarioDefinitionSchema = z.object({
   links: z.array(NetworkLinkSchema).default([]),
   hosts: z.array(HostConfigSchema).default([]),
   plantRecords: z.array(PlantRecordSchema).default([]),
-  customerReports: z.array(CustomerReportSchema).default([]),
+  nocReports: z.array(NocReportSchema).default([]),
   faults: z.array(FaultInstanceSchema).default([]),
   redHerringPool: z.object({ pick: z.number().int().min(0), from: z.array(FaultInstanceSchema) }).optional(),
   hints: z.array(z.string()).default([]),

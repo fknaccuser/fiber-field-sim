@@ -3,7 +3,11 @@ export const POWER_METER_SECONDS = 60;
 export const VFL_SECONDS = 120;
 export const SCOPE_SECONDS = 90;
 export const RECORDS_SECONDS = 60;
-export const CUSTOMER_CONTACT_SECONDS = 120;
+/**
+ * One call to NOC, not one per subscriber. NOC reads you the whole alarm picture in a
+ * single conversation, which is both how it goes and why calling twice buys nothing.
+ */
+export const NOC_CONTACT_SECONDS = 150;
 export const HINT_SECONDS = 0;
 export const EXCAVATE_SECONDS = 1800;
 export const DIAGNOSIS_SECONDS = 0;
