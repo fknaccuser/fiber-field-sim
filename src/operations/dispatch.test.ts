@@ -148,3 +148,32 @@ describe('the construction board', () => {
     expect(committedMinutes([])).toBe(0);
   });
 });
+
+describe('what a week actually looks like', () => {
+  it('puts DigAlert tickets on the board about as often as splices', () => {
+    // The crew answers more of these than anything except splicing. A board that can go a
+    // fortnight without showing one is teaching the wrong shape of week, so this asserts the
+    // weighting rather than trusting it.
+    const counts = new Map<string, number>();
+    for (let seed = 1; seed <= 300; seed++) {
+      for (const order of buildConstructionDay(seed, new Date(2026, 4, 14), 4)) {
+        counts.set(order.kind, (counts.get(order.kind) ?? 0) + 1);
+      }
+    }
+    const locates = counts.get('locate-mark') ?? 0;
+    const splices = counts.get('ribbon-splice') ?? 0;
+    expect(locates).toBeGreaterThan(0);
+    expect(locates).toBeGreaterThan(splices * 0.6);
+  });
+
+  it('draws each order independently rather than repeating one kind down the board', () => {
+    // Measured, not guessed: across 400 seeds the generator produces no day whose four
+    // orders are all the same kind. Asserting the measured behaviour rather than a loose
+    // bound is the point -- a generator that had quietly stopped advancing its rng would
+    // sail past "most days vary" and be caught here.
+    for (let seed = 1; seed <= 400; seed++) {
+      const kinds = new Set(buildConstructionDay(seed, new Date(2026, 4, 14), 4).map((o) => o.kind));
+      expect(kinds.size).toBeGreaterThan(1);
+    }
+  });
+});

@@ -32,6 +32,7 @@ const BENCH: Partial<Record<JobKind, { to: string; label: string }>> = {
   'ribbon-splice': { to: '/bench/run', label: 'Work the case →' },
   'closure-dress': { to: '/bench/tray', label: 'Open the tray bench →' },
   'acceptance-test': { to: '/bench/test', label: 'Open the acceptance bench →' },
+  'locate-mark': { to: '/bench/locate', label: 'Answer the ticket →' },
 };
 
 const KIND_TAG: Record<JobKind, string> = {
@@ -42,6 +43,7 @@ const KIND_TAG: Record<JobKind, string> = {
   'pop-equipment': 'TURN-UP',
   'acceptance-test': 'TEST',
   'locate-request': 'PLAN',
+  'locate-mark': 'LOCATE',
   outage: 'OUTAGE',
 };
 

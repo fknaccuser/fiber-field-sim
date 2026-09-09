@@ -17,9 +17,10 @@ has to discover the gaps by clicking.
 | **Ribbon splice** | `/bench/splice` | The 22-step procedure. The loss chart's *shape* is the diagnosis. |
 | **Tray dressing** | `/bench/tray` | Bend radius, slack, capacity. Defect versus workmanship. |
 | **Acceptance testing** | `/bench/test` | Gainers, and why one direction is not a measurement. |
+| **Locate and mark** | `/bench/locate` | Answering a DigAlert. You mark the cable, not the drawing. |
 | **Construction board** | `/` (under the fault queue) | Triage: kit, grade, locate — reported together. |
 
-All three benches record. A run is scored, written to IndexedDB against the same trainee as
+All four benches record. A run is scored, written to IndexedDB against the same trainee as
 a field session, and surfaces on dispatch and in the training record. Practice that leaves
 no trace teaches only whoever happens to be watching.
 
@@ -33,6 +34,7 @@ no trace teaches only whoever happens to be watching.
 | `catalog.ts` — FOSC 450, FIST-GC02, HexDomes, HexDome FDH | tray bench (closure picker) |
 | `dispatch.ts` — job templates, readiness, `STANDARD_RIG` | construction board |
 | `digalert.ts` — §4216, working days, paint colours | construction board (locate chips) |
+| `locate.ts` — incoming tickets, the wand, mark judging | locate bench |
 | `benchRecord.ts` — scoring and standings | all benches, dispatch, history |
 | `crew.ts` — stretch, fatigue, morale, crew flags | **nothing.** See below. |
 
@@ -46,8 +48,8 @@ Stated plainly rather than left to be discovered.
   between job and person, fatigue and morale are tracked separately, and `crewNotes` flags
   stagnation as loudly as burnout. It has no screen because the crew asked to keep the
   manager board off for now. This is a deliberate hold, not an oversight.
-- **FDH build, IDF prep, POP turn-up, locate requests.** Job templates, durations, kit and
-  grade gates all exist and the board schedules them. None has a bench. Their cards say
+- **FDH build, IDF prep, POP turn-up, outgoing locate requests.** Job templates, durations,
+  kit and grade gates all exist and the board schedules them. None has a bench. Their cards say
   "bench not built yet — engine only" rather than offering a button that goes nowhere.
 - **Nothing carries between work orders.** Each bench run is scored on its own. A shift does
   not accumulate, and the drive back to the yard does not exist.
@@ -69,6 +71,14 @@ These are not engineering gaps. They need information this project does not have
 3. **Closure open and seal.** The transcript that grounds `ribbon.ts` picks up with the case
    already open, so anchoring, gasket seating and sealing remain inference. One video of a
    case being opened and closed would settle them.
+4. **How often the as-builts are wrong.** `locate.ts` re-routes a run behind the records
+   about one job in three, and that figure is invented. It is high enough that sweeping is
+   never optional and low enough that the print cannot simply be assumed wrong — but the
+   crew knows the real rate on this plant and this project does not.
+5. **What the wand does on a bad day.** `signalAt` is a clean Gaussian with no coupling, no
+   bleed-over from a parallel utility and no null over a deep line. Those are real and each
+   needs a number somebody measured; inventing them would teach a trainee to distrust a
+   reading for the wrong reason, so the model stays honest about being simple.
 
 ---
 

@@ -19,10 +19,11 @@
  *
  * Pure: no storage, no React. Persistence lives in ui/store.
  */
+import type { LocateVerdict } from './locate';
 import { allMistakes, PROCEDURE, type StepId } from './ribbon';
 import type { TrayVerdict } from './tray';
 
-export type BenchKind = 'ribbon-splice' | 'tray-dress';
+export type BenchKind = 'ribbon-splice' | 'tray-dress' | 'locate-mark';
 
 export interface BenchRun {
   id: string;
@@ -87,15 +88,39 @@ export function scoreTrayRun(verdict: TrayVerdict): number {
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
+/**
+ * Score an answered locate ticket.
+ *
+ * A strike risk is not a deduction on a scale with the others. Somewhere in that dig area a
+ * machine is going to open the ground where this locate said it was safe, and no amount of
+ * neat paint elsewhere offsets it — so one of them takes the run out of a pass, and the
+ * arithmetic says so rather than letting a mostly-good ticket average its way to a B.
+ */
+export function scoreLocateRun(verdict: LocateVerdict): number {
+  let score = 100;
+  score -= verdict.strikeRisks * 45;
+  score -= verdict.defects * 14;
+  score -= verdict.workmanship * 5;
+  // Coverage is charged on top, because "most of it" is a different failure from "none of
+  // it" and a ticket can carry one strike risk with very different amounts left unpainted.
+  if (verdict.plantMeters > 0) {
+    const missed = 1 - verdict.markedMeters / verdict.plantMeters;
+    score -= missed * 25;
+  }
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
 /** The competencies each bench exercises, for the record to roll up. */
 export const BENCH_DOMAINS: Record<BenchKind, string[]> = {
   'ribbon-splice': ['splicing', 'testing'],
   'tray-dress': ['splicing', 'records'],
+  'locate-mark': ['locating', 'compliance', 'records'],
 };
 
 export const BENCH_LABEL: Record<BenchKind, string> = {
   'ribbon-splice': 'Ribbon splice',
   'tray-dress': 'Tray dressing',
+  'locate-mark': 'Locate and mark',
 };
 
 /** Steps in the procedure that a run never touched. */

@@ -25,6 +25,7 @@ export type JobKind =
   | 'pop-equipment'
   | 'acceptance-test'
   | 'locate-request'
+  | 'locate-mark'
   | 'outage';
 
 export interface JobTemplate {
@@ -120,6 +121,16 @@ export const JOB_TEMPLATES: readonly JobTemplate[] = [
     domains: ['testing', 'records'],
   },
   {
+    kind: 'locate-mark',
+    title: 'DigAlert — locate and mark',
+    brief: 'Somebody else is digging near your plant. Sweep the area, mark what is actually there in orange, and clear the ticket before their dig date.',
+    minutes: 90,
+    kit: ['locator', 'paint', 'hand-tools'],
+    minRole: 'l1',
+    breaksGround: false,
+    domains: ['locating', 'compliance', 'records'],
+  },
+  {
     kind: 'locate-request',
     title: 'Call in locates for next week',
     brief: 'Ticket the dig sites now. Two working days of notice cannot be bought back on the morning.',
@@ -143,6 +154,11 @@ export const STANDARD_RIG: readonly string[] = [
   'mass-fusion-splicer', 'mass-cleaver', 'heat-jacket-stripper', 'ribbonizing-jig',
   'cleaning-kit', 'otdr', 'power-meter', 'vfl', 'inspection-scope',
   'launch-cable-500m', 'laptop', 'labels', 'hand-tools',
+  // A truck that answers DigAlert tickets every week carries the wand and the paint. Adding
+  // them is not softening the readiness gate: the console cable is still deliberately absent,
+  // so POP turn-up still blocks on kit, and one honest gate teaches more than two contrived
+  // ones.
+  'locator', 'paint',
 ];
 
 export function templateFor(kind: JobKind): JobTemplate {
@@ -230,6 +246,9 @@ export function buildConstructionDay(daySeed: number, now: Date, count = 3): Wor
   const rng = createRng(deriveSeed(daySeed, 'construction-day'));
   const weighted: JobKind[] = [
     'ribbon-splice', 'ribbon-splice', 'ribbon-splice',
+    // DigAlerts land constantly. The crew answers more of these than anything except
+    // splicing, and a board that never shows one teaches the wrong shape of week.
+    'locate-mark', 'locate-mark', 'locate-mark',
     'outage', 'outage',
     'closure-dress', 'closure-dress',
     'acceptance-test',

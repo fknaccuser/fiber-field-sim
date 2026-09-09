@@ -136,7 +136,54 @@ reference in the authored scenarios down by one. `t4` and `t5` both carried them
 validator replays each reference solution through the real runner and would have caught a
 mistake here, which is exactly what it is for.
 
+## Increment 5 — DigAlerts, the direction they actually run
+
+The brief said DigAlerts are done constantly and should be a bigger part of the trainer. The
+engine already had `digalert.ts` — but that models the ticket *you* open before *you* break
+ground: notify, wait two working days, dig. That is the law, and it is the rarer half.
+
+The half the crew does constantly runs the other way. A ticket lands because somebody else
+is excavating near your plant, and you go out and mark your own facilities before their dig
+date. Planning and locating are different jobs with different failure modes, so
+`locate.ts` is a new module rather than an option on the old one, and the two keep their
+numbers apart: `MARK_TOLERANCE_M` is how close a traced mark must be to count in this
+trainer, `TOLERANCE_ZONE_INCHES` is the statutory hand-dig zone, and conflating them would
+hand a technician a wrong figure to argue with.
+
+**The lesson the bench is built around.** Every run has a `recorded` route and an `actual`
+route. Most of the time they are the same array. Roughly one job in three they are not,
+because a re-route never made it back to the as-builts — and a trainee who traces the print
+finishes in ninety seconds with a tidy ticket and a cut cable. So the drawing gives you the
+recorded routes for free and makes you sweep for the real ones. The wand reports the signal
+under your finger and nothing else; joining the peaks into a facility is the trainee's job,
+which is what locating is.
+
+`judgeLocate` names that failure specifically — `marked-the-record`, not a generic
+`unmarked-facility` — because "you missed a bit" and "you trusted the print" are different
+admissions.
+
+**What else it catches.** Facilities nobody swept for (the drop, the abandoned stub — what
+actually gets hit). Paint with nothing under it, which is as dangerous as no paint. Wrong
+colour, which is a defect rather than a strike risk: the cable is marked, it is just claimed
+by somebody else. And a ticket answered after the dig date, which protected nothing.
+
+**Honest about the model.** `signalAt` is a clean Gaussian — no coupling onto a parallel
+water main, no bleed-over, no null over a deep line. Those are real, and each needs a number
+somebody measured. Inventing them would teach a trainee to distrust a reading for the wrong
+reason, so the wand stays simple and the difficulty stays where it belongs: nothing tells you
+when you have swept enough.
+
+**Caught by running it.** The bench's page projection was not invertible — the forward
+transform rotated the drawing and the inverse did not, so every stroke was laid down
+transposed. It only showed up on a screen. `groundProjector` now lives in `locate.ts` with a
+round-trip test, which is one assertion and would have caught it before it got there.
+
+The board weights `locate-mark` alongside ribbon splicing, `STANDARD_RIG` gained a locator
+and paint (a truck that answers these weekly carries them; the console cable is still
+deliberately absent so POP turn-up keeps the one honest kit gate), and two tests assert the
+board's distribution rather than trusting it.
+
 ## Still to come
 
-Increments 5–7: incoming DigAlert locate-and-mark; the 3D tray bench; backbone into a new
-terminal. This file grows as they land.
+Increments 6–7: the 3D tray bench, and backbone into a new terminal. This file grows as they
+land.
