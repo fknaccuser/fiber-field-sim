@@ -78,6 +78,13 @@ let db = new FiberSimDb();
 /** Test-only: point at a fresh, isolated database instead of the shared singleton. */
 export function _useDatabase(name: string): void {
   db = new FiberSimDb(name);
+  traineeIdPromise = null;
+  ephemeralTraineeId = null;
+}
+
+/** Test-only: the live database, so a test can make a table stop answering. */
+export function _db(): FiberSimDb {
+  return db;
 }
 
 export interface SessionIdentity {
@@ -132,15 +139,21 @@ function toStoredSession(identity: SessionIdentity, session: SessionState, repor
 /** Upserts the session's row and, if it just finished, the scenario+seed's personal best. */
 export async function saveSession(identity: SessionIdentity, session: SessionState, report: ScoreReport | null): Promise<void> {
   const stored = toStoredSession(identity, session, report);
-  await db.sessions.put(stored);
+  await settle(
+    async () => {
+      await db.sessions.put(stored);
 
-  if (report) {
-    const key = `${session.meta.scenarioId}:${session.meta.seed}`;
-    const existing = await db.personalBests.get(key);
-    if (!existing || report.total > existing.total || (report.total === existing.total && session.clockSeconds < existing.simulatedSeconds)) {
-      await db.personalBests.put({ key, sessionId: identity.id, total: report.total, simulatedSeconds: session.clockSeconds });
-    }
-  }
+      if (report) {
+        const key = `${session.meta.scenarioId}:${session.meta.seed}`;
+        const existing = await db.personalBests.get(key);
+        if (!existing || report.total > existing.total || (report.total === existing.total && session.clockSeconds < existing.simulatedSeconds)) {
+          await db.personalBests.put({ key, sessionId: identity.id, total: report.total, simulatedSeconds: session.clockSeconds });
+        }
+      }
+    },
+    undefined,
+    'session not written; the score stands but the record does not',
+  );
 }
 
 /**
@@ -166,7 +179,13 @@ export async function getSession(id: string): Promise<StoredSession | undefined>
 
 /** The most recently started session still in progress (no diagnosis/strike yet), if any -- powers Home's "Continue". */
 export async function loadUnfinished(): Promise<StoredSession | undefined> {
-  const all = await readOrEmpty(() => db.sessions.orderBy('startedAt').reverse().toArray(), []);
+  // On the short deadline: the field session will not paint until this answers.
+  const all = await settle(
+    () => db.sessions.orderBy('startedAt').reverse().toArray(),
+    [] as StoredSession[],
+    'could not check for an unfinished run; starting fresh',
+    BLOCKING_READ_TIMEOUT_MS,
+  );
   return migrateStored(all.find((s) => s.endedAt === null));
 }
 
@@ -221,27 +240,113 @@ let ephemeralTraineeId: string | null = null;
  * database to read; a blank page where the record should be is not.
  */
 async function readOrEmpty<T>(read: () => Promise<T>, fallback: T): Promise<T> {
+  return settle(read, fallback, 'could not read stored history; showing none');
+}
+
+/**
+ * How long to wait for the database before deciding there isn't one.
+ *
+ * Long enough that a cold database on a busy phone is never cut off -- an open plus a
+ * first read is tens of milliseconds warm and a few hundred on the worst hardware worth
+ * supporting. Short enough that a trainee is not left looking at a spinner wondering
+ * whether the app is broken, because from where they are standing it is.
+ */
+export const STORAGE_TIMEOUT_MS = 4000;
+
+/**
+ * The deadline for a read that a screen is waiting on.
+ *
+ * Much shorter, because the cost of the two outcomes is not symmetric. Waiting too long
+ * shows a trainee a spinner on an app that is not coming back -- four seconds of that is
+ * indistinguishable from broken, which is precisely the report that led here. Giving up
+ * too early costs them the offer to resume a run they can start again in one tap. A resume
+ * lookup against a database that works is a few milliseconds warm and well under a second
+ * on the worst hardware worth supporting, so a second and a half is not a device being
+ * slow. It is a device that is not going to answer.
+ */
+export const BLOCKING_READ_TIMEOUT_MS = 1500;
+
+/** Test seam: run one call against a shorter deadline than a person would ever wait. */
+let timeoutMs = STORAGE_TIMEOUT_MS;
+export function _useStorageTimeout(ms: number): void {
+  timeoutMs = ms;
+}
+
+/**
+ * Run a database call, or give up on it.
+ *
+ * Every other guard in this module is a `try`/`catch`, and a `catch` is the wrong tool for
+ * the failure that actually shipped. Storage does not only refuse -- sometimes it does not
+ * answer. `indexedDB.open()` is specified to fire `blocked` and then simply wait, and in a
+ * storage-restricted context (an in-app browser, a private window, a frame denied storage
+ * access) the request can stay pending for the life of the page. Nothing rejects, so
+ * nothing is caught, and any screen awaiting the call waits with it.
+ *
+ * That is not hypothetical: it is what put the field session on `Loading scenario...`
+ * forever, on a deployed build, with an empty console -- because the session start was
+ * behind an await on a resume lookup that never came back.
+ *
+ * So a deadline, not a `catch`. Whatever is stored is a convenience -- which run to resume,
+ * which trainee id to file the record under. None of it is worth the app for. When the
+ * database does not answer in time it is treated as empty, exactly as if it had refused,
+ * and the session starts fresh.
+ */
+async function settle<T>(work: () => Promise<T>, fallback: T, what: string, deadlineMs?: number): Promise<T> {
+  const ms = Math.min(deadlineMs ?? timeoutMs, timeoutMs);
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    return await read();
+    return await Promise.race([
+      work(),
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => {
+          console.warn(`[persistence] storage did not answer in ${ms}ms; ${what}.`);
+          resolve(fallback);
+        }, ms);
+      }),
+    ]);
   } catch (error) {
-    console.warn('[persistence] could not read stored history; showing none.', error);
+    console.warn(`[persistence] ${what}.`, error);
     return fallback;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
 /** The local trainee id, created once on first launch and reused thereafter. */
+/**
+ * Resolved once per page, then reused.
+ *
+ * Two reasons, and the second is the one that bit. Every bench and every session start
+ * asked the database for the same unchanging string, which is wasteful but harmless. The
+ * harm was that a *session start blocks on it* -- the world is already built and ready to
+ * draw, and the screen was being held back for a lookup of an id that is not needed until
+ * something is written down. On a database that never answers, that was four seconds of
+ * `Loading scenario...` stacked on top of the resume lookup's own wait.
+ *
+ * Memoising collapses that to one lookup for the life of the page, and puts it on the
+ * short deadline, because it is on the path to first paint.
+ */
+let traineeIdPromise: Promise<string> | null = null;
+
 export async function getOrCreateTraineeId(): Promise<string> {
-  try {
-    const existing = await getSetting<string>('traineeId');
-    if (existing) return existing;
-    const id = crypto.randomUUID();
-    await setSetting('traineeId', id);
-    return id;
-  } catch (error) {
-    console.warn('[persistence] no durable storage; this session is not being recorded.', error);
+  traineeIdPromise ??= (async () => {
+    const stored = await settle(
+      async () => {
+        const existing = await getSetting<string>('traineeId');
+        if (existing) return existing;
+        const id = crypto.randomUUID();
+        await setSetting('traineeId', id);
+        return id;
+      },
+      null,
+      'no durable storage; this session is not being recorded',
+      BLOCKING_READ_TIMEOUT_MS,
+    );
+    if (stored) return stored;
     ephemeralTraineeId ??= crypto.randomUUID();
     return ephemeralTraineeId;
-  }
+  })();
+  return traineeIdPromise;
 }
 
 /**
@@ -253,11 +358,7 @@ export async function getOrCreateTraineeId(): Promise<string> {
  * is called, and there is nothing useful for the trainee to do about a storage refusal.
  */
 export async function saveBenchRun(runRecord: BenchRun): Promise<void> {
-  try {
-    await db.benchRuns.put(runRecord);
-  } catch (error) {
-    console.warn('[persistence] bench run not saved; storage is unavailable.', error);
-  }
+  await settle(() => db.benchRuns.put(runRecord), undefined, 'bench run not saved; storage is unavailable');
 }
 
 /** Most recent first. */

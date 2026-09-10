@@ -1,11 +1,12 @@
 import 'fake-indexeddb/auto';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getScenario, instantiateScenario } from '../../scenarios';
 import { resolveProfileSet } from '../../profiles';
 import { startSession, perform } from '../../session/runner';
 import type { SessionState } from '../../session/types';
 import { clearSetting, readSetting, writeSetting } from './localSettings';
-import { _useDatabase, getOrCreateTraineeId, getPersonalBest, getSession, loadUnfinished, migrateStored, saveBenchRun, saveSession, type StoredSession } from './persistence';
+import { _db, _useDatabase, _useStorageTimeout, STORAGE_TIMEOUT_MS, getOrCreateTraineeId, getPersonalBest, getSession, loadUnfinished, migrateStored, saveBenchRun, saveSession, type StoredSession } from './persistence';
+import type { BenchRun } from '../../operations/benchRecord';
 
 function runReference(seed = 1): { session: SessionState; report: import('../../scoring/types').ScoreReport } {
   const def = getScenario('t1-dark-ont-vista-court');
@@ -174,5 +175,60 @@ describe('local settings where there is no local storage', () => {
     } finally {
       restore();
     }
+  });
+});
+
+describe('storage that does not answer', () => {
+  // The failure this guards against is not an exception. `indexedDB.open()` is specified to
+  // fire `blocked` and then wait, and in a storage-restricted context it can stay pending
+  // for the life of the page. Every `try`/`catch` in this module is blind to that: nothing
+  // rejects, so nothing is caught, and the caller waits forever. A deployed build sat on
+  // `Loading scenario...` because of exactly this.
+  beforeEach(() => {
+    _useStorageTimeout(50);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    _useStorageTimeout(STORAGE_TIMEOUT_MS);
+    vi.restoreAllMocks();
+  });
+
+  /** A database call that is neither slow nor broken -- it simply never comes back. */
+  const neverSettles = () => new Promise<never>(() => {});
+
+  /** Make `sessions.orderBy(...).reverse().toArray()` behave however the test needs. */
+  function stubSessionScan(toArray: () => Promise<unknown>) {
+    const table = _db().sessions;
+    vi.spyOn(table, 'orderBy').mockReturnValue({
+      reverse: () => ({ toArray }),
+    } as never);
+  }
+
+  it('gives up on a read rather than waiting for it forever', async () => {
+    _useDatabase('never-settles-read');
+    stubSessionScan(neverSettles);
+    await expect(loadUnfinished()).resolves.toBeUndefined();
+  });
+
+  it('gives up on a write rather than leaving the caller hanging', async () => {
+    _useDatabase('never-settles-write');
+    vi.spyOn(_db().benchRuns, 'put').mockImplementation(neverSettles as never);
+    await expect(saveBenchRun({ id: 'b1' } as unknown as BenchRun)).resolves.toBeUndefined();
+  });
+
+  it('hands back an ephemeral trainee id when the settings table never answers', async () => {
+    _useDatabase('never-settles-settings');
+    vi.spyOn(_db().settings, 'get').mockImplementation(neverSettles as never);
+    const id = await getOrCreateTraineeId();
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    // Stable within the session, so a run and its record still agree on who did it.
+    expect(await getOrCreateTraineeId()).toBe(id);
+  });
+
+  it('still returns the stored answer when storage is merely slow', async () => {
+    _useDatabase('slow-but-working');
+    const row = { id: 'slow-1', endedAt: null } as unknown as StoredSession;
+    stubSessionScan(() => new Promise((r) => setTimeout(() => r([row]), 5)));
+    await expect(loadUnfinished()).resolves.toMatchObject({ id: 'slow-1' });
   });
 });
