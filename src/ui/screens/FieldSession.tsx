@@ -112,12 +112,22 @@ export function FieldSession() {
           console.warn('[session] could not check for an unfinished run; starting fresh.', error);
           existing = undefined;
         }
+        let resumed = false;
         if (existing && existing.scenarioId === resolvedScenarioId && existing.seed === resolvedSeed) {
-          const session = resumeSession(existing);
-          store.restore(session, { id: existing.id, traineeId: existing.traineeId, startedAt: existing.startedAt });
-        } else {
-          startFresh();
+          try {
+            const session = resumeSession(existing);
+            store.restore(session, { id: existing.id, traineeId: existing.traineeId, startedAt: existing.startedAt });
+            resumed = true;
+          } catch (error) {
+            // Replaying a stored run means running data written by an older build through
+            // today's code, and that is a boundary that will keep moving. Losing a part-done
+            // run is a bad afternoon; not being able to open the app at all is worse, and
+            // that is exactly what shipped. So a resume that cannot be replayed steps aside
+            // for a fresh start rather than taking the screen down with it.
+            console.warn('[session] could not replay the unfinished run; starting fresh.', error);
+          }
         }
+        if (!resumed) startFresh();
       } catch (error) {
         // Building the world is the one thing here with no fallback worth inventing. Say
         // so, on the screen, instead of spinning.

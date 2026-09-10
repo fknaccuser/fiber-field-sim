@@ -28,7 +28,35 @@ export async function loadDebriefSession(id: string): Promise<StoredSession | un
 }
 
 /** The intent that produced a logged action -- recovers everything `perform` needs to replay it, so a stored session can be rebuilt by re-running the same steps through a fresh, deterministic instantiation. */
-function intentFromActionEvent(action: UiActionEvent): Intent {
+/**
+ * Names this app used to write down, and what they are called now.
+ *
+ * A stored log is not current data -- it is whatever the build that wrote it believed, still
+ * sitting on a device. `customer-contact` became `noc-contact` when infra stopped talking to
+ * customers, and every run recorded before that carries the old name.
+ */
+const RENAMED_ACTIONS: Record<string, UiActionEvent['type']> = {
+  'customer-contact': 'noc-contact',
+};
+
+/**
+ * Turn a stored action back into the intent that produced it, or `null` if this build cannot.
+ *
+ * The `null` is the whole point, and its absence is what broke the deployed site. This was an
+ * exhaustive switch with no `default`, which TypeScript will happily prove correct: it is
+ * exhaustive over the union *as it is today*. But the input does not come from today. It comes
+ * out of IndexedDB, written by whatever version of this app the trainee last ran, and a name
+ * that has since been renamed matches no case at all. The switch then fell off the end and
+ * returned `undefined`, the runner read `.type` off it, and the app would not open for anyone
+ * carrying such a row -- with an error naming a minified variable.
+ *
+ * So: renames are carried forward, and anything genuinely unrecognisable is dropped with a
+ * warning rather than becoming an `undefined` for someone else to trip over. A missing action
+ * costs a little clock time in a resumed run. Returning `undefined` costs the whole app.
+ */
+function intentFromActionEvent(stored: UiActionEvent): Intent | null {
+  const renamed = RENAMED_ACTIONS[stored.type];
+  const action = (renamed ? { ...stored, type: renamed } : stored) as UiActionEvent;
   switch (action.type) {
     case 'otdr-shot':
       return { type: 'otdr-shot', access: action.access, settings: action.settings };
@@ -57,8 +85,15 @@ function intentFromActionEvent(action: UiActionEvent): Intent {
       return { type: 'comms', eventId: action.eventId, replyId: action.replyId, seconds: action.durationSeconds };
     case 'diagnosis':
       return { type: 'diagnosis', diagnosis: action.diagnosis };
-    case 'refused':
-      return action.intent;
+    case 'refused': {
+      // The refused intent is stored data too, and can carry a name from before a rename.
+      const inner = action.intent as Intent & { type: string };
+      const innerRenamed = RENAMED_ACTIONS[inner.type];
+      return (innerRenamed ? { ...inner, type: innerRenamed } : inner) as Intent;
+    }
+    default:
+      console.warn(`[session] stored action "${(action as { type: string }).type}" is not something this build can replay; skipping it.`);
+      return null;
   }
 }
 
@@ -69,7 +104,9 @@ export function resumeSession(stored: StoredSession): SessionState {
   const profiles = resolveProfileSet(def.profiles);
   let state = startSession(world, profiles, meta);
   for (const action of stored.log) {
-    state = runnerPerform(state, intentFromActionEvent(action)).state;
+    const intent = intentFromActionEvent(action);
+    if (intent === null) continue;
+    state = runnerPerform(state, intent).state;
   }
   return state;
 }
