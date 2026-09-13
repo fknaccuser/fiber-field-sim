@@ -256,3 +256,21 @@ hand never does).
 
 **Status:** complete. **DAY3 checkpoint (S07-S09) reached**: clickable graph, editable devices,
 and the supported CLI all work and are tested.
+
+## S10 — Fault injection and deterministic generation (Day 4)
+
+**Built:** `src/solo/seed.js` (reference copy, unchanged), `src/solo/generate.js`
+(`generateCase`, `nextCase`, `applyRecipe`), `layouts.js`'s `deriveRequirements` (factored out of
+`app.js`'s `createConfigureAttempt`). `tests/solo/generate.test.mjs` (25 cases).
+
+**Checks:** `node --test tests/solo/generate.test.mjs` — exit 0, 25/25. `npm run solo:test` —
+exit 0, 169/169, stable over 3 runs. `npx tsc -b`/`npm run build` — exit 0. Vitest — 73/1030,
+unaffected. No UI wiring in this task, so no browser check applies.
+
+**Acceptance:** met. "START is P1" — confirmed. "HM cannot generate V2 or tier4" — confirmed (10
+HM V-family codes all resolve to V1; an HM+tier4 code throws). "Every tier4 pair stays broken
+after either repair alone and succeeds after both" — confirmed for all 6 approved pairs. "No
+generated task uses unsupported protocols" — the engine only models Ethernet/IPv4/VLAN/DNS, so
+this holds by construction; also confirmed generated faulted networks stay `validateNetwork`-valid.
+
+**Status:** complete.

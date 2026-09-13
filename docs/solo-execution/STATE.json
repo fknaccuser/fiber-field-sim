@@ -1,12 +1,12 @@
 {
   "spec": "SOLO-1",
   "branch": "claude/field-solo-implementation-am520q",
-  "lastWorkingCommit": "b0d966eceb7d9993423274e750654d86b2a1912f",
+  "lastWorkingCommit": "6c44bdcf420655ee5597c453b17dfb89a28f9649",
   "day": 4,
-  "task": "S10",
+  "task": "S11",
   "substep": "read-contracts",
   "status": "not-started",
-  "completedTasks": ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09"],
+  "completedTasks": ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10"],
   "changedFiles": [
     "index.html",
     "package.json",
@@ -31,52 +31,49 @@
     "src/solo/diagram.js",
     "src/solo/devices.js",
     "src/solo/cli.js",
+    "src/solo/seed.js",
+    "src/solo/generate.js",
     "tests/solo/app.mission.test.mjs",
     "tests/solo/devices.test.mjs",
     "tests/solo/app.editing.test.mjs",
     "tests/solo/cli.test.mjs",
+    "tests/solo/generate.test.mjs",
     "docs/solo-execution/STATE.json",
     "docs/solo-execution/HANDOFF.md",
     "docs/solo-execution/RESULTS.md"
   ],
   "tests": [
     {
-      "command": "node --test tests/solo/cli.test.mjs",
+      "command": "node --test tests/solo/generate.test.mjs",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T05:47:00Z"
+      "observedAt": "2026-09-13T05:55:00Z"
     },
     {
       "command": "npm run solo:test (x3 for stability)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T05:49:00Z"
+      "observedAt": "2026-09-13T05:56:00Z"
     },
     {
       "command": "npx tsc -b",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T05:49:15Z"
+      "observedAt": "2026-09-13T05:56:10Z"
     },
     {
       "command": "npm run build",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T05:49:20Z"
+      "observedAt": "2026-09-13T05:56:15Z"
     },
     {
       "command": "npm test -- --run (pre-existing vitest suite, unaffected)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T05:49:34Z"
-    },
-    {
-      "command": "manual: npm run dev + scripted Chromium check (390px viewport) — enable/conf t/interface/shutdown breaks then no-shut restores service, user-mode shutdown rejected, builder insertion+submission works (not committed to the repo)",
-      "exitCode": 0,
-      "resultPath": null,
-      "observedAt": "2026-09-13T05:52:00Z"
+      "observedAt": "2026-09-13T05:56:24Z"
     }
   ],
   "blockers": [],
-  "nextCommand": "DAY3 checkpoint reached (S07-S09). Read the-field-solo-week/tasks/S10.md and its referenced contracts to start DAY4 (S10-S12: eight faults, deterministic variations, tiers and hints)."
+  "nextCommand": "Read the-field-solo-week/tasks/S11.md and its referenced contracts, then continue DAY4 (S10-S12: eight faults, deterministic variations, tiers and hints). generateCase/nextCase are not yet wired into app.js/the UI - that is likely S11 or S12's job."
 }

@@ -328,15 +328,41 @@ never is regardless of whether the builder was opened.
 all work and are tested. 144/144 solo tests, `tsc -b` clean, build clean, legacy suite unaffected
 throughout.
 
-## Next task: S10
+## What S10 added
 
-Starts DAY4 (S10–S12: eight faults, deterministic variations, tiers and hints). Read only
-`the-field-solo-week/tasks/S10.md` and whatever contracts it names before starting. This is where
-`src/solo/seed.js` (copied verbatim from `reference/seed.mjs`, per SCENARIOS.md/BUILD_AND_HANDOFF.md)
-and `src/solo/generate.js` (`generateCase`/`nextCase`) most likely land — the eight fault recipes
-from SCENARIOS.md, applied as fixture-style patches to `layouts.js`'s healthy networks. Read
-`reference/seed.mjs` itself before implementing anything that depends on its exact PRNG/pool
-behavior; do not approximate it.
+- `src/solo/seed.js` — `reference/seed.mjs` copied unchanged (`hashSeed`, `makeRng`,
+  `parameters`). "HM cannot generate V2" and "HM cannot generate tier4" both fall directly out of
+  this file's own pool selection (`V: layout==='HM' ? ['V1'] : ['V1','V2']`) and combination check
+  (`(tier===4 && layout==='HM')` throws) — verified, not re-implemented.
+- `src/solo/generate.js` — `generateCase(caseCode)`: builds the healthy layout, derives
+  `requirements` from it *before* injecting any fault (matters concretely for I1, which moves the
+  target off its intended subnet entirely), then applies the recipe(s) to a separately-cloned
+  `initialNetwork`. `nextCase(settings, recentFingerprints)`: fingerprint-dedup search entirely
+  off the caller's `candidateSeed()` callback (never calls randomness itself) — up to 50 base
+  tries, then 50 suffix tries truncating the base to fit the 24-character seed-text limit, then
+  throws `"Choose a seed manually."`.
+- `src/solo/layouts.js` gained `deriveRequirements`, factored out of `app.js`'s
+  `createConfigureAttempt` so both it and `generate.js` compute `Attempt.requirements` identically
+  instead of two slowly-diverging copies.
+- **Not yet wired into the UI.** `generateCase`/`nextCase` are pure engine functions only; no
+  screen calls them yet (Home's "Start"/"Recommended job"/"Enter seed" buttons, the New mission
+  sheet). That wiring, plus tiers and hints, is S11/S12's job — confirm against those task files
+  rather than assuming which piece lands where.
 
-Next command: read `the-field-solo-week/tasks/S10.md`, then implement its files and run its
+**Verified:** all five `fixtures/seed-vectors.json` vectors match `parameters()` exactly. All
+eight recipes individually: healthy base passes, the injected fault fails, and applying the real
+repair action (via `applyAction`) restores service. All six approved tier4 pairs: broken with
+both faults present, *still* broken after either single repair, restored only after both.
+`generateCase` is fully deterministic (two calls with the same code produce a deep-equal Attempt).
+A sweep of 200 tier4 codes never produced anything outside the six approved pairs.
+
+## Next task: S11
+
+Continues DAY4 (S10–S12: eight faults, deterministic variations, tiers and hints). Read only
+`the-field-solo-week/tasks/S11.md` and whatever contracts it names before starting — likely where
+`generateCase`/`nextCase` actually get wired into `app.js`/Home's Start-a-job flow, plus
+difficulty tiers and the fading-hints mechanism (MASTER_DESIGN.md §5–§6). Confirm against the
+actual task file rather than this guess.
+
+Next command: read `the-field-solo-week/tasks/S11.md`, then implement its files and run its
 listed checks.
