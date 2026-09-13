@@ -101,13 +101,60 @@ does.
 No baseline failures existed to preserve — `tsc -b`, the Vitest suite, and `npm run build` were
 all green before S01 started, and stayed green through S02.
 
-## Next task: S03
+## What S03 added
 
-Read (only): `the-field-solo-week/tasks/S03.md` and whatever contracts it names. Per
-BUILD_AND_HANDOFF.md's Day1 row, S03 is the remaining Day1 piece: "exact healthy network
-fixture." `fixtures/healthy-branch.json` in the package (not yet copied into the repo) is almost
-certainly the referenced contract — copy it into `src/solo/` (or wherever S03 says) rather than
-inventing a network shape ahead of the model.js/ip.js/forward.js engine tasks that consume it.
+- `src/solo/model.js` — `validateNetwork(state)` and `cloneNetwork(state)` (ENGINE_RULES.md
+  "State shape"/"Files and exports"). `validateNetwork` checks structural integrity only —
+  unique/present IDs across devices/ports/links, every reference resolves, at most one router,
+  at most 7 devices / 10 links, no port wired by two links, no physical cycle (union-find over
+  the device graph induced by links), router segments reference a port on their own device and
+  don't overlap (/24 only, matching "editable only to /24 in SOLO-1"), and syntactic (not
+  semantic) IPv4 checks with the .0/.255 host-bit rule on any /24 address. It does *not* check
+  whether the network works — a syntactically valid but wrong gateway passes, matching
+  ENGINE_RULES.md exactly. `cloneNetwork` is `structuredClone`. The IPv4 syntax check is a small
+  local helper, not an import from `ip.js` — that file doesn't exist until S04; once it does,
+  worth consolidating so there's one definition of "syntactically valid IPv4," not two.
+- `src/solo/layouts.js` — `createHealthyLayout(layoutId, x, host, label)`. `BR` is the supplied
+  `fixtures/healthy-branch.json` copied in as data (X=42, host=130 baked in, confirmed to
+  reproduce the golden fixture exactly at those values). `x` (1-200) is substituted into every
+  `10.42.*.*` address; `host` (130-149) replaces the target client's own host octet only.  `HM`
+  removes SW2 and wires SW1:Gi0/24 directly to R1:Gi0/0 (5 devices). `OF` adds PC3 wired to a new
+  SW2:Gi0/3 (access VLAN 10) and moves PC2 onto a new SW2:Gi0/2 (access VLAN 20), leaving the
+  original SW1:Gi0/2 present but unused rather than deleting it (7 devices) — both exactly as
+  SCENARIOS.md's "Fixed generator details" specifies. All three layouts pass `validateNetwork`.
+- `tests/solo/model.test.mjs` — 17 cases: the three device/link counts, golden-fixture address
+  reproduction, x-substitution, clone independence, wrong-gateway-is-valid, missing/duplicate ID,
+  unknown port/device reference, single-router limit, cycle rejection, segment overlap,
+  malformed IPv4, reserved host bit, and out-of-range `x`/`host`/`layoutId` inputs.
 
-Next command: read `the-field-solo-week/tasks/S03.md`, then `npm run solo:test` once its files
-are in place. DAY1 checkpoint (S01–S03) closes once S03's acceptance passes.
+**Deferred, and documented as such:** the `label` parameter ('plain', the default, is the only
+one actually exercised) — its three real display-name templates live in `reference/seed.mjs`,
+which S03 was not scoped to read (S03's reading list is DATA_CONTRACTS.md, ENGINE_RULES.md, the
+fixture, and SCENARIOS.md only) and is copied verbatim as `src/solo/seed.js` by a later task.
+Anything other than `'plain'` currently applies a generic, clearly-provisional prefix; whoever
+copies `seed.js` should replace `applyLabel` in `layouts.js` with the real templates rather than
+leaving both. Layout coordinates (SCENARIOS.md's per-device x/y positions) are not part of the
+Network state shape in ENGINE_RULES.md and are not implemented here — that's `diagram.js`'s job
+once the topology view exists.
+
+**Bug found and fixed while running S03's full-suite regression check (touches S02's
+`store.js`):** `store.test.mjs`'s "keeps exactly one recovery record" case failed intermittently
+when run alongside the other suites (not in isolation) — `replaceData`'s new recovery key
+(an ISO timestamp) can collide with the previous one at millisecond resolution, and `writeMany`
+was applying puts before deletes, so the fresh snapshot got written and then immediately deleted
+by the same transaction. Fixed by reordering `writeMany` (both the real IndexedDB adapter and
+the memory adapter) to delete before put. Verified with 5 consecutive full `npm run solo:test`
+runs, all 42/42.
+
+## Next task: S04
+
+Day 2, first of "correct link/IP/VLAN/DNS evaluator and configuration actions" (DAY2 checkpoint
+is S04–S06). Per ENGINE_RULES.md's "Files and exports" table, S04 is most likely `src/solo/ip.js`
+(`parseIPv4`, `prefixFromMask`, `inSubnet`) and the start of `src/solo/forward.js`
+(`linkUsable`, `canReach`, `resolveName`, `testService`) implementing the forwarding algorithm
+section verbatim (deterministic error-check order is spelled out there). Read only S04.md and
+whatever contracts it names before starting — do not assume this guess is exactly what S04.md
+says once it's actually read.
+
+Next command: read `the-field-solo-week/tasks/S04.md`, then implement its files and run its
+listed checks.

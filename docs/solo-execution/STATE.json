@@ -1,12 +1,12 @@
 {
   "spec": "SOLO-1",
   "branch": "claude/field-solo-implementation-am520q",
-  "lastWorkingCommit": "b4c80b790c9416afab70868901d6937d9e4d5670",
-  "day": 1,
-  "task": "S03",
+  "lastWorkingCommit": "1dea4bda06a02e5615b6de1872f66451e65715d0",
+  "day": 2,
+  "task": "S04",
   "substep": "read-contracts",
   "status": "not-started",
-  "completedTasks": ["S01", "S02"],
+  "completedTasks": ["S01", "S02", "S03"],
   "changedFiles": [
     "index.html",
     "package.json",
@@ -14,10 +14,13 @@
     "src/solo/main.js",
     "src/solo/store.js",
     "src/solo/view.js",
+    "src/solo/model.js",
+    "src/solo/layouts.js",
     "src/solo/styles.css",
     "tests/solo/shell.test.mjs",
     "tests/solo/store.test.mjs",
     "tests/solo/app.store.test.mjs",
+    "tests/solo/model.test.mjs",
     "docs/solo-execution/STATE.json",
     "docs/solo-execution/HANDOFF.md",
     "docs/solo-execution/RESULTS.md"
@@ -27,33 +30,33 @@
       "command": "npm run solo:test",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T04:10:00Z"
+      "observedAt": "2026-09-13T04:20:00Z"
+    },
+    {
+      "command": "node --test tests/solo/model.test.mjs",
+      "exitCode": 0,
+      "resultPath": null,
+      "observedAt": "2026-09-13T04:16:00Z"
     },
     {
       "command": "npx tsc -b",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T04:11:00Z"
+      "observedAt": "2026-09-13T04:20:30Z"
     },
     {
       "command": "npm run build",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T04:11:30Z"
+      "observedAt": "2026-09-13T04:20:45Z"
     },
     {
-      "command": "npm test -- --run (pre-existing vitest suite, unaffected by S02)",
+      "command": "npm test -- --run (pre-existing vitest suite, unaffected by S03)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T04:05:55Z"
-    },
-    {
-      "command": "manual: npm run dev + scripted Chromium check against real IndexedDB (Continue disabled with no mission, profile shape, openingEnabled/textScale survive reload) (not committed to the repo)",
-      "exitCode": 0,
-      "resultPath": null,
-      "observedAt": "2026-09-13T04:09:00Z"
+      "observedAt": "2026-09-13T04:14:04Z"
     }
   ],
   "blockers": [],
-  "nextCommand": "Read the-field-solo-week/tasks/S03.md and its referenced contracts, then implement Day1's remaining piece: the exact healthy network fixture."
+  "nextCommand": "DAY1 checkpoint reached (S01-S03). Read the-field-solo-week/tasks/S04.md and its referenced contracts, then implement the link/IP/VLAN/DNS evaluator (src/solo/ip.js, src/solo/forward.js per ENGINE_RULES.md's forwarding algorithm)."
 }

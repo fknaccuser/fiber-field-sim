@@ -78,3 +78,43 @@ validated now. No visible Settings screen yet to hand-toggle opening/text scale 
 `boot`/`applyProfileUpdate` mechanism is complete and tested, but nothing in the UI calls it yet.
 
 **Status:** complete.
+
+## S03 — Network model and fixed fixture (Day 1)
+
+**Built:** `src/solo/model.js` (`validateNetwork`, `cloneNetwork`), `src/solo/layouts.js`
+(`createHealthyLayout`), `tests/solo/model.test.mjs` (17 cases).
+
+**Bug found and fixed (in S02's `store.js`, caught by this task's full-suite regression run):**
+`replaceData`'s "keep exactly one recovery record" guarantee could fail when the new recovery
+key (an ISO timestamp) collided with the one being pruned at millisecond resolution, because
+`writeMany` applied puts before deletes. Fixed by deleting before putting in both adapters.
+Verified stable across 5 consecutive full `npm run solo:test` runs (42/42 each time) after the
+fix; it had failed intermittently before.
+
+**Checks run:**
+- `node --test tests/solo/model.test.mjs` — exit 0, 17/17 passing.
+- `npm run solo:test` (full suite) — exit 0, 42/42 passing, confirmed stable over 5 runs.
+- `npx tsc -b` — exit 0.
+- `npm run build` — exit 0, 8 modules transformed (engine files aren't imported by the UI yet,
+  so bundle size is unchanged from S02).
+- `npm test -- --run` (Vitest) — exit 0, 73 files / 1030 tests, unaffected.
+
+**Acceptance (S03.md):** met. "BR has six devices and five links" — confirmed, and BR at
+x=42/host=130 reproduces the golden fixture's exact addresses. "HM has five devices; OF seven" —
+confirmed. "Changing the clone never changes the source" — confirmed (mutating a cloned
+network's devices/links/revision leaves the source's untouched). "Wrong gateway is valid
+structure" — confirmed (`validateNetwork` accepts a syntactically valid but unassigned gateway).
+"Missing device ID is invalid" — confirmed (`MISSING_ID`). The task body's own "Test IDs,
+endpoint references, single-router limit, cycle rejection and clone independence" is also
+covered: duplicate device ID, unknown port/device reference, a second router, and a link closing
+a physical loop (via union-find over the device graph) all correctly fail.
+
+**Deferred, and why (recorded in HANDOFF.md):** the `label` parameter's real three display-name
+templates live in `reference/seed.mjs`, out of scope for S03's reading list and copied verbatim
+as `src/solo/seed.js` by a later task; only `'plain'` (identity, no-op) is exercised now, and a
+generic placeholder prefix stands in for the other two until that file lands. Layout x/y
+coordinates from SCENARIOS.md aren't part of ENGINE_RULES.md's Network state shape and are left
+for the topology/diagram task.
+
+**Status:** complete. **DAY1 checkpoint (S01-S03) reached**: small app shell, save/reload, and
+the exact healthy network fixture all work and are tested.
