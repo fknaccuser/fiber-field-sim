@@ -1,0 +1,92 @@
+{
+  "spec": "SOLO-1",
+  "branch": "claude/field-solo-implementation-am520q",
+  "lastWorkingCommit": "1c7b51ff01ee1e0a503c9096f48c6ebaadc8bc66",
+  "day": 7,
+  "task": "S20",
+  "substep": "blocked-owner-check",
+  "status": "blocked",
+  "completedTasks": ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10", "S11", "S12", "S13", "S14", "S15", "S16", "S17", "S18", "S19"],
+  "changedFiles": [
+    "index.html",
+    "package.json",
+    "package-lock.json",
+    ".gitignore",
+    "vite.config.ts",
+    "playwright.solo.config.mjs",
+    "src/solo/app.js",
+    "src/solo/main.js",
+    "src/solo/store.js",
+    "src/solo/view.js",
+    "src/solo/model.js",
+    "src/solo/layouts.js",
+    "src/solo/ip.js",
+    "src/solo/forward.js",
+    "src/solo/styles.css",
+    "tests/solo/shell.test.mjs",
+    "tests/solo/store.test.mjs",
+    "tests/solo/app.store.test.mjs",
+    "tests/solo/model.test.mjs",
+    "tests/solo/ip.test.mjs",
+    "tests/solo/l2.test.mjs",
+    "tests/solo/forward.test.mjs",
+    "src/solo/actions.js",
+    "tests/solo/actions.test.mjs",
+    "src/solo/diagram.js",
+    "src/solo/devices.js",
+    "src/solo/cli.js",
+    "src/solo/seed.js",
+    "src/solo/generate.js",
+    "tests/solo/app.mission.test.mjs",
+    "tests/solo/devices.test.mjs",
+    "tests/solo/app.editing.test.mjs",
+    "tests/solo/cli.test.mjs",
+    "tests/solo/generate.test.mjs",
+    "tests/solo/app.session.test.mjs",
+    "src/solo/content.js",
+    "tests/solo/content.test.mjs",
+    "src/solo/grade.js",
+    "tests/solo/grade.test.mjs",
+    "src/solo/progress.js",
+    "tests/solo/progress.test.mjs",
+    "tests/solo/configure.test.mjs",
+    "src/solo/study.js",
+    "tests/solo/backup.test.mjs",
+    "tests/solo-browser/solo.spec.mjs",
+    "tests/solo-browser/offline.spec.mjs",
+    "docs/solo-execution/PHONE_CHECK.md",
+    "docs/solo-execution/STATE.json",
+    "docs/solo-execution/HANDOFF.md",
+    "docs/solo-execution/RESULTS.md"
+  ],
+  "tests": [
+    {
+      "command": "npm run solo:test",
+      "exitCode": 0,
+      "resultPath": null,
+      "observedAt": "2026-09-13T11:15:00Z"
+    },
+    {
+      "command": "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm run solo:e2e",
+      "exitCode": 0,
+      "resultPath": null,
+      "observedAt": "2026-09-13T11:15:30Z"
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "resultPath": null,
+      "observedAt": "2026-09-13T11:15:45Z"
+    },
+    {
+      "command": "manual, emulated only (no physical device available): npx vite preview + Chromium 'iPhone 13' device emulation (touch, mobile UA) via tap() throughout — START repair to debrief, a VLAN scenario with typed CLI, a tier4 pair (correctly triggered the Keep-current/Replace prompt), a viewport rotation swap, and an Export download all completed with zero console errors; see docs/solo-execution/PHONE_CHECK.md for the full breakdown and its explicit caveats (this is emulation, not real-device acceptance)",
+      "exitCode": 0,
+      "resultPath": "docs/solo-execution/PHONE_CHECK.md",
+      "observedAt": "2026-09-13T11:20:00Z"
+    }
+  ],
+  "blockers": [
+    "S20 requires a physical iPhone or Android device for real acceptance (S20.md: install the deployed app, airplane mode, real software keyboard/rotation/touch). No physical device is available in this sandboxed execution environment. All automated gates pass and a best-effort Chromium device-emulation pass found no issues, but per S20.md's own instruction this is explicitly NOT a substitute for owner phone validation. docs/solo-execution/PHONE_CHECK.md records exact steps for the owner to complete the real check."
+  ],
+  "nextCommand": "S20 is blocked pending the owner's own physical-device check (see docs/solo-execution/PHONE_CHECK.md for exact steps). Do not fabricate phone validation or mark S20 complete without it. S21 (static deployment and final handoff) also requires explicit deployment authorization per the original task instructions (\"deployment awaits explicit authorization\") and should not proceed without the user's go-ahead."
+}
