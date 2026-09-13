@@ -31,3 +31,7 @@ docs/reference/*.png
 # dist/ -- rebuild it, do not commit it.
 dist-standalone
 fiber-field-sim.html
+
+# Playwright E2E output (S18): screenshots, traces and HTML reports.
+/test-results/
+/playwright-report/

@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "check:pwa": "node scripts/check-pwa.mjs",
     "build:standalone": "node scripts/build-standalone.mjs",
-    "solo:test": "node --test tests/solo/*.test.mjs"
+    "solo:test": "node --test tests/solo/*.test.mjs",
+    "solo:e2e": "playwright test --config=playwright.solo.config.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",
@@ -26,6 +27,7 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
