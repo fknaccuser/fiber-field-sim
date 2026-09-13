@@ -128,6 +128,32 @@ body {
   color: var(--field-text);
 }
 
+.home-continue {
+  background: var(--field-panel);
+  color: var(--field-text);
+  border: 1px solid var(--field-cyan);
+  border-radius: 6px;
+  padding: 0 16px;
+}
+
+.home-continue:disabled {
+  color: var(--field-muted);
+  border-color: var(--field-muted);
+  cursor: not-allowed;
+}
+
+.home-save-status {
+  color: var(--field-muted);
+}
+
+.home-retry-save {
+  background: var(--field-panel);
+  color: var(--field-error);
+  border: 1px solid var(--field-error);
+  border-radius: 6px;
+  padding: 0 16px;
+}
+
 button,
 input {
   min-height: 44px;

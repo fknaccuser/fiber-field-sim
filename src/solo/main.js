@@ -1,8 +1,11 @@
-import { createInitialState, submitOpeningCommand, completeInitialization } from './app.js';
+import { createInitialState, submitOpeningCommand, completeInitialization, boot, persistProfile } from './app.js';
+import { openStore } from './store.js';
+import { renderHome } from './view.js';
 
 const INIT_LINES = ['Initializing local session.', 'Preparing The Field.', 'Ready.'];
 const INIT_LINE_DELAY_MS = 200;
 
+const store = openStore();
 let state = createInitialState();
 
 function render() {
@@ -13,8 +16,17 @@ function render() {
   } else if (state.screen === 'initializing') {
     root.appendChild(renderInitializing());
   } else if (state.screen === 'home') {
-    root.appendChild(renderHome());
+    root.appendChild(
+      renderHome(state, {
+        onRetrySave: retrySave,
+      }),
+    );
   }
+}
+
+async function retrySave() {
+  state = await persistProfile(state, store);
+  render();
 }
 
 function renderOpening() {
@@ -116,18 +128,8 @@ function runInitializationSequence() {
   });
 }
 
-function renderHome() {
-  const container = document.createElement('div');
-  container.className = 'home-screen';
-
-  const heading = document.createElement('h1');
-  heading.textContent = 'The Field';
-  container.appendChild(heading);
-
-  return container;
-}
-
-function start() {
+async function start() {
+  state = await boot(store);
   render();
 }
 
