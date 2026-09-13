@@ -3,6 +3,7 @@
 // touch `document` like view.js/diagram.js.
 
 import { canReach, resolveName, testService } from './forward.js';
+import { getHelp } from './cli.js';
 
 function findPort(network, portId) {
   return network.ports.find((p) => p.id === portId);
@@ -304,5 +305,86 @@ export function renderTests(deviceId, onRunTest) {
     row.appendChild(button);
   }
   container.appendChild(row);
+  return container;
+}
+
+// UI_AND_STORAGE.md's Terminal sub-tab: output text via textContent, a real
+// input, Enter/Submit, ? help, builder toggle. Inspect/Configure/Terminal are
+// rendered as one stacked panel rather than sub-tabs of a sub-tab — a
+// deliberate simplification for this release, not a missing feature (every
+// section is present and functional, just not tab-switched independently).
+export function renderTerminal(terminal, { onSubmitCommand, onInsertBuilderCommand } = {}) {
+  const container = document.createElement('div');
+  container.className = 'device-terminal';
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'Terminal';
+  container.appendChild(heading);
+
+  const output = document.createElement('pre');
+  output.className = 'terminal-output';
+  output.textContent = terminal.output.join('\n');
+  container.appendChild(output);
+
+  const form = document.createElement('form');
+  form.className = 'terminal-input-row';
+  const label = document.createElement('label');
+  label.className = 'visually-hidden';
+  label.textContent = `Command for ${terminal.deviceId}`;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'terminal-input';
+  input.autocomplete = 'off';
+  input.autocapitalize = 'off';
+  input.spellcheck = false;
+  label.appendChild(input);
+  form.appendChild(label);
+  const submit = document.createElement('button');
+  submit.type = 'submit';
+  submit.textContent = 'Enter';
+  form.appendChild(submit);
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (input.value.trim() === '') return; // blank submission is ignored
+    onSubmitCommand?.(input.value);
+    input.value = '';
+  });
+  container.appendChild(form);
+
+  const helpRow = document.createElement('div');
+  helpRow.className = 'terminal-help-row';
+  const helpButton = document.createElement('button');
+  helpButton.type = 'button';
+  helpButton.textContent = '?';
+  helpButton.title = 'List valid continuations';
+  const helpList = document.createElement('div');
+  helpList.className = 'terminal-help-list';
+  helpButton.addEventListener('click', () => {
+    helpList.textContent = getHelp(terminal, input.value).join(' | ') || '(no matching commands)';
+  });
+  helpRow.append(helpButton, helpList);
+  container.appendChild(helpRow);
+
+  const builderHeading = document.createElement('p');
+  builderHeading.className = 'terminal-builder-heading';
+  builderHeading.textContent = 'Command builder';
+  container.appendChild(builderHeading);
+  const builderList = document.createElement('div');
+  builderList.className = 'terminal-builder-list';
+  for (const suggestion of getHelp(terminal, '')) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = suggestion;
+    // Builder insertion sets provenance; typed commands never gain assisted
+    // provenance merely by the builder existing on screen.
+    button.addEventListener('click', () => {
+      input.value = suggestion;
+      input.focus();
+      onInsertBuilderCommand?.();
+    });
+    builderList.appendChild(button);
+  }
+  container.appendChild(builderList);
+
   return container;
 }

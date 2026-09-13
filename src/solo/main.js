@@ -13,10 +13,14 @@ import {
   cancelReconnect,
   confirmReconnect,
   recordTestEvent,
+  terminalSessionFor,
+  setTerminalSession,
+  markTerminalBuilderOrigin,
 } from './app.js';
 import { openStore } from './store.js';
 import { renderHome, renderMission } from './view.js';
 import { runMissionTest } from './devices.js';
+import { executeCommand } from './cli.js';
 
 const INIT_LINES = ['Initializing local session.', 'Preparing The Field.', 'Ready.'];
 const INIT_LINE_DELAY_MS = 200;
@@ -57,6 +61,8 @@ function render() {
           onCancelReconnect: cancelReconnectFlow,
           onApplyDeviceForm: applyDeviceForm,
           onRunTest: runTest,
+          onSubmitCommand: submitTerminalCommand,
+          onInsertBuilderCommand: insertBuilderCommand,
         },
         missionTab,
       ),
@@ -141,6 +147,22 @@ function runTest(testKind, deviceId) {
   state = recordTestEvent(state, testKind, deviceId, result);
   render();
   persistMission();
+}
+
+function submitTerminalCommand(deviceId, deviceKind, text) {
+  const session = terminalSessionFor(state, deviceId, deviceKind);
+  const { state: nextState, terminal } = executeCommand(state, session, text, session.builderOrigin);
+  state = setTerminalSession(nextState, deviceId, terminal);
+  render();
+  persistMission();
+}
+
+// Inserting a builder suggestion only sets provenance for the next submission
+// (devices.js already wrote the suggestion text into the input directly): no
+// render() here, since a full re-render would rebuild the input and discard
+// whatever the person is about to edit.
+function insertBuilderCommand(deviceId, deviceKind) {
+  state = markTerminalBuilderOrigin(state, deviceId, deviceKind);
 }
 
 function renderOpening() {

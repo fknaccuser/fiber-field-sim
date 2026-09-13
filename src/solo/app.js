@@ -4,6 +4,7 @@
 import { createHealthyLayout } from './layouts.js';
 import { cloneNetwork } from './model.js';
 import { applyAction } from './actions.js';
+import { createTerminalSession } from './cli.js';
 
 export function createInitialState() {
   return {
@@ -336,4 +337,23 @@ export function recordTestEvent(state, testKind, targetDeviceId, testResult) {
     assistance: false,
   };
   return { ...state, mission: { ...state.mission, events: [...state.mission.events, event] } };
+}
+
+// Selecting another device maintains a separate terminal mode and output
+// history (UI_AND_STORAGE.md): sessions are keyed by deviceId and created on
+// first use.
+export function terminalSessionFor(state, deviceId, deviceKind) {
+  return state.terminalSessions[deviceId] ?? createTerminalSession(deviceId, deviceKind);
+}
+
+export function setTerminalSession(state, deviceId, terminal) {
+  return { ...state, terminalSessions: { ...state.terminalSessions, [deviceId]: terminal } };
+}
+
+// Marks the given device's terminal session as builder-originated without
+// otherwise touching it (UI_AND_STORAGE.md/ENGINE_RULES.md: "Builder insertion
+// sets provenance; manual edits retain it until submission/clear").
+export function markTerminalBuilderOrigin(state, deviceId, deviceKind) {
+  const session = terminalSessionFor(state, deviceId, deviceKind);
+  return setTerminalSession(state, deviceId, { ...session, builderOrigin: true });
 }

@@ -439,6 +439,72 @@ input {
   color: var(--field-error);
 }
 
+.device-terminal {
+  border: 1px solid var(--field-panel);
+  border-radius: 6px;
+  padding: 10px;
+  margin-top: 12px;
+}
+
+.terminal-output {
+  background: var(--field-black);
+  color: var(--field-success);
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 13px;
+  padding: 8px;
+  border-radius: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.terminal-input-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.terminal-input {
+  flex: 1;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+
+.terminal-help-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.terminal-help-list {
+  color: var(--field-muted);
+  font-size: 0.85rem;
+}
+
+.terminal-builder-heading {
+  color: var(--field-muted);
+  margin: 10px 0 4px;
+  font-size: 0.85rem;
+}
+
+.terminal-builder-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.terminal-builder-list button {
+  background: var(--field-panel);
+  color: var(--field-text);
+  border: 1px solid var(--field-muted);
+  border-radius: 6px;
+  padding: 0 10px;
+  min-height: 36px;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+}
+
 @media (min-width: 900px) {
   /* Tablet+: topology left (40%), selected device right (60%), both visible
      at once (MASTER_DESIGN.md §7) — so the tab control that switches between

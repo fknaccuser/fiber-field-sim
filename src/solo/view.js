@@ -2,7 +2,15 @@
 // (app.js) stays DOM-free so it is testable under `node --test`.
 
 import { renderTopology } from './diagram.js';
-import { renderClientForm, renderPortForm, renderRouterSegmentForm, renderDnsRecordForm, renderTests } from './devices.js';
+import { terminalSessionFor } from './app.js';
+import {
+  renderClientForm,
+  renderPortForm,
+  renderRouterSegmentForm,
+  renderDnsRecordForm,
+  renderTests,
+  renderTerminal,
+} from './devices.js';
 
 function describeSaveStatus(status) {
   switch (status) {
@@ -189,6 +197,14 @@ function renderDevicePanel(state, actions) {
   if (device.kind === 'client') {
     container.appendChild(renderTests(device.id, (testKind, deviceId) => actions.onRunTest?.(testKind, deviceId)));
   }
+
+  const terminal = terminalSessionFor(state, device.id, device.kind);
+  container.appendChild(
+    renderTerminal(terminal, {
+      onSubmitCommand: (text) => actions.onSubmitCommand?.(device.id, device.kind, text),
+      onInsertBuilderCommand: () => actions.onInsertBuilderCommand?.(device.id, device.kind),
+    }),
+  );
 
   return container;
 }
