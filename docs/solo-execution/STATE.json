@@ -1,0 +1,55 @@
+{
+  "spec": "SOLO-1",
+  "branch": "claude/field-solo-implementation-am520q",
+  "lastWorkingCommit": "9a3ec0214f56b83afae1b99ca75751a514997f7f",
+  "day": 1,
+  "task": "S02",
+  "substep": "read-contracts",
+  "status": "not-started",
+  "completedTasks": ["S01"],
+  "changedFiles": [
+    "index.html",
+    "package.json",
+    "src/solo/app.js",
+    "src/solo/main.js",
+    "src/solo/styles.css",
+    "tests/solo/shell.test.mjs",
+    "docs/solo-execution/STATE.json",
+    "docs/solo-execution/HANDOFF.md",
+    "docs/solo-execution/RESULTS.md"
+  ],
+  "tests": [
+    {
+      "command": "npm run solo:test",
+      "exitCode": 0,
+      "resultPath": null,
+      "observedAt": "2026-09-13T04:00:00Z"
+    },
+    {
+      "command": "npx tsc -b",
+      "exitCode": 0,
+      "resultPath": null,
+      "observedAt": "2026-09-13T03:57:00Z"
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "resultPath": null,
+      "observedAt": "2026-09-13T03:58:00Z"
+    },
+    {
+      "command": "npm test -- --run (pre-existing vitest suite, unaffected by S01)",
+      "exitCode": 0,
+      "resultPath": null,
+      "observedAt": "2026-09-13T03:54:44Z"
+    },
+    {
+      "command": "manual: npm run dev + scripted Chromium check of opening/error/enable/init/home/reload (not committed to the repo)",
+      "exitCode": 0,
+      "resultPath": null,
+      "observedAt": "2026-09-13T04:05:00Z"
+    }
+  ],
+  "blockers": [],
+  "nextCommand": "Read the-field-solo-week/tasks/S02.md, DATA_CONTRACTS.md and UI_AND_STORAGE.md, then implement src/solo/store.js (openStore/loadProfile/saveProfile/loadMission/saveMission/exportData/replaceData) and wire it into app.js and a first view.js Home render."
+}
