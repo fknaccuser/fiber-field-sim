@@ -433,3 +433,31 @@ unchanged). "Repair progression does not change after a configure session" — c
 (`counters`/`evidence`/`completedRuns` are deep-equal before and after, with or without a note).
 
 **Status:** complete.
+
+## S16 — Small study and reference pack (Day 6)
+
+**Built:** `content.js` (`STUDY_PACK` copied exactly from the supplied fixture; `REFERENCE_ENTRIES`
+covering every ENGINE_RULES.md CLI command plus four named concept distinctions). `study.js` (new
+— lesson/question/card selection, table-driven grading, latest-attempt-only answer/review
+recording, reference search). `app.js` (Study navigation, `openReference`). `view.js`
+(`renderStudy`, `renderReference`). `tests/solo/content.test.mjs` (+18 cases, 26 total).
+
+**No app bugs found this task.**
+
+**Checks:** `node --test tests/solo/content.test.mjs` — exit 0, 26/26. `npm run solo:test` —
+exit 0, 241/241, stable over 3 runs. `npx tsc -b`/`npm run build` — exit 0 (study pack bundles into
+the built JS, precached by the PWA build). Vitest — 73/1030, unaffected. Manual scripted Chromium
+check (390px, not committed): family filter narrows lessons; a lesson's questions show every
+option's explanation with correct/wrong marks once answered; flashcard reveal + Got it/Review
+again works; reference search filters correctly; opening Reference mid-repair marks the run
+assisted (confirmed via the debrief's "Completed with support") and returns to the same mission
+tab.
+
+**Acceptance:** met. "Schema test verifies counts, unique IDs, one correct option and all
+explanations" — confirmed directly. "Study is fully local" — confirmed (no fetch anywhere in
+study.js/content.js). "Returning from reference preserves mission state" — confirmed (same
+mission id/network/selectedDeviceId/tab before and after). "Quiz correctness is not a
+prerequisite gate" — confirmed (`recordStudyAnswer` never blocks on correctness; nothing reads
+`studyAnswers` to gate any other feature).
+
+**Status:** complete.

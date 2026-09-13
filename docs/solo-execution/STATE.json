@@ -1,12 +1,12 @@
 {
   "spec": "SOLO-1",
   "branch": "claude/field-solo-implementation-am520q",
-  "lastWorkingCommit": "3d3304e0661c7c4d25aaf5bb88ae74bbf0b3d686",
+  "lastWorkingCommit": "fd33448545c67f492f166aa37591ab6b9492dea6",
   "day": 6,
-  "task": "S16",
+  "task": "S17",
   "substep": "read-contracts",
   "status": "not-started",
-  "completedTasks": ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10", "S11", "S12", "S13", "S14", "S15"],
+  "completedTasks": ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10", "S11", "S12", "S13", "S14", "S15", "S16"],
   "changedFiles": [
     "index.html",
     "package.json",
@@ -46,48 +46,49 @@
     "src/solo/progress.js",
     "tests/solo/progress.test.mjs",
     "tests/solo/configure.test.mjs",
+    "src/solo/study.js",
     "docs/solo-execution/STATE.json",
     "docs/solo-execution/HANDOFF.md",
     "docs/solo-execution/RESULTS.md"
   ],
   "tests": [
     {
-      "command": "node --test tests/solo/configure.test.mjs",
+      "command": "node --test tests/solo/content.test.mjs",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T07:00:00Z"
+      "observedAt": "2026-09-13T07:10:00Z"
     },
     {
       "command": "npm run solo:test (x3 for stability)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T07:00:30Z"
+      "observedAt": "2026-09-13T07:10:30Z"
     },
     {
       "command": "npx tsc -b",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T07:01:40Z"
+      "observedAt": "2026-09-13T07:11:40Z"
     },
     {
       "command": "npm run build",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T07:01:45Z"
+      "observedAt": "2026-09-13T07:11:45Z"
     },
     {
       "command": "npm test -- --run (pre-existing vitest suite, unaffected)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T07:01:57Z"
+      "observedAt": "2026-09-13T07:11:57Z"
     },
     {
-      "command": "manual: npm run dev + scripted Chromium check (390px) — configure session shows a Reset button (no Replay/New variation, since it has no caseCode); disconnecting a cable directly fails the checklist immediately; Reset asks for confirmation, Cancel leaves the broken network untouched, confirming restores the healthy snapshot; Submit with no documentation completes to a 'Configuration complete' debrief; Progress stays at zero afterward (not committed to the repo)",
+      "command": "manual: npm run dev + scripted Chromium check (390px) — Study's family filter narrows the lesson list; opening a lesson shows its text, 3 questions (answering shows every option's explanation, correct/wrong marked) and 3 flashcards (Reveal then Got it/Review again); Reference search filters by title/body; opening Reference from within an active repair mission marks it assisted (debrief read 'Completed with support' afterward) and returns to the same mission tab (not committed to the repo)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T07:03:00Z"
+      "observedAt": "2026-09-13T07:15:00Z"
     }
   ],
   "blockers": [],
-  "nextCommand": "Read the-field-solo-week/tasks/S16.md and its referenced contracts, then continue DAY6 (S16: small study and reference pack)."
+  "nextCommand": "Read the-field-solo-week/tasks/S17.md and its referenced contracts, then continue DAY6 (S17: backup and restore)."
 }

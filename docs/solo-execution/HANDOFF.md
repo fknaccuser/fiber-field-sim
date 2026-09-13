@@ -545,14 +545,48 @@ concrete message; Reset's confirmation Cancel leaves the broken state alone, Res
 healthy snapshot; Submit with no documentation at all reaches a "Configuration complete" debrief;
 the Progress screen still reads zero everywhere afterward.
 
-## Next task: S16
+## What S16 added
 
-Continues DAY6 (S16: small study and reference pack). Read only
-`the-field-solo-week/tasks/S16.md` and whatever contracts it names before starting — likely
-`src/solo/study.js` (question/card session logic per UI_AND_STORAGE.md's file list) plus lesson/
-question/flashcard/reference content in `content.js` (MASTER_DESIGN.md §9: "eight short lessons,
-24 questions, 24 flashcards and a reference sheet") and Study/Reference screens in `view.js` — but
-confirm scope against the actual task file rather than assuming.
+- `src/solo/content.js` — `STUDY_PACK`, copied byte-for-byte from the supplied
+  `fixtures/study-content.json` (8 lessons, 24 four-option questions, 24 flashcards; DATA_CONTRACTS.md's
+  schema exactly). `REFERENCE_ENTRIES` — one entry per ENGINE_RULES.md's exact supported CLI command
+  (switch/router/client/server, each a real example matching cli.js's own keyword syntax) plus the
+  four concept distinctions UI_AND_STORAGE.md names by name (link up vs service up, IP vs DNS
+  failure, access VLAN vs trunk allowance, configuration vs verification).
+- `src/solo/study.js` (new) — pure lesson/question/card selection (`lessonsForFamily`,
+  `questionsForLesson`, `cardsForLesson`), `gradeAnswer` (reads the option table's own `correct`
+  flag, never inferred), `recordStudyAnswer`/`recordCardReview` (keep only the latest attempt per
+  question/card — "No timed assessment or confidence tracking" means history isn't needed), and
+  `searchReference` (case-insensitive title/body substring match).
+- `src/solo/app.js` — Study screen navigation (`openStudy`/`closeStudy`/`selectStudyFamily`/
+  `openLesson`/`closeLesson`/`revealCard`) mirrors `missionTab`: transient in `state.studySession`,
+  never persisted (the profile's `studyAnswers`/`cardReviews` are what persist, through the
+  already-generic `updateAndPersistProfile` — no new persistence path needed). `openReference`
+  marks a run assisted when opened during an active repair mission (mirrors `requestHint`) and is
+  a no-op otherwise; screen navigation back to wherever it was opened from is main.js's job.
+- `src/solo/view.js` — `renderStudy` (family filter chips, a lesson view, immediate-feedback
+  questions that reveal every option's explanation once any answer is submitted, reveal + Got
+  it/Review again cards) and `renderReference` (a search box over `REFERENCE_ENTRIES`). Reference
+  is reachable from both Home and the mission header.
+- `tests/solo/content.test.mjs` (+18 cases, 26 total): the schema test (exact counts, unique IDs,
+  exactly one correct option, an explanation on every option), `study.js`'s selection/grading, and
+  the Study/Reference navigation and assisted-marking behavior.
 
-Next command: read `the-field-solo-week/tasks/S16.md`, then implement its files and run its
+**Verified live in a browser, not just Node tests:** the family filter narrows the lesson list
+(8 → 2 for VLAN); opening a lesson shows its 3 questions and 3 cards; answering a question
+immediately shows all four explanations with correct/wrong marks; a flashcard's Reveal then Got
+it/Review again works; Reference's search filters correctly; opening Reference from within an
+active repair mission marks it assisted (the debrief read "Completed with support" afterward) and
+returns to the same mission tab untouched.
+
+## Next task: S17
+
+Continues DAY6 (S17: backup and restore). Read only `the-field-solo-week/tasks/S17.md` and
+whatever contracts it names before starting — `store.js`'s `exportData`/`replaceData` and the
+recovery-record logic already exist from S02 (see that task's tests in `store.test.mjs`), so S17
+likely wires actual Export/Import UI and a preview/Replace-or-Cancel flow on top of that existing
+engine rather than building the underlying mechanism from scratch — but confirm scope against the
+actual task file rather than assuming.
+
+Next command: read `the-field-solo-week/tasks/S17.md`, then implement its files and run its
 listed checks.
