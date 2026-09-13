@@ -435,14 +435,46 @@ directly (brief now reads "(VLAN 20)" for the protected subnet).
 **DAY4 checkpoint (S10-S12) reached**: eight faults, deterministic variations, tiers and hints all
 work and are tested. 197/197 solo tests, `tsc -b` clean, build clean, legacy suite unaffected.
 
-## Next task: S13
+## What S13 added
 
-Starts DAY5 (S13–S15: verification/debrief, local skill progress and configure mode). Read only
-`the-field-solo-week/tasks/S13.md` and whatever contracts it names before starting — likely
-`grade.js` (`evaluateCompletion`/`summarizeRun`) and the completion/debrief flow
-(MASTER_DESIGN.md §11's Definition of done, §9's per-skill progress, §6's debrief content) — but
-confirm against the actual task file. This is also where debrief copy (deferred from S12) most
-plausibly lands.
+- `src/solo/grade.js` — `evaluateCompletion(attempt)`: live target/protected service checks,
+  both clients' department constraints (subnet + the switch access port's VLAN, resolved via the
+  link — not the client's own ignored port field, same resolution `isRecipeRepaired`/
+  `deriveRequirements` needed), a same-current-revision recorded pass on `openPortal` (target) and
+  `checkProtected` (protected), a genuinely-captured selected finding, and a 10-500 character
+  note. Every unmet check names a concrete next action. `summarizeRun(attempt, completedAt)`
+  builds the documented RunSummary — `completedAt` is an additive second parameter (the engine
+  itself can't call `Date.now()`; app.js is the only caller and supplies it).
+- `src/solo/app.js` — `selectDevice` now automatically records an `'inspection'` event (observed
+  fields only) on every selection, so Findings has real evidence without a separate capture step.
+  `toggleFinding`/`setCompletionNote` back the form; `completeRun` evaluates and, on success,
+  freezes the run (`status:'completed'`, screen → `'debrief'`) and updates
+  counters/evidence/completedRuns in the same step — each recipe's own family gets credited
+  (`recipeId[0]`), so a tier4 mixed pair correctly credits both families rather than filing
+  everything under `'M'`. Configure mode never touches evidence at all. Rejects a repeat
+  completion.
+- **Bug found and fixed, exposed by this task's own grading logic, not a browser click:**
+  `recordTestEvent` for `checkProtected` (from S08) was logging the event under whichever
+  device's Tests panel happened to trigger it, not the protected client the test actually
+  verifies — so `evaluateCompletion`'s same-revision check could never find it under the right
+  device id no matter what the player did. Fixed in `main.js`'s `runTest`.
+- `src/solo/view.js` — Findings now lists every captured inspection/test as a selectable
+  checkbox, a live completion checklist, the note field and Submit. A new Debrief screen shows
+  service results, assistance used, actual causes (the hint copy, now safe to reveal), the full
+  ordered action history, and a fixed authored expert-sequence example investigation. "Linked
+  lesson" is a placeholder — the study pack doesn't exist yet (a later task).
 
-Next command: read `the-field-solo-week/tasks/S13.md`, then implement its files and run its
+**Verified end-to-end live in a browser**, not just Node tests: submitting before any repair
+shows concrete failing checks (not a blank rejection); reconnecting the cable, testing both
+clients, selecting a finding and writing a note brings every check to passing and reaches the
+debrief screen with the real action history rendered.
+
+## Next task: S14
+
+Continues DAY5 (S13–S15: verification/debrief, local skill progress and configure mode). Read
+only `the-field-solo-week/tasks/S14.md` and whatever contracts it names before starting — likely
+`src/solo/progress.js` (recommendation logic, per-skill completed/independent/highest-tier
+tracking, MASTER_DESIGN.md §9) and a Progress screen — but confirm against the actual task file.
+
+Next command: read `the-field-solo-week/tasks/S14.md`, then implement its files and run its
 listed checks.

@@ -338,3 +338,38 @@ injected fake clock values (active-active-paused-active sequencing).
 
 **Status:** complete. **DAY4 checkpoint (S10-S12) reached**: eight faults, deterministic
 variations, tiers and hints all work and are tested.
+
+## S13 — Findings, completion and debrief (Day 5)
+
+**Built:** `src/solo/grade.js` (new — `evaluateCompletion` checks live target/protected service
+tests, department subnet+VLAN constraints for both clients, a same-current-revision recorded test
+event so a stale pass after further changes doesn't count, a genuinely-captured selected finding,
+and a 10-500 char note; `summarizeRun`). `app.js` (`captureObservedFields`, `selectDevice` now
+also logs an `'inspection'` event, `toggleFinding`, `setCompletionNote`, `completeRun` — on pass,
+moves to the debrief screen, updates profile counters/evidence/completedRuns for repair-mode
+missions). `view.js` (`renderFindings` rewritten to show selectable findings, a live completion
+checklist, note field and submit; new `renderDebrief`). `main.js` (findings/submit/debrief
+handlers; `noteChange` deliberately skips `render()` to avoid destroying the textarea and losing
+focus/cursor position mid-edit). `tests/solo/grade.test.mjs` (new).
+
+**Bug found and fixed while verifying live in a browser:** `runTest`'s `'checkProtected'` calls
+were logging the test event under whichever device's Tests panel triggered the click, not
+`mission.protectedClientId` — the client the test actually verifies — so `grade.js`'s
+same-current-revision check could never find a matching event no matter what the player did.
+Fixed by special-casing the logged device id for `checkProtected` in `main.js`.
+
+**Checks:** `node --test tests/solo/grade.test.mjs` — exit 0. `npm run solo:test` — exit 0,
+208/208, stable over 3 runs. `npx tsc -b`/`npm run build` — exit 0. Vitest — 73/1030, unaffected.
+Manual scripted Chromium check (390px, not committed): submitting before any repair shows a
+checklist with failing items; reconnecting the workstation cable, running both service tests,
+selecting a finding and writing a note brings every check to passing and Submit reaches the
+debrief screen.
+
+**Acceptance:** met. "Submission is blocked until every check passes" — confirmed (checklist
+shows `✗` pre-repair, submit is refused with `CHECKS_FAILED`). "A stale test from before a change
+does not count" — confirmed via a test that bumps the network revision after a passing test and
+finds the completion check now failing. "A genuinely selected finding and a note of adequate
+length are both required" — confirmed. "Repair-mode completion updates skill evidence and counts
+independent vs. assisted runs" — confirmed.
+
+**Status:** complete.
