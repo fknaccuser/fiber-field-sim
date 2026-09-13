@@ -62,11 +62,15 @@ export function createIndexedDBAdapter(idbFactory = globalThis.indexedDB) {
     return new Promise((resolve, reject) => {
       const storeNames = [...new Set([...puts.map((p) => p.store), ...deletes.map((d) => d.store)])];
       const tx = db.transaction(storeNames, 'readwrite');
-      for (const put of puts) {
-        tx.objectStore(put.store).put(put.value, put.key);
-      }
+      // Deletes first: a delete and a put can legitimately target the same key
+      // (e.g. replaceData's new recovery snapshot can collide, at ISO-timestamp
+      // resolution, with the previous one it is pruning), and the put's value
+      // must be what survives.
       for (const del of deletes) {
         tx.objectStore(del.store).delete(del.key);
+      }
+      for (const put of puts) {
+        tx.objectStore(put.store).put(put.value, put.key);
       }
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
@@ -90,11 +94,11 @@ export function createMemoryAdapter() {
       return [...data[store].keys()];
     },
     async writeMany(puts, deletes = []) {
-      for (const { store, key, value } of puts) {
-        data[store].set(key, value);
-      }
       for (const { store, key } of deletes) {
         data[store].delete(key);
+      }
+      for (const { store, key, value } of puts) {
+        data[store].set(key, value);
       }
     },
   };
