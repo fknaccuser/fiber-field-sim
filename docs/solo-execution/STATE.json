@@ -1,12 +1,12 @@
 {
   "spec": "SOLO-1",
   "branch": "claude/field-solo-implementation-am520q",
-  "lastWorkingCommit": "521e3840cbdf7586c1c3eef669fb426710d2a9e8",
+  "lastWorkingCommit": "2e12c1f687d5c0e1a1b3aa049ae20613a115f07c",
   "day": 3,
-  "task": "S07",
+  "task": "S08",
   "substep": "read-contracts",
   "status": "not-started",
-  "completedTasks": ["S01", "S02", "S03", "S04", "S05", "S06"],
+  "completedTasks": ["S01", "S02", "S03", "S04", "S05", "S06", "S07"],
   "changedFiles": [
     "index.html",
     "package.json",
@@ -28,42 +28,50 @@
     "tests/solo/forward.test.mjs",
     "src/solo/actions.js",
     "tests/solo/actions.test.mjs",
+    "src/solo/diagram.js",
+    "tests/solo/app.mission.test.mjs",
     "docs/solo-execution/STATE.json",
     "docs/solo-execution/HANDOFF.md",
     "docs/solo-execution/RESULTS.md"
   ],
   "tests": [
     {
-      "command": "node --test tests/solo/actions.test.mjs",
+      "command": "node --test tests/solo/app.mission.test.mjs",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T05:17:00Z"
+      "observedAt": "2026-09-13T05:24:00Z"
     },
     {
-      "command": "npm run solo:test (x3 for stability)",
+      "command": "npm run solo:test",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T05:18:00Z"
-    },
-    {
-      "command": "npx tsc -b",
-      "exitCode": 0,
-      "resultPath": null,
-      "observedAt": "2026-09-13T05:18:10Z"
+      "observedAt": "2026-09-13T05:24:30Z"
     },
     {
       "command": "npm run build",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T05:18:20Z"
+      "observedAt": "2026-09-13T05:24:45Z"
+    },
+    {
+      "command": "npx tsc -b",
+      "exitCode": 0,
+      "resultPath": null,
+      "observedAt": "2026-09-13T05:26:20Z"
     },
     {
       "command": "npm test -- --run (pre-existing vitest suite, unaffected)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T05:18:25Z"
+      "observedAt": "2026-09-13T05:26:33Z"
+    },
+    {
+      "command": "manual: npm run dev + scripted Chromium check (390px viewport) — touch and keyboard reachability across HM/BR/OF, no horizontal overflow, hidden-tab state preserved (not committed to the repo)",
+      "exitCode": 0,
+      "resultPath": null,
+      "observedAt": "2026-09-13T05:26:00Z"
     }
   ],
   "blockers": [],
-  "nextCommand": "DAY2 checkpoint reached (S04-S06). Read the-field-solo-week/tasks/S07.md and its referenced contracts to start DAY3 (S07-S09: clickable graph, editable devices, supported CLI)."
+  "nextCommand": "Read the-field-solo-week/tasks/S08.md and its referenced contracts, then continue DAY3 (S07-S09: clickable graph, editable devices, supported CLI)."
 }

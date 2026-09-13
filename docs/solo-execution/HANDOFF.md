@@ -212,13 +212,48 @@ runs, all 42/42.
 work and are tested. 108/108 solo tests, `tsc -b` clean, build clean, legacy suite unaffected
 (73 files/1030 tests) throughout.
 
-## Next task: S07
+## What S07 added
 
-Starts DAY3 (S07–S09: clickable graph, editable devices, supported CLI). Read only
-`the-field-solo-week/tasks/S07.md` and whatever contracts it names before starting — this is the
-first task that touches the UI/rendering layer again since S02, so re-check UI_AND_STORAGE.md's
-screen details for the Network/Device/Findings tabs and `diagram.js`'s SVG topology before
-assuming scope.
+- `src/solo/diagram.js` — `renderTopology(network, {selectedDeviceId, onSelectDevice})`: an SVG
+  at SCENARIOS.md's fixed per-layout coordinates (HM/BR/OF each have their own position table,
+  HM's R1/S1 moved per the spec), links drawn first, plain-vector device glyphs (rect/polygon by
+  kind) as keyboard-focusable (`tabindex`, `role="button"`, Enter/Space) `<g>` buttons, plus a
+  plain HTML `<ul>` equivalent listing every device and link's connected state — the "SVG nodes
+  have buttons or keyboard-focusable equivalents" and "every cable action has a list alternative"
+  rules from UI_AND_STORAGE.md. Cable *interaction* (reconnect flow) is out of scope here — S07
+  is selection only; only Configuration/Terminal editing is later tasks' job.
+- `src/solo/app.js` — `createConfigureAttempt(layoutId)` builds a configure-mode Attempt (the
+  same shape DATA_CONTRACTS.md defines for a real mission, `mode:"configure"`, network ===
+  initialNetwork, requirements derived from the healthy layout's own addressing) since
+  MASTER_DESIGN.md's "free configuration of a provided healthy network" mode uses that same
+  Attempt shape, not a separate ad hoc structure that would need migrating once `generate.js`
+  lands. `startConfigureSession`/`exitMission`/`selectDevice` (recent-device list, capped at 4,
+  most-recent-first, deduplicated) round out `app.js`'s state machine for the new `'mission'`
+  screen.
+- `src/solo/view.js` — `renderMission`: header, Network/Device/Findings tabs, a device Inspect
+  panel (kind/power/IP/gateway/DNS/ports — Configure and Terminal sub-tabs are S08/S09's job),
+  recent-devices row. `renderHome` gained a "Configure a network" section (HM/BR/OF buttons).
+  Tab visibility is **transient view state kept in `main.js`, not added to `app.js`'s tracked
+  state** — UI_AND_STORAGE.md's App state shape has no tab field, and panels are always rendered
+  and merely `hidden`, so switching tabs can never discard terminal or selection state (nothing
+  is unmounted).
+- `src/solo/styles.css` — mission screen/tabs/panels/diagram styling; at ≥900px the tab control
+  hides and all three panels render at once (topology 40% left, device+findings stacked 60%
+  right), matching MASTER_DESIGN.md §7's tablet layout.
 
-Next command: read `the-field-solo-week/tasks/S07.md`, then implement its files and run its
+**Verified in a real browser** (not just unit tests, since this is a rendering/interaction task):
+every device in HM (5), BR (6) and OF (7) is selectable both via direct SVG clicks and via the
+equivalent list; a keyboard-focused SVG device selects on Enter; no horizontal page overflow at a
+390px viewport in any layout; switching the mobile tab away from Device and back preserves the
+current selection exactly (before/after device name matched).
+
+## Next task: S08
+
+Continues DAY3 (S07–S09: clickable graph, editable devices, supported CLI). Read only
+`the-field-solo-week/tasks/S08.md` and whatever contracts it names before starting — likely the
+Configure/Terminal sub-tabs of the Device panel and wiring `actions.js` into the UI (Apply/Cancel
+draft state per UI_AND_STORAGE.md's "Device configuration" section), but confirm against the
+actual task file.
+
+Next command: read `the-field-solo-week/tasks/S08.md`, then implement its files and run its
 listed checks.

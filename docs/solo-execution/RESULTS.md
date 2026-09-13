@@ -179,3 +179,24 @@ evaluator (`testService`) as instructed.
 
 **Status:** complete. **DAY2 checkpoint (S04-S06) reached**: link/IP/VLAN/DNS evaluator and
 configuration actions all work and are tested.
+
+## S07 — Clickable topology (Day 3)
+
+**Built:** `src/solo/diagram.js` (`renderTopology`), `app.js` additions
+(`createConfigureAttempt`, `startConfigureSession`, `exitMission`, `selectDevice`), `view.js`
+additions (`renderMission`, device Inspect panel, Home's "Configure a network" section),
+`styles.css` mission/diagram/responsive rules. `tests/solo/app.mission.test.mjs` (8 cases).
+
+**Checks:** `node --test tests/solo/app.mission.test.mjs` — exit 0, 8/8. `npm run solo:test` —
+exit 0, 116/116. `npm run build` — exit 0. `npx tsc -b` — exit 0. Vitest — 73/1030, unaffected.
+Manual scripted Chromium check at a 390px viewport (real browser, not committed): every device
+in HM/BR/OF selectable via SVG click and via the equivalent list; keyboard focus + Enter selects;
+no horizontal overflow in any layout; hiding/re-showing the Device tab preserves the selection.
+
+**Acceptance:** met. "Every device in all three layouts is reachable by touch and keyboard" —
+confirmed for all 5+6+7 devices, both input modes. "No horizontal page overflow at 390px" —
+confirmed for all three layouts. "Hidden tabs do not discard terminal or selection state" —
+confirmed (panels are hidden via the `hidden` attribute, never unmounted; a real terminal exists
+starting S09, so this is re-verified then).
+
+**Status:** complete.
