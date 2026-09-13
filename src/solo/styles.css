@@ -158,3 +158,220 @@ button,
 input {
   min-height: 44px;
 }
+
+.home-section-heading {
+  color: var(--field-text);
+  font-size: 1rem;
+  margin-top: 24px;
+}
+
+.home-configure-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.home-configure-button {
+  background: var(--field-panel);
+  color: var(--field-text);
+  border: 1px solid var(--field-muted);
+  border-radius: 6px;
+  padding: 0 16px;
+}
+
+/* Mission workspace */
+
+.mission-screen {
+  min-height: 100vh;
+  background: var(--field-bg);
+  color: var(--field-text);
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.mission-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--field-panel);
+}
+
+.mission-title {
+  font-weight: 600;
+}
+
+.mission-exit {
+  background: transparent;
+  color: var(--field-text);
+  border: 1px solid var(--field-muted);
+  border-radius: 6px;
+  padding: 0 16px;
+}
+
+.mission-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--field-panel);
+}
+
+.mission-tab {
+  flex: 1;
+  background: transparent;
+  color: var(--field-muted);
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 10px 0;
+}
+
+.mission-tab-active {
+  color: var(--field-text);
+  border-bottom-color: var(--field-cyan);
+}
+
+.mission-panels {
+  flex: 1;
+  padding: 16px;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.mission-recent-devices {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  color: var(--field-muted);
+  flex-wrap: wrap;
+}
+
+.mission-recent-device {
+  background: var(--field-panel);
+  color: var(--field-text);
+  border: 1px solid var(--field-muted);
+  border-radius: 6px;
+  padding: 0 12px;
+  min-height: 36px;
+}
+
+.diagram {
+  max-width: 100%;
+}
+
+.diagram svg {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  display: block;
+}
+
+.diagram-link {
+  stroke: var(--field-muted);
+  stroke-width: 0.6;
+}
+
+.diagram-link-down {
+  stroke: var(--field-error);
+  stroke-dasharray: 2 1.5;
+}
+
+.diagram-device {
+  cursor: pointer;
+  fill: var(--field-panel);
+  stroke: var(--field-muted);
+  stroke-width: 0.4;
+}
+
+.diagram-device:focus-visible {
+  outline: 1.5px solid var(--field-cyan);
+  outline-offset: 1px;
+}
+
+.diagram-device-selected {
+  stroke: var(--field-cyan);
+  stroke-width: 0.8;
+}
+
+.diagram-device-label {
+  font-size: 4px;
+  fill: var(--field-text);
+  stroke: none;
+  pointer-events: none;
+}
+
+.diagram-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.diagram-list-device {
+  background: var(--field-panel);
+  color: var(--field-text);
+  border: 1px solid var(--field-muted);
+  border-radius: 6px;
+  padding: 0 10px;
+  min-height: 36px;
+}
+
+.diagram-list-link {
+  align-self: center;
+  color: var(--field-muted);
+  font-size: 0.85rem;
+}
+
+.device-panel-empty {
+  color: var(--field-muted);
+}
+
+.device-inspect {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 12px;
+  row-gap: 4px;
+}
+
+.device-inspect dt {
+  color: var(--field-muted);
+}
+
+.device-inspect dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+@media (min-width: 900px) {
+  /* Tablet+: topology left (40%), selected device right (60%), both visible
+     at once (MASTER_DESIGN.md §7) — so the tab control that switches between
+     them below 900px is redundant and hidden; all three panels are forced
+     visible regardless of the `hidden` attribute tab state set. */
+  .mission-tabs {
+    display: none;
+  }
+
+  .mission-panels {
+    display: grid;
+    grid-template-columns: 40% 60%;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .mission-panel-network,
+  .mission-panel-device,
+  .mission-panel-findings {
+    display: block !important;
+  }
+
+  .mission-panel-network {
+    grid-column: 1;
+  }
+
+  .mission-panel-device,
+  .mission-panel-findings {
+    grid-column: 2;
+  }
+}

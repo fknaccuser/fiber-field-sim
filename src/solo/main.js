@@ -1,12 +1,26 @@
-import { createInitialState, submitOpeningCommand, completeInitialization, boot, persistProfile } from './app.js';
+import {
+  createInitialState,
+  submitOpeningCommand,
+  completeInitialization,
+  boot,
+  persistProfile,
+  startConfigureSession,
+  exitMission,
+  selectDevice,
+} from './app.js';
 import { openStore } from './store.js';
-import { renderHome } from './view.js';
+import { renderHome, renderMission } from './view.js';
 
 const INIT_LINES = ['Initializing local session.', 'Preparing The Field.', 'Ready.'];
 const INIT_LINE_DELAY_MS = 200;
 
 const store = openStore();
 let state = createInitialState();
+// Which mission tab is visible below 900px. Transient view state, not part of
+// the tracked app state (UI_AND_STORAGE.md's App state shape has no tab field):
+// switching tabs never discards terminal or selection state because nothing
+// is unmounted, only hidden (see renderMission).
+let missionTab = 'network';
 
 function render() {
   const root = document.getElementById('root');
@@ -19,13 +33,49 @@ function render() {
     root.appendChild(
       renderHome(state, {
         onRetrySave: retrySave,
+        onStartConfigure: startConfigure,
       }),
+    );
+  } else if (state.screen === 'mission') {
+    root.appendChild(
+      renderMission(
+        state,
+        {
+          onExit: exitToHome,
+          onTabChange: changeMissionTab,
+          onSelectDevice: pickDevice,
+        },
+        missionTab,
+      ),
     );
   }
 }
 
 async function retrySave() {
   state = await persistProfile(state, store);
+  render();
+}
+
+function startConfigure(layoutId) {
+  state = startConfigureSession(state, layoutId);
+  missionTab = 'network';
+  render();
+}
+
+function exitToHome() {
+  state = exitMission(state);
+  missionTab = 'network';
+  render();
+}
+
+function changeMissionTab(tab) {
+  missionTab = tab;
+  render();
+}
+
+function pickDevice(deviceId) {
+  state = selectDevice(state, deviceId);
+  missionTab = 'device';
   render();
 }
 
