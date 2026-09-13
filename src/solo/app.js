@@ -1,7 +1,7 @@
 // Pure, DOM-free application state and transitions for The Field Solo shell.
 // main.js is the only module allowed to touch `document`.
 
-import { createHealthyLayout } from './layouts.js';
+import { createHealthyLayout, deriveRequirements } from './layouts.js';
 import { cloneNetwork } from './model.js';
 import { applyAction } from './actions.js';
 import { createTerminalSession } from './cli.js';
@@ -118,21 +118,13 @@ export async function updateAndPersistProfile(state, store, updates) {
   return persistProfile(applyProfileUpdate(state, updates), store);
 }
 
-function subnetOf(ip) {
-  return `${ip.split('.').slice(0, 3).join('.')}.0`;
-}
-
 // Configure mode (MASTER_DESIGN.md §2: "free configuration of a provided
 // healthy network") uses the same Attempt shape as a repair mission
 // (DATA_CONTRACTS.md "Attempt creation"), mode:"configure", no fault: network
-// starts identical to initialNetwork. Full fault-driven missions (mode:"repair")
-// are generateCase's job, a later task.
+// starts identical to initialNetwork. Fault-driven missions (mode:"repair")
+// are generate.js's generateCase (S10).
 export function createConfigureAttempt(layoutId, { x = 42, host = 130, label = 'plain' } = {}) {
   const network = createHealthyLayout(layoutId, x, host, label);
-  const pc1 = network.devices.find((d) => d.id === 'PC1');
-  const pc2 = network.devices.find((d) => d.id === 'PC2');
-  const pc1Port = network.ports.find((p) => p.deviceId === 'PC1');
-  const pc2Port = network.ports.find((p) => p.deviceId === 'PC2');
   return {
     schema: 1,
     id: crypto.randomUUID(),
@@ -151,15 +143,7 @@ export function createConfigureAttempt(layoutId, { x = 42, host = 130, label = '
     completionNote: null,
     status: 'active',
     mode: 'configure',
-    requirements: {
-      targetSubnet: subnetOf(pc1.ip),
-      targetPrefix: 24,
-      targetVlan: pc1Port.accessVlan,
-      protectedSubnet: subnetOf(pc2.ip),
-      protectedPrefix: 24,
-      protectedVlan: pc2Port.accessVlan,
-      portalServerId: 'S1',
-    },
+    requirements: deriveRequirements(network),
     hintLevels: {},
     compactedEventCount: 0,
   };

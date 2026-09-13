@@ -188,3 +188,27 @@ export function createHealthyLayout(layoutId, x, host = 130, label = 'plain') {
 
   return { ...network, layoutId, devices: applyLabel(network.devices, label) };
 }
+
+function subnetOf(ip) {
+  return `${ip.split('.').slice(0, 3).join('.')}.0`;
+}
+
+// Attempt.requirements (DATA_CONTRACTS.md "Binding clarifications"): "These
+// come from the healthy layout before faults." Shared by configure-mode
+// attempts (app.js) and generated repair attempts (generate.js) so both
+// derive requirements the same way, from an unfaulted network.
+export function deriveRequirements(healthyNetwork) {
+  const pc1 = healthyNetwork.devices.find((d) => d.id === 'PC1');
+  const pc2 = healthyNetwork.devices.find((d) => d.id === 'PC2');
+  const pc1Port = healthyNetwork.ports.find((p) => p.deviceId === 'PC1');
+  const pc2Port = healthyNetwork.ports.find((p) => p.deviceId === 'PC2');
+  return {
+    targetSubnet: subnetOf(pc1.ip),
+    targetPrefix: 24,
+    targetVlan: pc1Port.accessVlan,
+    protectedSubnet: subnetOf(pc2.ip),
+    protectedPrefix: 24,
+    protectedVlan: pc2Port.accessVlan,
+    portalServerId: 'S1',
+  };
+}
