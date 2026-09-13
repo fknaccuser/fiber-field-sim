@@ -13,6 +13,10 @@ import {
   chooseReconnectSource,
   cancelReconnect,
   confirmReconnect,
+  disconnectLink,
+  requestReset,
+  cancelReset,
+  confirmReset,
   recordTestEvent,
   terminalSessionFor,
   setTerminalSession,
@@ -82,6 +86,10 @@ function render() {
           onChooseReconnectSource: chooseSource,
           onConfirmReconnect: confirmReconnectFlow,
           onCancelReconnect: cancelReconnectFlow,
+          onDisconnectLink: disconnectLinkAction,
+          onRequestReset: requestResetAction,
+          onConfirmReset: confirmResetAction,
+          onCancelReset: cancelResetAction,
           onApplyDeviceForm: applyDeviceForm,
           onRunTest: runTest,
           onSubmitCommand: submitTerminalCommand,
@@ -279,6 +287,29 @@ function confirmReconnectFlow(destinationPortId) {
   state = result.ok ? { ...nextState, error: null } : { ...state, error: result.message || 'Could not reconnect that cable.' };
   render();
   if (result.ok) persistMission();
+}
+
+function disconnectLinkAction(linkId) {
+  const { state: nextState, result } = disconnectLink(state, linkId);
+  state = result.ok ? { ...nextState, error: null } : { ...state, error: result.message || 'Could not disconnect that cable.' };
+  render();
+  if (result.ok) persistMission();
+}
+
+function requestResetAction() {
+  state = requestReset(state);
+  render();
+}
+
+function cancelResetAction() {
+  state = cancelReset(state);
+  render();
+}
+
+function confirmResetAction() {
+  state = confirmReset(state);
+  render();
+  persistMission();
 }
 
 function applyDeviceForm(actions) {

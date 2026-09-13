@@ -551,13 +551,22 @@ input {
 }
 
 .mission-replay,
-.mission-variation {
+.mission-variation,
+.mission-reset {
   background: transparent;
   color: var(--field-text);
   border: 1px solid var(--field-muted);
   border-radius: 6px;
   padding: 0 12px;
   margin-right: 8px;
+}
+
+.reconnect-disconnect {
+  background: transparent;
+  color: var(--field-warning);
+  border: 1px solid var(--field-warning);
+  border-radius: 6px;
+  padding: 0 16px;
 }
 
 .mission-brief {

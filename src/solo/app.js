@@ -7,7 +7,7 @@ import { applyAction } from './actions.js';
 import { createTerminalSession } from './cli.js';
 import { generateCase, nextCase, fingerprintForCode } from './generate.js';
 import { inSubnet } from './ip.js';
-import { evaluateCompletion, summarizeRun } from './grade.js';
+import { evaluateCompletion, evaluateConfigureChecklist, summarizeRun } from './grade.js';
 
 export const RECOMMENDED_CODE = 'TF1-HM-1-P-START';
 const RECENT_FINGERPRINT_LIMIT = 20;
@@ -31,6 +31,10 @@ export function createInitialState() {
     // Resume/Replace choice when one is already active (S11).
     reconnect: null,
     pendingMissionRequest: null,
+    // Gates Reset behind an explicit confirmation (MASTER_DESIGN.md §6:
+    // "Reset offers confirmation") the same way pendingMissionRequest gates
+    // Resume/Replace (S15).
+    pendingReset: false,
     // Wall-clock timestamp (Date.now()) the mission was last (re)entered, or
     // null while paused; main.js supplies `now` so this file never calls the
     // clock itself. Elapsed time accrues only between resume and pause
@@ -206,6 +210,7 @@ export function exitMission(state, now = Date.now()) {
     screen: 'home',
     reconnect: null,
     pendingMissionRequest: null,
+    pendingReset: false,
     error: null,
   };
 }
@@ -242,6 +247,7 @@ function enterMission(state, attempt, now = Date.now()) {
     recentDevices: [],
     reconnect: null,
     pendingMissionRequest: null,
+    pendingReset: false,
     error: null,
     sessionResumedAt: now,
   };
@@ -474,6 +480,61 @@ export function confirmReconnect(state, destinationPortId) {
   return { state: { ...nextState, reconnect: null }, result };
 }
 
+// Explicit unplug (S15.md: "Allow disconnecting cables"), independent of the
+// full reconnect flow — MASTER_DESIGN.md §7 treats a cable's connected
+// status as directly actionable, not only reachable through a reroute.
+export function disconnectLink(state, linkId) {
+  if (!state.mission) return { state, result: { ok: true } };
+  const { state: nextState, result } = applyMissionActions(state, [
+    { type: 'setLinkConnected', linkId, connected: false },
+  ]);
+  if (!result.ok) return { state: nextState, result };
+  return { state: { ...nextState, reconnect: null, error: null }, result };
+}
+
+// --- Reset (S15) ---
+
+// Reset restores the active mission's own stored initial network snapshot
+// (MASTER_DESIGN.md §6: "Reset offers confirmation and starts the same seed
+// from its initial state"). Repair/seeded missions can already get this
+// through Replay (which regenerates the identical case from its caseCode);
+// configure sessions have no caseCode to regenerate from, so Reset reads the
+// attempt's own initialNetwork instead — the one path that works for both.
+export function requestReset(state) {
+  if (!state.mission) return state;
+  return { ...state, pendingReset: true };
+}
+
+export function cancelReset(state) {
+  return { ...state, pendingReset: false };
+}
+
+export function confirmReset(state, now = Date.now()) {
+  if (!state.mission) return { ...state, pendingReset: false };
+  const mission = state.mission;
+  return {
+    ...state,
+    pendingReset: false,
+    selectedDeviceId: null,
+    recentDevices: [],
+    reconnect: null,
+    error: null,
+    sessionResumedAt: now,
+    mission: {
+      ...mission,
+      network: cloneNetwork(mission.initialNetwork),
+      events: [],
+      selectedFindingIds: [],
+      completionNote: null,
+      status: 'active',
+      assisted: false,
+      hintLevels: {},
+      elapsedMs: 0,
+      compactedEventCount: 0,
+    },
+  };
+}
+
 function nextTestEventId(mission) {
   return nextEventId(mission);
 }
@@ -641,7 +702,11 @@ export function completeRun(state, now = Date.now()) {
   if (state.mission.status === 'completed') {
     return { state, result: { ok: false, code: 'ALREADY_COMPLETED', checks: [] } };
   }
-  const evaluation = evaluateCompletion(state.mission);
+  // Configure mode gets its own simpler checklist (departments + portal
+  // access only, no revision-locked test/finding/note requirements — it
+  // "may complete with documentation but awards no repair evidence").
+  const evaluation =
+    state.mission.mode === 'repair' ? evaluateCompletion(state.mission) : evaluateConfigureChecklist(state.mission);
   if (!evaluation.passed) {
     return { state, result: { ok: false, code: 'CHECKS_FAILED', checks: evaluation.checks } };
   }

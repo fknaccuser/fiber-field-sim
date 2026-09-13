@@ -12,7 +12,7 @@ import {
   renderTerminal,
 } from './devices.js';
 import { CUSTOMER_QUESTIONS, CUSTOMER_FACTS, HARMLESS_DETAILS, HINTS, renderHintText, TIER_GOAL_MS } from './content.js';
-import { evaluateCompletion } from './grade.js';
+import { evaluateCompletion, evaluateConfigureChecklist } from './grade.js';
 import { allFamilyStats, recommendedTier } from './progress.js';
 
 function describeSaveStatus(status) {
@@ -397,9 +397,10 @@ function renderReconnectPanel(state, actions) {
   const container = document.createElement('div');
   container.className = 'reconnect-panel';
 
+  const link = network.links.find((l) => l.id === reconnect.linkId);
   const heading = document.createElement('p');
   heading.className = 'reconnect-heading';
-  heading.textContent = `Reconnecting cable ${reconnect.linkId}`;
+  heading.textContent = `Reconnecting cable ${reconnect.linkId} (currently ${link?.connected ? 'connected' : 'disconnected'})`;
   container.appendChild(heading);
 
   if (state.error) {
@@ -435,6 +436,15 @@ function renderReconnectPanel(state, actions) {
     nextButton.textContent = 'Next: choose destination';
     nextButton.addEventListener('click', () => actions.onChooseReconnectSource?.(select.value));
     container.appendChild(nextButton);
+
+    if (link?.connected) {
+      const disconnectButton = document.createElement('button');
+      disconnectButton.type = 'button';
+      disconnectButton.className = 'reconnect-disconnect';
+      disconnectButton.textContent = 'Disconnect';
+      disconnectButton.addEventListener('click', () => actions.onDisconnectLink?.(reconnect.linkId));
+      container.appendChild(disconnectButton);
+    }
   } else {
     const label = document.createElement('label');
     label.className = 'form-row';
@@ -535,35 +545,36 @@ function renderFindings(state, actions) {
     container.appendChild(list);
   }
 
-  if (mission.mode === 'repair') {
-    const noteLabel = document.createElement('label');
-    noteLabel.className = 'form-row';
-    const noteSpan = document.createElement('span');
-    noteSpan.textContent = 'Completion note (10-500 characters)';
-    const noteInput = document.createElement('textarea');
-    noteInput.value = mission.completionNote ?? '';
-    noteInput.rows = 3;
-    noteInput.addEventListener('input', () => actions.onNoteChange?.(noteInput.value));
-    noteLabel.append(noteSpan, noteInput);
-    container.appendChild(noteLabel);
+  const noteLabel = document.createElement('label');
+  noteLabel.className = 'form-row';
+  const noteSpan = document.createElement('span');
+  // Configure mode "may complete with documentation" (S15.md) — the note is
+  // optional there, only repair's grade.js check requires 10-500 characters.
+  noteSpan.textContent =
+    mission.mode === 'repair' ? 'Completion note (10-500 characters)' : 'Documentation (optional)';
+  const noteInput = document.createElement('textarea');
+  noteInput.value = mission.completionNote ?? '';
+  noteInput.rows = 3;
+  noteInput.addEventListener('input', () => actions.onNoteChange?.(noteInput.value));
+  noteLabel.append(noteSpan, noteInput);
+  container.appendChild(noteLabel);
 
-    const checklist = document.createElement('ul');
-    checklist.className = 'completion-checklist';
-    for (const check of actions.completionChecks ?? []) {
-      const item = document.createElement('li');
-      item.className = check.passed ? 'checklist-pass' : 'checklist-fail';
-      item.textContent = `${check.passed ? '✓' : '✗'} ${check.message}`;
-      checklist.appendChild(item);
-    }
-    container.appendChild(checklist);
-
-    const submitButton = document.createElement('button');
-    submitButton.type = 'button';
-    submitButton.className = 'findings-submit';
-    submitButton.textContent = 'Submit';
-    submitButton.addEventListener('click', () => actions.onSubmit?.());
-    container.appendChild(submitButton);
+  const checklist = document.createElement('ul');
+  checklist.className = 'completion-checklist';
+  for (const check of actions.completionChecks ?? []) {
+    const item = document.createElement('li');
+    item.className = check.passed ? 'checklist-pass' : 'checklist-fail';
+    item.textContent = `${check.passed ? '✓' : '✗'} ${check.message}`;
+    checklist.appendChild(item);
   }
+  container.appendChild(checklist);
+
+  const submitButton = document.createElement('button');
+  submitButton.type = 'button';
+  submitButton.className = 'findings-submit';
+  submitButton.textContent = 'Submit';
+  submitButton.addEventListener('click', () => actions.onSubmit?.());
+  container.appendChild(submitButton);
 
   return container;
 }
@@ -702,6 +713,15 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
     variationButton.textContent = 'New variation';
     variationButton.addEventListener('click', () => actions.onNewVariation?.());
     header.appendChild(variationButton);
+  } else if (mission.mode === 'configure') {
+    // Configure sessions have no caseCode to Replay from (S15.md); Reset
+    // restores the same attempt's own stored initial (healthy) network.
+    const resetButton = document.createElement('button');
+    resetButton.type = 'button';
+    resetButton.className = 'mission-reset';
+    resetButton.textContent = 'Reset';
+    resetButton.addEventListener('click', () => actions.onRequestReset?.());
+    header.appendChild(resetButton);
   }
   const exitButton = document.createElement('button');
   exitButton.type = 'button';
@@ -710,6 +730,24 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   exitButton.addEventListener('click', () => actions.onExit?.());
   header.appendChild(exitButton);
   container.appendChild(header);
+  if (state.pendingReset) {
+    const resetPrompt = document.createElement('div');
+    resetPrompt.className = 'home-pending-prompt';
+    resetPrompt.setAttribute('role', 'alertdialog');
+    const message = document.createElement('p');
+    message.textContent = 'Reset will discard every change and restore the original healthy network.';
+    resetPrompt.appendChild(message);
+    const cancelButton = document.createElement('button');
+    cancelButton.type = 'button';
+    cancelButton.textContent = 'Cancel';
+    cancelButton.addEventListener('click', () => actions.onCancelReset?.());
+    const confirmButton = document.createElement('button');
+    confirmButton.type = 'button';
+    confirmButton.textContent = 'Reset';
+    confirmButton.addEventListener('click', () => actions.onConfirmReset?.());
+    resetPrompt.append(cancelButton, confirmButton);
+    container.appendChild(resetPrompt);
+  }
   if (state.pendingMissionRequest) {
     container.appendChild(renderPendingMissionPrompt(state, actions));
   }
@@ -761,7 +799,8 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   findingsPanel.appendChild(
     renderFindings(state, {
       ...actions,
-      completionChecks: mission.mode === 'repair' ? evaluateCompletion(mission).checks : [],
+      completionChecks:
+        mission.mode === 'repair' ? evaluateCompletion(mission).checks : evaluateConfigureChecklist(mission).checks,
     }),
   );
   panels.appendChild(findingsPanel);
@@ -813,12 +852,17 @@ export function renderDebrief(state, actions = {}) {
   container.className = 'debrief-screen';
 
   const heading = document.createElement('h1');
-  heading.textContent = 'Service restored';
+  heading.textContent = mission.mode === 'repair' ? 'Service restored' : 'Configuration complete';
   container.appendChild(heading);
 
   const status = document.createElement('p');
   status.className = 'debrief-status';
-  status.textContent = mission.assisted ? 'Completed with support.' : 'Completed independently.';
+  status.textContent =
+    mission.mode === 'repair'
+      ? mission.assisted
+        ? 'Completed with support.'
+        : 'Completed independently.'
+      : 'Configure session saved.';
   container.appendChild(status);
 
   const timer = document.createElement('p');

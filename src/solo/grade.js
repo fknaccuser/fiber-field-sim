@@ -143,6 +143,69 @@ export function evaluateCompletion(attempt) {
   return { passed: checks.every((c) => c.passed), checks };
 }
 
+// evaluateConfigureChecklist(attempt) -> {passed, checks}. Configure mode's
+// checklist (S15.md: "display a checklist for required departments and
+// portal access"): the same live-network department and service checks as
+// evaluateCompletion, without the same-revision recorded-test, finding or
+// note requirements — those document a repair investigation, which a
+// configure session never claims to be (ENGINE_RULES.md: "Configure mode
+// never awards independent repair evidence").
+export function evaluateConfigureChecklist(attempt) {
+  const network = attempt.network;
+  const requirements = attempt.requirements;
+  const checks = [];
+
+  const targetLive = testService(network, attempt.targetClientId, attempt.targetName);
+  checks.push({
+    id: 'targetServicePasses',
+    passed: targetLive.ok,
+    message: targetLive.ok
+      ? 'Target service is currently reachable.'
+      : `Target's portal access is currently failing: ${targetLive.code}.`,
+  });
+
+  const protectedLive = testService(network, attempt.protectedClientId, attempt.targetName);
+  checks.push({
+    id: 'protectedServicePasses',
+    passed: protectedLive.ok,
+    message: protectedLive.ok
+      ? 'Protected service is currently reachable.'
+      : `Protected client's portal access is currently failing: ${protectedLive.code}.`,
+  });
+
+  const targetInDepartment = remainsInDepartment(
+    network,
+    attempt.targetClientId,
+    requirements.targetSubnet,
+    requirements.targetPrefix,
+    requirements.targetVlan,
+  );
+  checks.push({
+    id: 'targetInRequiredDepartment',
+    passed: targetInDepartment,
+    message: targetInDepartment
+      ? 'Target client is in its required subnet and VLAN.'
+      : "Target client is not in its required department's subnet and VLAN.",
+  });
+
+  const protectedInDepartment = remainsInDepartment(
+    network,
+    attempt.protectedClientId,
+    requirements.protectedSubnet,
+    requirements.protectedPrefix,
+    requirements.protectedVlan,
+  );
+  checks.push({
+    id: 'protectedInRequiredDepartment',
+    passed: protectedInDepartment,
+    message: protectedInDepartment
+      ? 'Protected client is in its required subnet and VLAN.'
+      : "Protected client is not in its required department's subnet and VLAN.",
+  });
+
+  return { passed: checks.every((c) => c.passed), checks };
+}
+
 function familyForRecipes(recipeIds) {
   return recipeIds.length > 1 ? 'M' : recipeIds[0][0];
 }
