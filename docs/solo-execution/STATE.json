@@ -4,8 +4,8 @@
   "lastWorkingCommit": "1c7b51ff01ee1e0a503c9096f48c6ebaadc8bc66",
   "day": 7,
   "task": "S20",
-  "substep": "read-contracts",
-  "status": "not-started",
+  "substep": "blocked-owner-check",
+  "status": "blocked",
   "completedTasks": ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10", "S11", "S12", "S13", "S14", "S15", "S16", "S17", "S18", "S19"],
   "changedFiles": [
     "index.html",
@@ -54,48 +54,39 @@
     "tests/solo/backup.test.mjs",
     "tests/solo-browser/solo.spec.mjs",
     "tests/solo-browser/offline.spec.mjs",
+    "docs/solo-execution/PHONE_CHECK.md",
     "docs/solo-execution/STATE.json",
     "docs/solo-execution/HANDOFF.md",
     "docs/solo-execution/RESULTS.md"
   ],
   "tests": [
     {
-      "command": "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm run solo:e2e (x2 for stability, 13/13)",
+      "command": "npm run solo:test",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T11:09:30Z"
+      "observedAt": "2026-09-13T11:15:00Z"
     },
     {
-      "command": "npm run solo:test (x3 for stability)",
+      "command": "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm run solo:e2e",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T11:09:00Z"
-    },
-    {
-      "command": "npx tsc -b",
-      "exitCode": 0,
-      "resultPath": null,
-      "observedAt": "2026-09-13T11:09:09Z"
+      "observedAt": "2026-09-13T11:15:30Z"
     },
     {
       "command": "npm run build",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T11:09:10Z"
+      "observedAt": "2026-09-13T11:15:45Z"
     },
     {
-      "command": "npm test -- --run (pre-existing vitest suite, unaffected)",
+      "command": "manual, emulated only (no physical device available): npx vite preview + Chromium 'iPhone 13' device emulation (touch, mobile UA) via tap() throughout — START repair to debrief, a VLAN scenario with typed CLI, a tier4 pair (correctly triggered the Keep-current/Replace prompt), a viewport rotation swap, and an Export download all completed with zero console errors; see docs/solo-execution/PHONE_CHECK.md for the full breakdown and its explicit caveats (this is emulation, not real-device acceptance)",
       "exitCode": 0,
-      "resultPath": null,
-      "observedAt": "2026-09-13T11:09:20Z"
-    },
-    {
-      "command": "manual: npx vite preview + scripted Chromium check — 'Ready offline' badge appears on Home; a simulated IndexedDB QuotaExceededError produces 'Storage is full — not saved' with visible Retry and Export buttons inside the mission screen, and Exit is refused with an explanatory message until resolved (not committed to the repo)",
-      "exitCode": 0,
-      "resultPath": null,
-      "observedAt": "2026-09-13T11:10:00Z"
+      "resultPath": "docs/solo-execution/PHONE_CHECK.md",
+      "observedAt": "2026-09-13T11:20:00Z"
     }
   ],
-  "blockers": [],
-  "nextCommand": "Read the-field-solo-week/tasks/S20.md and its referenced contracts, then continue DAY7 (S20: owner phone acceptance and fixes)."
+  "blockers": [
+    "S20 requires a physical iPhone or Android device for real acceptance (S20.md: install the deployed app, airplane mode, real software keyboard/rotation/touch). No physical device is available in this sandboxed execution environment. All automated gates pass and a best-effort Chromium device-emulation pass found no issues, but per S20.md's own instruction this is explicitly NOT a substitute for owner phone validation. docs/solo-execution/PHONE_CHECK.md records exact steps for the owner to complete the real check."
+  ],
+  "nextCommand": "S20 is blocked pending the owner's own physical-device check (see docs/solo-execution/PHONE_CHECK.md for exact steps). Do not fabricate phone validation or mark S20 complete without it. S21 (static deployment and final handoff) also requires explicit deployment authorization per the original task instructions (\"deployment awaits explicit authorization\") and should not proceed without the user's go-ahead."
 }

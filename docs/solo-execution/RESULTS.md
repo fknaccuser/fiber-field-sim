@@ -554,3 +554,31 @@ user Reload after a flush. "Quota failures offer export rather than false Saved"
 (`saveStatus:'quota'` renders Retry and Export, never a false "Saved").
 
 **Status:** complete.
+
+## S20 — Owner phone acceptance and repairs (Day 7)
+
+**Built:** `docs/solo-execution/PHONE_CHECK.md` (new). No app code changed — nothing was found to
+repair, because nothing could be genuinely tested on real hardware.
+
+**No physical device available.** Per S20.md's own explicit instruction ("If no physical device
+is available mark this task blocked on owner check and provide exact steps; do not fabricate
+phone validation"), this task is recorded as **blocked**, not complete.
+
+**Checks:** `npm run solo:test` — exit 0, 249/249. `npm run solo:e2e`
+(`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`) — exit 0, 13/13. `npm run build` — exit 0. All three real,
+against the actual production build.
+
+**Best-effort emulated pass (Chromium "iPhone 13" device profile, touch + mobile UA, `tap()`
+throughout, explicitly not a substitute):** START through debrief; a VLAN scenario with typed CLI;
+a tier4 pair (correctly triggered the Keep-current/Replace prompt); a viewport rotation swap;
+an Export download. Zero console errors. Full breakdown, including what remains genuinely
+unverified (real software keyboard, real touch comfort, real airplane mode/install flow, real
+device rotation) and exact steps for the owner, in `docs/solo-execution/PHONE_CHECK.md`.
+
+**Acceptance:** **not evaluated** — "Owner can complete at least one whole mission offline with
+mobile keyboard and save/reopen it," "No critical overlay traps or disappearing controls," and
+"Any unverified platform is explicitly marked unverified" all require an actual device to confirm
+or deny; the third is satisfied by explicitly marking the platform unverified in PHONE_CHECK.md
+rather than assuming pass or fail.
+
+**Status:** blocked on owner check. See `docs/solo-execution/PHONE_CHECK.md` for exact steps.

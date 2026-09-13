@@ -693,15 +693,35 @@ with visible Retry and Export buttons inside the mission screen, and Exit is ref
 explanatory message until resolved. **Verified via `npm run solo:e2e`, twice for stability:**
 13/13 passing (9 from S18 plus the 4 new offline tests).
 
-## Next task: S20
+## S20 — BLOCKED on owner phone check (Day 7)
 
-Continues DAY7 (S20: owner phone acceptance and repairs). Read only
-`the-field-solo-week/tasks/S20.md` and whatever contracts it names before starting — its `verify`
-command in `TASKS.json` is `npm run solo:test && npm run solo:e2e && npm run build`, all three of
-which already pass cleanly, so S20 is likely a real-device/manual acceptance pass (MASTER_DESIGN.md
-§11's "definition of done": install on a phone, go offline, generate scenarios, tap devices,
-configure, verify, retain/export progress) followed by fixing whatever it finds — not new
-infrastructure — but confirm scope against the actual task file rather than assuming.
+S20.md's own step 3 says exactly what to do here: "If no physical device is available mark this
+task blocked on owner check and provide exact steps; do not fabricate phone validation." No
+physical iPhone or Android is available in this sandboxed execution environment, so that is
+exactly what happened — S20 is **not** marked complete.
 
-Next command: read `the-field-solo-week/tasks/S20.md`, then implement its files and run its
-listed checks.
+What was actually done:
+- All three automated gates ran for real: `npm run solo:test` (249/249), `npm run solo:e2e`
+  (13/13, `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`), `npm run build` — all exit 0.
+- A best-effort **emulated** mobile pass (Chromium's built-in "iPhone 13" device profile: touch
+  input, mobile UA, device pixel ratio) drove START through debrief, a VLAN scenario with typed
+  CLI, a tier4 pair (correctly triggering the Keep-current/Replace prompt when a prior mission was
+  still active), a viewport rotation swap, and an Export download, all via `tap()`, all with zero
+  console errors.
+- `docs/solo-execution/PHONE_CHECK.md` (new) records the above in full, explicitly labeled as
+  emulation rather than device acceptance, lists exactly what real hardware would still need to
+  verify (real software keyboard obscuring inputs, real touch-target comfort, real airplane mode
+  and install-to-home-screen, real device rotation, any Safari-specific overlay/keyboard quirk),
+  and gives the owner exact steps to run the real check themselves.
+
+**Do not treat S20 as complete, and do not perform a real device check by assuming or guessing at
+results.** Only an actual owner-run pass (or an explicit owner instruction to proceed without one)
+should change this status.
+
+## Next task: S21 — also gated, on deployment authorization
+
+S21 (static deployment and final handoff) depends on S20. Separately from the S20 block, this
+session's original task setup explicitly stated "deployment awaits explicit authorization" — so
+S21's actual deployment step must not proceed without the user asking for it, regardless of S20's
+status. Read `the-field-solo-week/tasks/S21.md` when resuming, but do not deploy anything without
+a direct go-ahead from the user in this conversation.
