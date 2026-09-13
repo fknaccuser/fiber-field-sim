@@ -7,9 +7,16 @@ import {
   startConfigureSession,
   exitMission,
   selectDevice,
+  applyMissionActions,
+  beginReconnect,
+  chooseReconnectSource,
+  cancelReconnect,
+  confirmReconnect,
+  recordTestEvent,
 } from './app.js';
 import { openStore } from './store.js';
 import { renderHome, renderMission } from './view.js';
+import { runMissionTest } from './devices.js';
 
 const INIT_LINES = ['Initializing local session.', 'Preparing The Field.', 'Ready.'];
 const INIT_LINE_DELAY_MS = 200;
@@ -44,6 +51,12 @@ function render() {
           onExit: exitToHome,
           onTabChange: changeMissionTab,
           onSelectDevice: pickDevice,
+          onSelectLink: pickLink,
+          onChooseReconnectSource: chooseSource,
+          onConfirmReconnect: confirmReconnectFlow,
+          onCancelReconnect: cancelReconnectFlow,
+          onApplyDeviceForm: applyDeviceForm,
+          onRunTest: runTest,
         },
         missionTab,
       ),
@@ -53,6 +66,21 @@ function render() {
 
 async function retrySave() {
   state = await persistProfile(state, store);
+  render();
+}
+
+// One active mission autosaves after every accepted configuration change and
+// test (MASTER_DESIGN.md §10). Reuses the same saveStatus indicator as the
+// profile save.
+async function persistMission() {
+  state = { ...state, saveStatus: 'saving' };
+  render();
+  try {
+    await store.saveMission(state.mission);
+    state = { ...state, saveStatus: 'saved' };
+  } catch {
+    state = { ...state, saveStatus: 'error' };
+  }
   render();
 }
 
@@ -77,6 +105,42 @@ function pickDevice(deviceId) {
   state = selectDevice(state, deviceId);
   missionTab = 'device';
   render();
+}
+
+function pickLink(linkId) {
+  state = beginReconnect(state, linkId);
+  render();
+}
+
+function chooseSource(portId) {
+  state = chooseReconnectSource(state, portId);
+  render();
+}
+
+function cancelReconnectFlow() {
+  state = cancelReconnect(state);
+  render();
+}
+
+function confirmReconnectFlow(destinationPortId) {
+  const { state: nextState, result } = confirmReconnect(state, destinationPortId);
+  state = result.ok ? { ...nextState, error: null } : { ...state, error: result.message || 'Could not reconnect that cable.' };
+  render();
+  if (result.ok) persistMission();
+}
+
+function applyDeviceForm(actions) {
+  const { state: nextState, result } = applyMissionActions(state, actions, { deviceId: state.selectedDeviceId });
+  state = result.ok ? { ...nextState, error: null } : { ...state, error: result.message || 'Could not apply that change.' };
+  render();
+  if (result.ok && actions.length > 0) persistMission();
+}
+
+function runTest(testKind, deviceId) {
+  const result = runMissionTest(state.mission, testKind, deviceId);
+  state = recordTestEvent(state, testKind, deviceId, result);
+  render();
+  persistMission();
 }
 
 function renderOpening() {

@@ -344,6 +344,101 @@ input {
   word-break: break-word;
 }
 
+.device-panel-empty,
+.device-panel h2 + p {
+  color: var(--field-muted);
+}
+
+.device-form {
+  border: 1px solid var(--field-panel);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.form-row-checkbox {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.form-row span {
+  color: var(--field-muted);
+  font-size: 0.85rem;
+}
+
+.form-error {
+  color: var(--field-error);
+}
+
+.device-form button {
+  margin-right: 8px;
+}
+
+.device-port-heading {
+  color: var(--field-muted);
+  margin: 8px 0 2px;
+  font-size: 0.85rem;
+}
+
+.device-tests-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.diagram-link-reconnecting {
+  stroke: var(--field-cyan);
+  stroke-width: 1;
+}
+
+.diagram-list-link-reconnecting {
+  outline: 1.5px solid var(--field-cyan);
+}
+
+.reconnect-panel {
+  border: 1px solid var(--field-cyan);
+  border-radius: 6px;
+  padding: 10px;
+  margin-top: 12px;
+}
+
+.reconnect-heading {
+  color: var(--field-text);
+  font-weight: 600;
+}
+
+.reconnect-panel select {
+  min-height: 44px;
+}
+
+.reconnect-panel button {
+  margin-right: 8px;
+}
+
+.findings-empty {
+  color: var(--field-muted);
+}
+
+.findings-list {
+  padding-left: 20px;
+}
+
+.findings-row-pass {
+  color: var(--field-success);
+}
+
+.findings-row-fail {
+  color: var(--field-error);
+}
+
 @media (min-width: 900px) {
   /* Tablet+: topology left (40%), selected device right (60%), both visible
      at once (MASTER_DESIGN.md §7) — so the tab control that switches between

@@ -1,9 +1,8 @@
 // SVG topology (UI_AND_STORAGE.md "Network view is an SVG schematic"). Plain
 // vector shapes and labeled ports, not a 2D world/character engine. Every
-// clickable device also has a keyboard-focusable equivalent, and the whole
-// diagram has a plain HTML list alternative (UI_AND_STORAGE.md's accessibility
-// rules), since S07's scope is device selection only — cable interaction is a
-// later task's addition.
+// clickable device/cable also has a keyboard-focusable equivalent, and the
+// whole diagram has a plain HTML list alternative (UI_AND_STORAGE.md's
+// accessibility rules).
 
 // Coordinates from SCENARIOS.md "Fixed generator details", on a 100x100 viewBox.
 const POSITIONS = {
@@ -60,7 +59,10 @@ function linkEndpoints(network, link) {
   return [portA?.deviceId, portB?.deviceId];
 }
 
-export function renderTopology(network, { selectedDeviceId = null, onSelectDevice } = {}) {
+export function renderTopology(
+  network,
+  { selectedDeviceId = null, onSelectDevice, onSelectLink, reconnectLinkId = null } = {},
+) {
   const container = document.createElement('div');
   container.className = 'diagram';
 
@@ -73,12 +75,26 @@ export function renderTopology(network, { selectedDeviceId = null, onSelectDevic
     const posA = positions[deviceAId];
     const posB = positions[deviceBId];
     if (!posA || !posB) continue;
+    const classes = ['diagram-link'];
+    if (!link.connected) classes.push('diagram-link-down');
+    if (link.id === reconnectLinkId) classes.push('diagram-link-reconnecting');
     const line = svgEl('line', {
       x1: posA[0],
       y1: posA[1],
       x2: posB[0],
       y2: posB[1],
-      class: link.connected ? 'diagram-link' : 'diagram-link diagram-link-down',
+      class: classes.join(' '),
+      tabindex: '0',
+      role: 'button',
+      'aria-label': `Cable ${link.id}, ${link.connected ? 'connected' : 'disconnected'}`,
+    });
+    const selectLink = () => onSelectLink?.(link.id);
+    line.addEventListener('click', selectLink);
+    line.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        selectLink();
+      }
     });
     linksGroup.appendChild(line);
   }
@@ -132,8 +148,13 @@ export function renderTopology(network, { selectedDeviceId = null, onSelectDevic
   }
   for (const link of network.links) {
     const item = document.createElement('li');
-    item.className = 'diagram-list-link';
-    item.textContent = `Cable ${link.id}: ${link.connected ? 'connected' : 'disconnected'}`;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className =
+      link.id === reconnectLinkId ? 'diagram-list-link diagram-list-link-reconnecting' : 'diagram-list-link';
+    button.textContent = `Cable ${link.id}: ${link.connected ? 'connected' : 'disconnected'}`;
+    button.addEventListener('click', () => onSelectLink?.(link.id));
+    item.appendChild(button);
     list.appendChild(item);
   }
   container.appendChild(list);

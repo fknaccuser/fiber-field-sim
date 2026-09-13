@@ -3,6 +3,7 @@
 
 import { createHealthyLayout } from './layouts.js';
 import { cloneNetwork } from './model.js';
+import { applyAction } from './actions.js';
 
 export function createInitialState() {
   return {
@@ -15,6 +16,11 @@ export function createInitialState() {
     studySession: null,
     saveStatus: 'idle',
     error: null,
+    // Transient flows kept in app state (not in UI_AND_STORAGE.md's abbreviated
+    // App state list) so a full re-render never loses them, the same way
+    // terminalSessions must survive re-renders: "reconnect" tracks the
+    // tap-cable-then-source-then-destination flow (S08).
+    reconnect: null,
   };
 }
 
@@ -168,11 +174,21 @@ export function startConfigureSession(state, layoutId) {
     mission: createConfigureAttempt(layoutId),
     selectedDeviceId: null,
     recentDevices: [],
+    reconnect: null,
+    error: null,
   };
 }
 
 export function exitMission(state) {
-  return { ...state, screen: 'home', mission: null, selectedDeviceId: null, recentDevices: [] };
+  return {
+    ...state,
+    screen: 'home',
+    mission: null,
+    selectedDeviceId: null,
+    recentDevices: [],
+    reconnect: null,
+    error: null,
+  };
 }
 
 const RECENT_DEVICES_LIMIT = 4;
@@ -185,5 +201,139 @@ export function selectDevice(state, deviceId) {
     0,
     RECENT_DEVICES_LIMIT,
   );
-  return { ...state, selectedDeviceId: deviceId, recentDevices };
+  return { ...state, selectedDeviceId: deviceId, recentDevices, error: null };
+}
+
+// The specific entity an action touches, before/after — not the whole network
+// (DATA_CONTRACTS.md's 500-event budget rules out huge per-event snapshots).
+function extractEntity(network, action) {
+  switch (action.type) {
+    case 'setLinkConnected':
+    case 'moveCable':
+      return network.links.find((l) => l.id === action.linkId) ?? null;
+    case 'setPortAdmin':
+    case 'setAccessVlan':
+    case 'setTrunkAllowedVlans':
+      return network.ports.find((p) => p.id === action.portId) ?? null;
+    case 'setClientAddress':
+    case 'setClientGateway':
+    case 'setClientDns':
+      return network.devices.find((d) => d.id === action.deviceId) ?? null;
+    case 'setRouterSegmentAddress': {
+      const device = network.devices.find((d) => d.id === action.deviceId);
+      return (
+        device?.routerSegments?.find((s) => s.portId === action.portId && s.vlanId === (action.vlanId ?? null)) ??
+        null
+      );
+    }
+    case 'setDnsRecord':
+      return network.dnsRecords.find((r) => r.serverId === action.serverId && r.name === action.name) ?? null;
+    default:
+      return null;
+  }
+}
+
+function nextEventId(mission) {
+  return mission.compactedEventCount + mission.events.length;
+}
+
+function appendChangeEvent(mission, action, before, after, deviceId) {
+  const index = nextEventId(mission);
+  const event = {
+    id: String(index),
+    index,
+    kind: 'change',
+    revision: after.revision,
+    deviceId: deviceId ?? undefined,
+    details: { action, before: extractEntity(before, action), after: extractEntity(after, action) },
+    assistance: false,
+  };
+  return { ...mission, events: [...mission.events, event] };
+}
+
+// Dispatches a batch of actions through applyAction only (DATA_CONTRACTS.md/
+// S08.md), atomically from the caller's point of view: on the first rejected
+// action, the original state is returned untouched — "invalid input preserves
+// the prior network" — and every accepted change appends its own event.
+export function applyMissionActions(state, actions, { deviceId = null } = {}) {
+  if (!state.mission || actions.length === 0) {
+    return { state, result: { ok: true } };
+  }
+  let network = state.mission.network;
+  let mission = state.mission;
+  for (const action of actions) {
+    const before = network;
+    const result = applyAction(network, action);
+    if (!result.ok) {
+      return { state, result: { ok: false, code: result.code, message: result.message } };
+    }
+    network = result.state;
+    if (network.revision !== before.revision) {
+      mission = appendChangeEvent(mission, action, before, network, deviceId);
+    }
+  }
+  mission = { ...mission, network };
+  return { state: { ...state, mission }, result: { ok: true } };
+}
+
+export function beginReconnect(state, linkId) {
+  if (!state.mission) return state;
+  const exists = state.mission.network.links.some((l) => l.id === linkId);
+  if (!exists) return state;
+  return { ...state, reconnect: { linkId, sourcePortId: null }, error: null };
+}
+
+export function chooseReconnectSource(state, portId) {
+  if (!state.reconnect) return state;
+  return { ...state, reconnect: { ...state.reconnect, sourcePortId: portId }, error: null };
+}
+
+export function cancelReconnect(state) {
+  return { ...state, reconnect: null, error: null };
+}
+
+export function confirmReconnect(state, destinationPortId) {
+  if (!state.reconnect?.sourcePortId || !state.mission) {
+    return { state, result: { ok: false, code: 'INVALID_STATE', message: 'No reconnect in progress.' } };
+  }
+  const { linkId, sourcePortId } = state.reconnect;
+  const link = state.mission.network.links.find((l) => l.id === linkId);
+  const actions = [];
+  // moveCable has no `connected` field (ENGINE_RULES.md's Action envelope) and
+  // is a no-op when the endpoints don't change, so tapping Connect on an
+  // unplugged-but-correctly-wired cable (P1) would otherwise leave it
+  // unplugged. "Connect" always means plugged in at the chosen endpoints,
+  // whether or not they differ from the current ones.
+  if (link && (link.aPortId !== sourcePortId || link.bPortId !== destinationPortId)) {
+    actions.push({ type: 'moveCable', linkId, aPortId: sourcePortId, bPortId: destinationPortId });
+  }
+  if (!link || !link.connected) {
+    actions.push({ type: 'setLinkConnected', linkId, connected: true });
+  }
+  const { state: nextState, result } = applyMissionActions(state, actions);
+  if (!result.ok) {
+    return { state: nextState, result };
+  }
+  return { state: { ...nextState, reconnect: null }, result };
+}
+
+function nextTestEventId(mission) {
+  return nextEventId(mission);
+}
+
+// Records a 'test' event for a run through forward.js (canReach/resolveName/
+// testService all share the {ok,code,trace} shape well enough to log directly).
+export function recordTestEvent(state, testKind, targetDeviceId, testResult) {
+  if (!state.mission) return state;
+  const index = nextTestEventId(state.mission);
+  const event = {
+    id: String(index),
+    index,
+    kind: 'test',
+    revision: state.mission.network.revision,
+    deviceId: targetDeviceId,
+    details: { testKind, target: targetDeviceId, result: testResult },
+    assistance: false,
+  };
+  return { ...state, mission: { ...state.mission, events: [...state.mission.events, event] } };
 }
