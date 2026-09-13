@@ -6,6 +6,7 @@ import { cloneNetwork } from './model.js';
 import { applyAction } from './actions.js';
 import { createTerminalSession } from './cli.js';
 import { generateCase, nextCase, fingerprintForCode } from './generate.js';
+import { inSubnet } from './ip.js';
 
 export const RECOMMENDED_CODE = 'TF1-HM-1-P-START';
 const RECENT_FINGERPRINT_LIMIT = 20;
@@ -29,6 +30,11 @@ export function createInitialState() {
     // Resume/Replace choice when one is already active (S11).
     reconnect: null,
     pendingMissionRequest: null,
+    // Wall-clock timestamp (Date.now()) the mission was last (re)entered, or
+    // null while paused; main.js supplies `now` so this file never calls the
+    // clock itself. Elapsed time accrues only between resume and pause
+    // (S12.md: "Paused app time does not increase active elapsed time").
+    sessionResumedAt: null,
   };
 }
 
@@ -171,9 +177,31 @@ export function startConfigureSession(state, layoutId) {
 // and history intact (MASTER_DESIGN.md §10: "Resume keeps the scenario,
 // current device, input draft and history"). Only an explicit replace or
 // completion (grade.js, a later task) actually ends a mission.
-export function exitMission(state) {
+// Elapsed time accrues only while sessionResumedAt is set; pausing folds the
+// active delta into mission.elapsedMs and clears it. `now` is always supplied
+// by the caller (main.js), never read here (ENGINE_RULES.md's "Application
+// code supplies elapsed time" convention, applied here too for testability).
+export function pauseMissionTimer(state, now = Date.now()) {
+  if (state.sessionResumedAt == null || !state.mission) return state;
+  const delta = Math.max(0, now - state.sessionResumedAt);
   return {
     ...state,
+    sessionResumedAt: null,
+    mission: { ...state.mission, elapsedMs: state.mission.elapsedMs + delta },
+  };
+}
+
+export function resumeMissionTimer(state, now = Date.now()) {
+  if (!state.mission || state.sessionResumedAt != null) return state;
+  return { ...state, sessionResumedAt: now };
+}
+
+// Leaving the workspace pauses elapsed time automatically (MASTER_DESIGN.md
+// §10); the mission itself stays active and resumable (see exitMission's own
+// note above about not discarding it).
+export function exitMission(state, now = Date.now()) {
+  return {
+    ...pauseMissionTimer(state, now),
     screen: 'home',
     reconnect: null,
     pendingMissionRequest: null,
@@ -181,9 +209,9 @@ export function exitMission(state) {
   };
 }
 
-export function resumeMission(state) {
+export function resumeMission(state, now = Date.now()) {
   if (!state.mission) return state;
-  return { ...state, screen: 'mission', error: null };
+  return resumeMissionTimer({ ...state, screen: 'mission', error: null }, now);
 }
 
 // Records the fingerprint of a freshly started (non-replay) case into the
@@ -204,7 +232,7 @@ function recordFingerprint(state, caseCode) {
   return { ...state, profile: { ...state.profile, recentFingerprints } };
 }
 
-function enterMission(state, attempt) {
+function enterMission(state, attempt, now = Date.now()) {
   return {
     ...state,
     screen: 'mission',
@@ -214,6 +242,7 @@ function enterMission(state, attempt) {
     reconnect: null,
     pendingMissionRequest: null,
     error: null,
+    sessionResumedAt: now,
   };
 }
 
@@ -448,4 +477,103 @@ export function setTerminalSession(state, deviceId, terminal) {
 export function markTerminalBuilderOrigin(state, deviceId, deviceKind) {
   const session = terminalSessionFor(state, deviceId, deviceKind);
   return setTerminalSession(state, deviceId, { ...session, builderOrigin: true });
+}
+
+// --- Tiered guidance (S12) ---
+
+// Whether a specific recipe's fault is currently fixed, derived only from
+// data already on the Attempt (current network + requirements) — no separate
+// stored "healthy" snapshot is needed, since every recipe's correct value is
+// independently recoverable: the server's own address is never corrupted by
+// any recipe, so it's always available as the true DNS/portal target, and
+// the router's real target-segment address is always findable by VLAN.
+export function isRecipeRepaired(mission, recipeId) {
+  const network = mission.network;
+  const requirements = mission.requirements;
+  const pc1 = network.devices.find((d) => d.id === mission.targetClientId);
+  const pc1OwnPort = network.ports.find((p) => p.deviceId === mission.targetClientId);
+  const link = network.links.find((l) => l.aPortId === pc1OwnPort.id || l.bPortId === pc1OwnPort.id);
+  const switchPortId = link ? (link.aPortId === pc1OwnPort.id ? link.bPortId : link.aPortId) : null;
+  const switchPort = switchPortId ? network.ports.find((p) => p.id === switchPortId) : null;
+  const server = network.devices.find((d) => d.id === requirements.portalServerId);
+  switch (recipeId) {
+    case 'P1':
+      return Boolean(link?.connected);
+    case 'P2':
+      return switchPort?.adminUp === true;
+    case 'I1':
+      return inSubnet(pc1.ip, requirements.targetSubnet, requirements.targetPrefix);
+    case 'I2': {
+      const router = network.devices.find((d) => d.kind === 'router');
+      const targetSegment = router?.routerSegments?.find((s) => s.vlanId === requirements.targetVlan);
+      return targetSegment != null && pc1.gateway === targetSegment.ip;
+    }
+    case 'V1':
+      return switchPort?.mode === 'access' && switchPort.accessVlan === requirements.targetVlan;
+    case 'V2': {
+      const trunkPort = switchPort
+        ? network.ports.find((p) => p.mode === 'trunk' && p.deviceId === switchPort.deviceId)
+        : null;
+      return Boolean(trunkPort?.allowedVlans.includes(requirements.targetVlan));
+    }
+    case 'D1':
+      return pc1.dns === server?.ip;
+    case 'D2': {
+      const record = network.dnsRecords.find((r) => r.name === mission.targetName);
+      return record?.address === server?.ip;
+    }
+    default:
+      return false;
+  }
+}
+
+// Hints target the earliest still-broken fault in the case's own recipe pair
+// order (SCENARIOS.md: "request hints for the earliest still-unresolved
+// recipe according to pair order"); once it's fixed, requesting hints again
+// progresses to the remaining fault (S12.md acceptance, tier4).
+export function currentHintRecipeId(mission) {
+  for (const recipeId of mission.recipeIds) {
+    if (!isRecipeRepaired(mission, recipeId)) return recipeId;
+  }
+  return mission.recipeIds[mission.recipeIds.length - 1];
+}
+
+const MAX_HINT_LEVEL = 3;
+
+// Requesting a hint (any level) marks the run assisted and records a
+// distinct assistance event; ordinary CLI `?` never does (cli.js has no path
+// that calls this). Hints remain available at every tier including 4.
+export function requestHint(state) {
+  if (!state.mission) return state;
+  const recipeId = currentHintRecipeId(state.mission);
+  const currentLevel = state.mission.hintLevels[recipeId] ?? 0;
+  const level = Math.min(currentLevel + 1, MAX_HINT_LEVEL);
+  const mission = state.mission;
+  const index = mission.compactedEventCount + mission.events.length;
+  const event = {
+    id: String(index),
+    index,
+    kind: 'assistance',
+    revision: mission.network.revision,
+    deviceId: mission.targetClientId,
+    details: { type: 'hint', recipeId, level },
+    assistance: true,
+  };
+  return {
+    ...state,
+    mission: {
+      ...mission,
+      hintLevels: { ...mission.hintLevels, [recipeId]: level },
+      assisted: true,
+      events: [...mission.events, event],
+    },
+  };
+}
+
+export function showCauseCount(mission) {
+  return mission.mode !== 'repair' || mission.tier <= 2;
+}
+
+export function showHarmlessDetail(mission) {
+  return mission.mode === 'repair' && mission.tier === 3;
 }

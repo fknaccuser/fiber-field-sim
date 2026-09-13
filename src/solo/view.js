@@ -2,7 +2,7 @@
 // (app.js) stays DOM-free so it is testable under `node --test`.
 
 import { renderTopology } from './diagram.js';
-import { terminalSessionFor } from './app.js';
+import { terminalSessionFor, currentHintRecipeId, showCauseCount, showHarmlessDetail } from './app.js';
 import {
   renderClientForm,
   renderPortForm,
@@ -11,6 +11,7 @@ import {
   renderTests,
   renderTerminal,
 } from './devices.js';
+import { CUSTOMER_QUESTIONS, CUSTOMER_FACTS, HARMLESS_DETAILS, HINTS, renderHintText, TIER_GOAL_MS } from './content.js';
 
 function describeSaveStatus(status) {
   switch (status) {
@@ -420,6 +421,106 @@ const MISSION_TABS = [
   { id: 'findings', label: 'Findings' },
 ];
 
+function xFromNetwork(network) {
+  // The generated /24's second octet is never mutated by any recipe; the
+  // server's own address is always intact, so it's a reliable source.
+  const server = network.devices.find((d) => d.kind === 'server');
+  return server ? Number(server.ip.split('.')[1]) : null;
+}
+
+function formatDuration(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+// MASTER_DESIGN.md §4-6: the customer report, tiered cause visibility, the
+// harmless tier3 detail, hints, and the elapsed/goal timer.
+function renderBrief(state, actions) {
+  const mission = state.mission;
+  const container = document.createElement('div');
+  container.className = 'mission-brief';
+
+  if (mission.mode === 'repair') {
+    const factsHeading = document.createElement('h3');
+    factsHeading.textContent = 'Customer report';
+    container.appendChild(factsHeading);
+    const primaryRecipe = mission.recipeIds[0];
+    const facts = CUSTOMER_FACTS[primaryRecipe] ?? {};
+    const list = document.createElement('dl');
+    list.className = 'brief-facts';
+    for (const question of CUSTOMER_QUESTIONS) {
+      const dt = document.createElement('dt');
+      dt.textContent = question.prompt;
+      const dd = document.createElement('dd');
+      dd.textContent = facts[question.id] ?? '(no answer on file)';
+      list.append(dt, dd);
+    }
+    container.appendChild(list);
+
+    if (showCauseCount(mission)) {
+      const causeCount = document.createElement('p');
+      causeCount.className = 'brief-cause-count';
+      causeCount.textContent =
+        mission.recipeIds.length === 1 ? 'This job has a single fault to find.' : 'This job has two faults to find.';
+      container.appendChild(causeCount);
+    }
+
+    if (showHarmlessDetail(mission) && typeof mission.detail === 'number') {
+      const detail = document.createElement('p');
+      detail.className = 'brief-harmless-detail';
+      detail.textContent = HARMLESS_DETAILS[mission.detail] ?? '';
+      container.appendChild(detail);
+    }
+  }
+
+  const requirements = mission.requirements;
+  const req = document.createElement('p');
+  req.className = 'brief-requirements';
+  req.textContent = `Intended target subnet ${requirements.targetSubnet}/${requirements.targetPrefix} (VLAN ${requirements.targetVlan}); protected subnet ${requirements.protectedSubnet}/${requirements.protectedPrefix} (VLAN ${requirements.protectedVlan}); portal ${mission.targetName}.`;
+  container.appendChild(req);
+
+  const timer = document.createElement('p');
+  timer.className = 'brief-timer';
+  const goalMs = mission.mode === 'repair' ? TIER_GOAL_MS[mission.tier] : null;
+  timer.textContent = goalMs
+    ? `Elapsed ${formatDuration(mission.elapsedMs)} / goal ${formatDuration(goalMs)}`
+    : `Elapsed ${formatDuration(mission.elapsedMs)}`;
+  container.appendChild(timer);
+
+  if (mission.mode === 'repair') {
+    const hintButton = document.createElement('button');
+    hintButton.type = 'button';
+    hintButton.className = 'brief-hint-button';
+    hintButton.textContent = 'Hint';
+    hintButton.addEventListener('click', () => actions.onRequestHint?.());
+    container.appendChild(hintButton);
+
+    const recipeId = currentHintRecipeId(mission);
+    const level = mission.hintLevels[recipeId] ?? 0;
+    if (level > 0) {
+      const hint = HINTS[recipeId];
+      const x = xFromNetwork(mission.network);
+      const hintText = document.createElement('div');
+      hintText.className = 'brief-hint-text';
+      const levels = [
+        ['nudge', hint.nudge],
+        ['clue', hint.clue],
+        ['step', hint.step],
+      ];
+      for (let i = 0; i < level; i += 1) {
+        const p = document.createElement('p');
+        p.textContent = renderHintText(levels[i][1], x);
+        hintText.appendChild(p);
+      }
+      container.appendChild(hintText);
+    }
+  }
+
+  return container;
+}
+
 // The Field workspace (UI_AND_STORAGE.md "Mission"). Below 900px this shows one
 // tab at a time; the ≥900px 40/60 split is CSS-only (styles.css) — the same
 // panels are all rendered here, just laid out differently.
@@ -459,6 +560,7 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   if (state.pendingMissionRequest) {
     container.appendChild(renderPendingMissionPrompt(state, actions));
   }
+  container.appendChild(renderBrief(state, actions));
 
   const tabList = document.createElement('div');
   tabList.className = 'mission-tabs';

@@ -560,6 +560,61 @@ input {
   margin-right: 8px;
 }
 
+.mission-brief {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--field-panel);
+}
+
+.mission-brief h3 {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+}
+
+.brief-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 12px;
+  row-gap: 2px;
+  margin: 0 0 8px;
+}
+
+.brief-facts dt {
+  color: var(--field-muted);
+}
+
+.brief-facts dd {
+  margin: 0;
+}
+
+.brief-cause-count,
+.brief-requirements,
+.brief-timer {
+  color: var(--field-muted);
+  margin: 4px 0;
+}
+
+.brief-harmless-detail {
+  color: var(--field-warning);
+  margin: 4px 0;
+}
+
+.brief-hint-button {
+  background: var(--field-panel);
+  color: var(--field-text);
+  border: 1px solid var(--field-cyan);
+  border-radius: 6px;
+  padding: 0 16px;
+}
+
+.brief-hint-text {
+  margin-top: 8px;
+  color: var(--field-text);
+}
+
+.brief-hint-text p {
+  margin: 2px 0;
+}
+
 @media (min-width: 900px) {
   /* Tablet+: topology left (40%), selected device right (60%), both visible
      at once (MASTER_DESIGN.md §7) — so the tab control that switches between

@@ -197,18 +197,26 @@ function subnetOf(ip) {
 // come from the healthy layout before faults." Shared by configure-mode
 // attempts (app.js) and generated repair attempts (generate.js) so both
 // derive requirements the same way, from an unfaulted network.
+// The client's own port ("routed" mode, accessVlan ignored per ENGINE_RULES.md's
+// binding clarifications) never carries the real VLAN — that's on the switch
+// access port the client's link actually terminates on.
+function accessVlanFor(network, deviceId) {
+  const ownPort = network.ports.find((p) => p.deviceId === deviceId);
+  const link = network.links.find((l) => l.aPortId === ownPort.id || l.bPortId === ownPort.id);
+  const switchPortId = link.aPortId === ownPort.id ? link.bPortId : link.aPortId;
+  return network.ports.find((p) => p.id === switchPortId).accessVlan;
+}
+
 export function deriveRequirements(healthyNetwork) {
   const pc1 = healthyNetwork.devices.find((d) => d.id === 'PC1');
   const pc2 = healthyNetwork.devices.find((d) => d.id === 'PC2');
-  const pc1Port = healthyNetwork.ports.find((p) => p.deviceId === 'PC1');
-  const pc2Port = healthyNetwork.ports.find((p) => p.deviceId === 'PC2');
   return {
     targetSubnet: subnetOf(pc1.ip),
     targetPrefix: 24,
-    targetVlan: pc1Port.accessVlan,
+    targetVlan: accessVlanFor(healthyNetwork, 'PC1'),
     protectedSubnet: subnetOf(pc2.ip),
     protectedPrefix: 24,
-    protectedVlan: pc2Port.accessVlan,
+    protectedVlan: accessVlanFor(healthyNetwork, 'PC2'),
     portalServerId: 'S1',
   };
 }

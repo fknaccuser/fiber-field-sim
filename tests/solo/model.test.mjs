@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateNetwork, cloneNetwork } from '../../src/solo/model.js';
-import { createHealthyLayout } from '../../src/solo/layouts.js';
+import { createHealthyLayout, deriveRequirements } from '../../src/solo/layouts.js';
 
 test('BR has six devices and five links, and validates', () => {
   const br = createHealthyLayout('BR', 42, 130);
@@ -148,4 +148,17 @@ test('createHealthyLayout rejects an out-of-range x or host', () => {
   assert.throws(() => createHealthyLayout('BR', 0, 130));
   assert.throws(() => createHealthyLayout('BR', 42, 129));
   assert.throws(() => createHealthyLayout('WX', 42, 130));
+});
+
+test('deriveRequirements reads VLANs from the switch access port, not the ignored client-port field', () => {
+  // Regression: a client's own port is always "routed" with an ignored
+  // accessVlan (ENGINE_RULES.md's binding clarifications) copied verbatim
+  // from the golden fixture, which happens to read 10 for both PC1 and PC2 —
+  // masking a bug where protectedVlan silently read as 10 instead of 20.
+  for (const layoutId of ['HM', 'BR', 'OF']) {
+    const network = createHealthyLayout(layoutId, 33, 140);
+    const requirements = deriveRequirements(network);
+    assert.equal(requirements.targetVlan, 10, layoutId);
+    assert.equal(requirements.protectedVlan, 20, layoutId);
+  }
 });

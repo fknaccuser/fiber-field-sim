@@ -23,6 +23,9 @@ import {
   replayMission,
   startNewVariation,
   RECOMMENDED_CODE,
+  requestHint,
+  pauseMissionTimer,
+  resumeMissionTimer,
 } from './app.js';
 import { openStore } from './store.js';
 import { renderHome, renderMission } from './view.js';
@@ -80,6 +83,7 @@ function render() {
           onNewVariation: newVariation,
           onConfirmReplace: confirmReplace,
           onCancelReplace: cancelReplace,
+          onRequestHint: requestHintAction,
         },
         missionTab,
       ),
@@ -240,6 +244,25 @@ function runTest(testKind, deviceId) {
   render();
   persistMission();
 }
+
+function requestHintAction() {
+  state = requestHint(state);
+  render();
+  persistMission();
+}
+
+// Leaving the tab (backgrounding, switching apps) pauses elapsed time the
+// same way leaving the workspace does (MASTER_DESIGN.md §10); returning
+// resumes it only if a mission is actually on screen.
+document.addEventListener('visibilitychange', () => {
+  if (!state.mission) return;
+  if (document.hidden) {
+    state = pauseMissionTimer(state);
+    persistMission();
+  } else if (state.screen === 'mission') {
+    state = resumeMissionTimer(state);
+  }
+});
 
 function submitTerminalCommand(deviceId, deviceKind, text) {
   const session = terminalSessionFor(state, deviceId, deviceKind);

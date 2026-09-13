@@ -40,9 +40,13 @@ test('startConfigureSession rejects an unknown layout', () => {
 test('exitMission returns to Home but keeps the mission resumable (current device and history intact)', () => {
   const started = startConfigureSession(createInitialState(), 'BR');
   const withSelection = selectDevice(started, 'PC1');
+  // exitMission also pauses the elapsed-time timer (S12), which legitimately
+  // produces a new mission object (updated elapsedMs); compare identity apart
+  // from that field rather than the whole object's reference.
   const exited = exitMission(withSelection);
   assert.equal(exited.screen, 'home');
-  assert.equal(exited.mission, withSelection.mission);
+  assert.equal(exited.mission.id, withSelection.mission.id);
+  assert.deepEqual(exited.mission.network, withSelection.mission.network);
   assert.equal(exited.selectedDeviceId, 'PC1');
   assert.deepEqual(exited.recentDevices, ['PC1']);
 });

@@ -75,6 +75,7 @@ export function generateCase(caseCode) {
     id: null,
     caseCode,
     tier: params.tier,
+    detail: params.detail,
     initialNetwork: faultedNetwork,
     network: cloneNetwork(faultedNetwork),
     recipeIds: params.recipes,
