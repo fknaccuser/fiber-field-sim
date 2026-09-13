@@ -95,8 +95,14 @@ export function generateCase(caseCode) {
   };
 }
 
-function fingerprintFor(params) {
+// Fingerprint is JSON of [layout,tier,x,host,recipes,label,detail], in that
+// order (SCENARIOS.md "Fixed generator details").
+export function fingerprintFor(params) {
   return JSON.stringify([params.layout, params.tier, params.x, params.host, params.recipes, params.label, params.detail]);
+}
+
+export function fingerprintForCode(caseCode) {
+  return fingerprintFor(parameters(caseCode));
 }
 
 // nextCase(settings, recentFingerprints) -> case-code string.

@@ -25,6 +25,36 @@ function describeSaveStatus(status) {
   }
 }
 
+const SKILLS = [
+  { family: 'P', label: 'Link/port' },
+  { family: 'I', label: 'IPv4' },
+  { family: 'V', label: 'VLAN' },
+  { family: 'D', label: 'DNS' },
+];
+
+function renderPendingMissionPrompt(state, actions) {
+  const request = state.pendingMissionRequest;
+  const box = document.createElement('div');
+  box.className = 'home-pending-prompt';
+  box.setAttribute('role', 'alertdialog');
+  const message = document.createElement('p');
+  message.textContent =
+    request.kind === 'code'
+      ? `Starting "${request.caseCode}" will replace your current mission.`
+      : `Starting a new configure session will replace your current mission.`;
+  box.appendChild(message);
+  const resumeButton = document.createElement('button');
+  resumeButton.type = 'button';
+  resumeButton.textContent = 'Resume current';
+  resumeButton.addEventListener('click', () => actions.onCancelReplace?.());
+  const replaceButton = document.createElement('button');
+  replaceButton.type = 'button';
+  replaceButton.textContent = 'Replace';
+  replaceButton.addEventListener('click', () => actions.onConfirmReplace?.());
+  box.append(resumeButton, replaceButton);
+  return box;
+}
+
 export function renderHome(state, actions = {}) {
   const container = document.createElement('div');
   container.className = 'home-screen';
@@ -32,6 +62,10 @@ export function renderHome(state, actions = {}) {
   const heading = document.createElement('h1');
   heading.textContent = 'The Field';
   container.appendChild(heading);
+
+  if (state.pendingMissionRequest) {
+    container.appendChild(renderPendingMissionPrompt(state, actions));
+  }
 
   const continueButton = document.createElement('button');
   continueButton.type = 'button';
@@ -62,6 +96,65 @@ export function renderHome(state, actions = {}) {
     retryButton.addEventListener('click', () => actions.onRetrySave?.());
     container.appendChild(retryButton);
   }
+
+  if (state.error) {
+    const error = document.createElement('p');
+    error.className = 'form-error';
+    error.setAttribute('role', 'alert');
+    error.textContent = state.error;
+    container.appendChild(error);
+  }
+
+  const recommendedHeading = document.createElement('h2');
+  recommendedHeading.className = 'home-section-heading';
+  recommendedHeading.textContent = 'Recommended job';
+  container.appendChild(recommendedHeading);
+  const recommendedRow = document.createElement('div');
+  recommendedRow.className = 'home-recommended-row';
+  const recommendedText = document.createElement('span');
+  recommendedText.textContent = actions.recommendedCode ?? 'TF1-HM-1-P-START';
+  const startRecommended = document.createElement('button');
+  startRecommended.type = 'button';
+  startRecommended.textContent = 'Start';
+  startRecommended.addEventListener('click', () => actions.onStartCode?.(actions.recommendedCode ?? 'TF1-HM-1-P-START'));
+  recommendedRow.append(recommendedText, startRecommended);
+  container.appendChild(recommendedRow);
+
+  const skillsHeading = document.createElement('h2');
+  skillsHeading.className = 'home-section-heading';
+  skillsHeading.textContent = 'Choose a skill';
+  container.appendChild(skillsHeading);
+  const skillsRow = document.createElement('div');
+  skillsRow.className = 'home-skills-row';
+  for (const skill of SKILLS) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = skill.label;
+    button.addEventListener('click', () => actions.onStartVariation?.(skill.family));
+    skillsRow.appendChild(button);
+  }
+  container.appendChild(skillsRow);
+
+  const seedHeading = document.createElement('h2');
+  seedHeading.className = 'home-section-heading';
+  seedHeading.textContent = 'Enter seed';
+  container.appendChild(seedHeading);
+  const seedForm = document.createElement('form');
+  seedForm.className = 'home-seed-form';
+  const seedInput = document.createElement('input');
+  seedInput.type = 'text';
+  seedInput.placeholder = 'TF1-BR-3-D-12345';
+  seedInput.setAttribute('aria-label', 'Case code');
+  const seedButton = document.createElement('button');
+  seedButton.type = 'submit';
+  seedButton.textContent = 'Go';
+  seedForm.append(seedInput, seedButton);
+  seedForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (seedInput.value.trim() === '') return;
+    actions.onStartCode?.(seedInput.value.trim());
+  });
+  container.appendChild(seedForm);
 
   const configureHeading = document.createElement('h2');
   configureHeading.className = 'home-section-heading';
@@ -342,6 +435,20 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   title.textContent =
     mission.mode === 'configure' ? `Configure: ${mission.network.layoutId}` : (mission.caseCode ?? 'Mission');
   header.appendChild(title);
+  if (mission.caseCode) {
+    const replayButton = document.createElement('button');
+    replayButton.type = 'button';
+    replayButton.className = 'mission-replay';
+    replayButton.textContent = 'Replay';
+    replayButton.addEventListener('click', () => actions.onReplay?.());
+    header.appendChild(replayButton);
+    const variationButton = document.createElement('button');
+    variationButton.type = 'button';
+    variationButton.className = 'mission-variation';
+    variationButton.textContent = 'New variation';
+    variationButton.addEventListener('click', () => actions.onNewVariation?.());
+    header.appendChild(variationButton);
+  }
   const exitButton = document.createElement('button');
   exitButton.type = 'button';
   exitButton.className = 'mission-exit';
@@ -349,6 +456,9 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   exitButton.addEventListener('click', () => actions.onExit?.());
   header.appendChild(exitButton);
   container.appendChild(header);
+  if (state.pendingMissionRequest) {
+    container.appendChild(renderPendingMissionPrompt(state, actions));
+  }
 
   const tabList = document.createElement('div');
   tabList.className = 'mission-tabs';

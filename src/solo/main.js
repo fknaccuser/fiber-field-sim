@@ -6,6 +6,7 @@ import {
   persistProfile,
   startConfigureSession,
   exitMission,
+  resumeMission,
   selectDevice,
   applyMissionActions,
   beginReconnect,
@@ -16,6 +17,12 @@ import {
   terminalSessionFor,
   setTerminalSession,
   markTerminalBuilderOrigin,
+  attemptStartMission,
+  confirmReplaceMission,
+  cancelReplaceMission,
+  replayMission,
+  startNewVariation,
+  RECOMMENDED_CODE,
 } from './app.js';
 import { openStore } from './store.js';
 import { renderHome, renderMission } from './view.js';
@@ -45,6 +52,12 @@ function render() {
       renderHome(state, {
         onRetrySave: retrySave,
         onStartConfigure: startConfigure,
+        onContinue: continueMission,
+        onStartCode: startCode,
+        onStartVariation: startSkillVariation,
+        onConfirmReplace: confirmReplace,
+        onCancelReplace: cancelReplace,
+        recommendedCode: RECOMMENDED_CODE,
       }),
     );
   } else if (state.screen === 'mission') {
@@ -63,6 +76,10 @@ function render() {
           onRunTest: runTest,
           onSubmitCommand: submitTerminalCommand,
           onInsertBuilderCommand: insertBuilderCommand,
+          onReplay: replay,
+          onNewVariation: newVariation,
+          onConfirmReplace: confirmReplace,
+          onCancelReplace: cancelReplace,
         },
         missionTab,
       ),
@@ -90,9 +107,84 @@ async function persistMission() {
   render();
 }
 
+// Starting/replaying/varying a mission changes both the mission and the
+// profile's recentFingerprints together: use the atomic saveLocal pair
+// (DATA_CONTRACTS.md) so they can never diverge.
+async function persistProfileAndMission() {
+  state = { ...state, saveStatus: 'saving' };
+  render();
+  try {
+    await store.saveLocal(state.profile, state.mission);
+    state = { ...state, saveStatus: 'saved' };
+  } catch {
+    state = { ...state, saveStatus: 'error' };
+  }
+  render();
+}
+
 function startConfigure(layoutId) {
+  const before = state.mission;
   state = startConfigureSession(state, layoutId);
   missionTab = 'network';
+  render();
+  if (state.mission !== before) persistProfileAndMission();
+}
+
+function continueMission() {
+  state = resumeMission(state);
+  render();
+}
+
+function startCode(caseCode) {
+  const before = state.mission;
+  state = attemptStartMission(state, caseCode);
+  missionTab = 'network';
+  render();
+  if (state.mission !== before) persistProfileAndMission();
+}
+
+function startSkillVariation(family) {
+  const before = state.mission;
+  state = startNewVariation(state, 'BR', 1, family);
+  missionTab = 'network';
+  render();
+  if (state.mission !== before) persistProfileAndMission();
+}
+
+function familyForRecipe(recipeId) {
+  return recipeId[0]; // P1/P2 -> 'P', I1/I2 -> 'I', V1/V2 -> 'V', D1/D2 -> 'D'
+}
+
+function newVariation() {
+  if (!state.mission?.caseCode) return;
+  const layout = state.mission.network.layoutId;
+  const tier = state.mission.tier ?? 1;
+  const family = state.mission.recipeIds.length > 1 ? 'M' : familyForRecipe(state.mission.recipeIds[0]);
+  const before = state.mission;
+  state = startNewVariation(state, layout, tier, family);
+  missionTab = 'network';
+  render();
+  if (state.mission !== before) persistProfileAndMission();
+}
+
+function replay() {
+  const before = state.mission;
+  state = replayMission(state);
+  missionTab = 'network';
+  render();
+  if (state.mission !== before) persistMission();
+}
+
+function confirmReplace() {
+  const before = state.mission;
+  state = confirmReplaceMission(state);
+  missionTab = 'network';
+  render();
+  if (state.mission !== before) persistProfileAndMission();
+}
+
+function cancelReplace() {
+  state = cancelReplaceMission(state);
   render();
 }
 

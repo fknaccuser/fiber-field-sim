@@ -505,6 +505,61 @@ input {
   font-size: 0.85rem;
 }
 
+.home-recommended-row,
+.home-skills-row,
+.home-seed-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.home-recommended-row span {
+  color: var(--field-muted);
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+
+.home-skills-row button,
+.home-recommended-row button,
+.home-seed-form button {
+  background: var(--field-panel);
+  color: var(--field-text);
+  border: 1px solid var(--field-cyan);
+  border-radius: 6px;
+  padding: 0 16px;
+}
+
+.home-seed-form input {
+  flex: 1;
+  min-width: 160px;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+
+.home-pending-prompt {
+  border: 1px solid var(--field-warning);
+  border-radius: 6px;
+  padding: 10px;
+  margin: 10px 0;
+}
+
+.home-pending-prompt p {
+  color: var(--field-text);
+}
+
+.home-pending-prompt button {
+  margin-right: 8px;
+}
+
+.mission-replay,
+.mission-variation {
+  background: transparent;
+  color: var(--field-text);
+  border: 1px solid var(--field-muted);
+  border-radius: 6px;
+  padding: 0 12px;
+  margin-right: 8px;
+}
+
 @media (min-width: 900px) {
   /* Tablet+: topology left (40%), selected device right (60%), both visible
      at once (MASTER_DESIGN.md §7) — so the tab control that switches between

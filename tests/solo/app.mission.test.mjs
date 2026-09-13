@@ -37,14 +37,14 @@ test('startConfigureSession rejects an unknown layout', () => {
   assert.equal(next, state);
 });
 
-test('exitMission clears the mission and returns to Home', () => {
+test('exitMission returns to Home but keeps the mission resumable (current device and history intact)', () => {
   const started = startConfigureSession(createInitialState(), 'BR');
   const withSelection = selectDevice(started, 'PC1');
   const exited = exitMission(withSelection);
   assert.equal(exited.screen, 'home');
-  assert.equal(exited.mission, null);
-  assert.equal(exited.selectedDeviceId, null);
-  assert.deepEqual(exited.recentDevices, []);
+  assert.equal(exited.mission, withSelection.mission);
+  assert.equal(exited.selectedDeviceId, 'PC1');
+  assert.deepEqual(exited.recentDevices, ['PC1']);
 });
 
 test('selectDevice is a no-op without an active mission', () => {

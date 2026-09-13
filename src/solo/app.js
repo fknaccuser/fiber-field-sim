@@ -5,6 +5,10 @@ import { createHealthyLayout, deriveRequirements } from './layouts.js';
 import { cloneNetwork } from './model.js';
 import { applyAction } from './actions.js';
 import { createTerminalSession } from './cli.js';
+import { generateCase, nextCase, fingerprintForCode } from './generate.js';
+
+export const RECOMMENDED_CODE = 'TF1-HM-1-P-START';
+const RECENT_FINGERPRINT_LIMIT = 20;
 
 export function createInitialState() {
   return {
@@ -20,8 +24,11 @@ export function createInitialState() {
     // Transient flows kept in app state (not in UI_AND_STORAGE.md's abbreviated
     // App state list) so a full re-render never loses them, the same way
     // terminalSessions must survive re-renders: "reconnect" tracks the
-    // tap-cable-then-source-then-destination flow (S08).
+    // tap-cable-then-source-then-destination flow (S08); "pendingMissionRequest"
+    // gates starting a new mission (repair or configure) behind an explicit
+    // Resume/Replace choice when one is already active (S11).
     reconnect: null,
+    pendingMissionRequest: null,
   };
 }
 
@@ -153,27 +160,128 @@ const KNOWN_LAYOUTS = new Set(['HM', 'BR', 'OF']);
 
 export function startConfigureSession(state, layoutId) {
   if (!KNOWN_LAYOUTS.has(layoutId)) return state;
-  return {
-    ...state,
-    screen: 'mission',
-    mission: createConfigureAttempt(layoutId),
-    selectedDeviceId: null,
-    recentDevices: [],
-    reconnect: null,
-    error: null,
-  };
+  if (state.mission && state.mission.status === 'active') {
+    return { ...state, pendingMissionRequest: { kind: 'configure', layoutId }, error: null };
+  }
+  return startConfigureNow(state, layoutId);
 }
 
+// Exit returns to Home without abandoning the mission — it stays the one
+// active mission, resumable via Continue with its current device selection
+// and history intact (MASTER_DESIGN.md §10: "Resume keeps the scenario,
+// current device, input draft and history"). Only an explicit replace or
+// completion (grade.js, a later task) actually ends a mission.
 export function exitMission(state) {
   return {
     ...state,
     screen: 'home',
-    mission: null,
+    reconnect: null,
+    pendingMissionRequest: null,
+    error: null,
+  };
+}
+
+export function resumeMission(state) {
+  if (!state.mission) return state;
+  return { ...state, screen: 'mission', error: null };
+}
+
+// Records the fingerprint of a freshly started (non-replay) case into the
+// profile's freshness history, capped at 20 (SCENARIOS.md: "rejecting a
+// complete fingerprint found in the last 20 runs"). "Replays do not consume
+// freshness history as new distinct causes" — replayMission never calls this.
+function recordFingerprint(state, caseCode) {
+  let fingerprint;
+  try {
+    fingerprint = fingerprintForCode(caseCode);
+  } catch {
+    return state;
+  }
+  const recentFingerprints = [fingerprint, ...(state.profile.recentFingerprints ?? [])].slice(
+    0,
+    RECENT_FINGERPRINT_LIMIT,
+  );
+  return { ...state, profile: { ...state.profile, recentFingerprints } };
+}
+
+function enterMission(state, attempt) {
+  return {
+    ...state,
+    screen: 'mission',
+    mission: { ...attempt, id: crypto.randomUUID(), startedAt: new Date().toISOString() },
     selectedDeviceId: null,
     recentDevices: [],
     reconnect: null,
+    pendingMissionRequest: null,
     error: null,
   };
+}
+
+function startCaseNow(state, caseCode) {
+  let attempt;
+  try {
+    attempt = generateCase(caseCode);
+  } catch (error) {
+    return { ...state, pendingMissionRequest: null, error: error.message };
+  }
+  return recordFingerprint(enterMission(state, attempt), caseCode);
+}
+
+function startConfigureNow(state, layoutId) {
+  if (!KNOWN_LAYOUTS.has(layoutId)) return { ...state, pendingMissionRequest: null };
+  return enterMission(state, createConfigureAttempt(layoutId));
+}
+
+// Starts a case by code, generating it fresh. If a mission is already active,
+// defers to an explicit Resume/Replace choice instead of silently discarding
+// it (S11.md: "Protect the single active mission with explicit Resume/Replace
+// choices"). An invalid code leaves the active mission untouched and reports
+// the specific error.
+export function attemptStartMission(state, caseCode) {
+  if (state.mission && state.mission.status === 'active') {
+    return { ...state, pendingMissionRequest: { kind: 'code', caseCode }, error: null };
+  }
+  return startCaseNow(state, caseCode);
+}
+
+export function confirmReplaceMission(state) {
+  const request = state.pendingMissionRequest;
+  if (!request) return state;
+  if (request.kind === 'code') return startCaseNow(state, request.caseCode);
+  if (request.kind === 'configure') return startConfigureNow(state, request.layoutId);
+  return { ...state, pendingMissionRequest: null };
+}
+
+export function cancelReplaceMission(state) {
+  return { ...state, pendingMissionRequest: null, error: null };
+}
+
+// Exact replay: same code, same deterministic faulted initial state, but a
+// new attempt id — and, per SCENARIOS.md, never counted as a new distinct
+// cause in the freshness history.
+export function replayMission(state) {
+  if (!state.mission?.caseCode) return state;
+  let attempt;
+  try {
+    attempt = generateCase(state.mission.caseCode);
+  } catch (error) {
+    return { ...state, error: error.message };
+  }
+  return enterMission(state, attempt);
+}
+
+// New variation: a fresh local seed via candidateSeed, deduplicated against
+// the profile's recent fingerprints. candidateSeed is supplied here (the
+// application layer), never called by generate.js's nextCase itself.
+export function startNewVariation(state, layout, tier, family) {
+  const candidateSeed = () => Math.random().toString(36).slice(2, 10);
+  let code;
+  try {
+    code = nextCase({ layout, tier, family, candidateSeed }, state.profile.recentFingerprints ?? []);
+  } catch (error) {
+    return { ...state, error: error.message };
+  }
+  return attemptStartMission(state, code);
 }
 
 const RECENT_DEVICES_LIMIT = 4;
