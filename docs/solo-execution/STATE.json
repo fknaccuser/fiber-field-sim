@@ -1,12 +1,12 @@
 {
   "spec": "SOLO-1",
   "branch": "claude/field-solo-implementation-am520q",
-  "lastWorkingCommit": "1dea4bda06a02e5615b6de1872f66451e65715d0",
+  "lastWorkingCommit": "cf38f34ce7910c4e24d77cbd220ecbefb32913c1",
   "day": 2,
-  "task": "S04",
+  "task": "S05",
   "substep": "read-contracts",
   "status": "not-started",
-  "completedTasks": ["S01", "S02", "S03"],
+  "completedTasks": ["S01", "S02", "S03", "S04"],
   "changedFiles": [
     "index.html",
     "package.json",
@@ -16,47 +16,51 @@
     "src/solo/view.js",
     "src/solo/model.js",
     "src/solo/layouts.js",
+    "src/solo/ip.js",
+    "src/solo/forward.js",
     "src/solo/styles.css",
     "tests/solo/shell.test.mjs",
     "tests/solo/store.test.mjs",
     "tests/solo/app.store.test.mjs",
     "tests/solo/model.test.mjs",
+    "tests/solo/ip.test.mjs",
+    "tests/solo/l2.test.mjs",
     "docs/solo-execution/STATE.json",
     "docs/solo-execution/HANDOFF.md",
     "docs/solo-execution/RESULTS.md"
   ],
   "tests": [
     {
-      "command": "npm run solo:test",
+      "command": "node --test tests/solo/ip.test.mjs tests/solo/l2.test.mjs",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T04:20:00Z"
+      "observedAt": "2026-09-13T05:00:00Z"
     },
     {
-      "command": "node --test tests/solo/model.test.mjs",
+      "command": "npm run solo:test (x3 for stability)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T04:16:00Z"
+      "observedAt": "2026-09-13T05:04:00Z"
     },
     {
       "command": "npx tsc -b",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T04:20:30Z"
+      "observedAt": "2026-09-13T05:04:30Z"
     },
     {
       "command": "npm run build",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T04:20:45Z"
+      "observedAt": "2026-09-13T05:04:45Z"
     },
     {
-      "command": "npm test -- --run (pre-existing vitest suite, unaffected by S03)",
+      "command": "npm test -- --run (pre-existing vitest suite, unaffected)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T04:14:04Z"
+      "observedAt": "2026-09-13T05:05:00Z"
     }
   ],
   "blockers": [],
-  "nextCommand": "DAY1 checkpoint reached (S01-S03). Read the-field-solo-week/tasks/S04.md and its referenced contracts, then implement the link/IP/VLAN/DNS evaluator (src/solo/ip.js, src/solo/forward.js per ENGINE_RULES.md's forwarding algorithm)."
+  "nextCommand": "Read the-field-solo-week/tasks/S05.md and its referenced contracts, then continue DAY2 (S04-S06: link/IP/VLAN/DNS evaluator and configuration actions)."
 }

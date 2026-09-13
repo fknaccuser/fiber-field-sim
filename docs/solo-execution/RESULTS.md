@@ -118,3 +118,23 @@ for the topology/diagram task.
 
 **Status:** complete. **DAY1 checkpoint (S01-S03) reached**: small app shell, save/reload, and
 the exact healthy network fixture all work and are tested.
+
+## S04 — IPv4 and layer-2 reachability (Day 2)
+
+**Built:** `src/solo/ip.js` (`parseIPv4`, `prefixFromMask`, `inSubnet`), `src/solo/forward.js`
+(`linkUsable`, internal `layer2Reachable`). Tests: `tests/solo/ip.test.mjs` (7),
+`tests/solo/l2.test.mjs` (11).
+
+**Checks:** `node --test tests/solo/ip.test.mjs tests/solo/l2.test.mjs` — exit 0, 18/18.
+`npm run solo:test` — exit 0, 60/60, stable over 3 runs. `npx tsc -b` — exit 0. `npm run build`
+— exit 0. `npm test -- --run` (Vitest) — exit 0, 73/1030, unaffected.
+
+**Acceptance:** met exactly. `10.42.10.130` in `10.42.10.0/24` true, `.20.20` false.
+`255.255.254.0` → 23; `255.0.255.0` → null. Removing VLAN10 from the SW1↔SW2 trunk blocks PC1's
+L2 path to the router's VLAN10 segment while PC2's VLAN20 path stays reachable.
+
+**Deferred, and why:** `canReach`/`resolveName`/`testService` (forward.js's other declared
+exports) need the one-way IP pseudocode on top of L2, which S04.md's own task text didn't ask
+for — left for the next task that lists them.
+
+**Status:** complete.

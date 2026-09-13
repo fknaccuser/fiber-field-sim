@@ -146,15 +146,24 @@ by the same transaction. Fixed by reordering `writeMany` (both the real IndexedD
 the memory adapter) to delete before put. Verified with 5 consecutive full `npm run solo:test`
 runs, all 42/42.
 
-## Next task: S04
+## What S04 added
 
-Day 2, first of "correct link/IP/VLAN/DNS evaluator and configuration actions" (DAY2 checkpoint
-is S04–S06). Per ENGINE_RULES.md's "Files and exports" table, S04 is most likely `src/solo/ip.js`
-(`parseIPv4`, `prefixFromMask`, `inSubnet`) and the start of `src/solo/forward.js`
-(`linkUsable`, `canReach`, `resolveName`, `testService`) implementing the forwarding algorithm
-section verbatim (deterministic error-check order is spelled out there). Read only S04.md and
-whatever contracts it names before starting — do not assume this guess is exactly what S04.md
-says once it's actually read.
+- `src/solo/ip.js` — `parseIPv4`, `prefixFromMask`, `inSubnet`, exactly per ENGINE_RULES.md.
+- `src/solo/forward.js` — `linkUsable` and the internal `layer2Reachable` frame search from
+  reference/L2_PSEUDOCODE.md (queue + visited-set BFS over `{portId,tag}`, 256-visit
+  `MODEL_LIMIT` guard, router-as-endpoint-only). `canReach`/`resolveName`/`testService` (the
+  one-way IP pseudocode built on top of L2) are explicitly out of scope for S04's own task text
+  and left for whichever later task adds them (ENGINE_RULES.md lists them as this file's other
+  exports, but S04.md's "Execute in order" only asked for ip.js + linkUsable + layer2Reachable).
+- Tests: `tests/solo/ip.test.mjs` (7 cases) and `tests/solo/l2.test.mjs` (11 cases) — the four
+  acceptance fixtures (disconnected cable/P1, shutdown/P2, VLAN mismatch/V1, missing trunk
+  VLAN/V2) plus linkUsable's power/adminUp/connected combinations, run against `layouts.js`'s
+  real BR fixture rather than synthetic state.
 
-Next command: read `the-field-solo-week/tasks/S04.md`, then implement its files and run its
+## Next task: S05
+
+DAY2 (S04–S06: link/IP/VLAN/DNS evaluator and configuration actions). Read only
+`the-field-solo-week/tasks/S05.md` and whatever contracts it names before starting.
+
+Next command: read `the-field-solo-week/tasks/S05.md`, then implement its files and run its
 listed checks.
