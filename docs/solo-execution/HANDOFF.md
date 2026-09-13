@@ -614,17 +614,55 @@ confirmed Replace (the page reloaded), re-entered `enable`, and confirmed Progre
 the same completed run. A corrupt-JSON file was rejected with a visible error and no confirmation
 prompt appeared.
 
-## Next task: S18
+## What S18 added
 
-Continues DAY6 (S18: browser integration tests). Read only `the-field-solo-week/tasks/S18.md` and
-whatever contracts it names before starting — its own `verify` command in `TASKS.json` is
-`npm run solo:e2e`, a script that doesn't exist in `package.json` yet, so S18 likely both writes
-Playwright-based end-to-end journeys and adds that npm script — but confirm scope against the
-actual task file rather than assuming. This session has already been running ad hoc Playwright
-checks against `npm run dev` at 390px for every prior task's manual verification (see
-`/opt/pw-browsers/chromium-1194/chrome-linux/chrome`, launched via the globally-installed
-`/opt/node22/lib/node_modules/playwright/index.mjs`) — S18 is likely about turning that same kind
-of check into committed, repeatable test files.
+- `@playwright/test` (devDependency) and `playwright.solo.config.mjs`: `webServer` runs
+  `npm run build && npm run preview -- --port 4173 --strictPort` — every flow runs against the
+  actual production build, never the dev server. The pre-installed Chromium at
+  `/opt/pw-browsers/chromium-1194` is wired in via an explicit `launchOptions.executablePath` so a
+  differently pinned `@playwright/test` version never tries to download its own copy (do not run
+  `playwright install` in this environment). Default viewport is 390px phone-first, matching
+  MASTER_DESIGN.md's primary target device; a `>=900px` layout gets one dedicated test with an
+  explicit override instead of being the baseline.
+- `tests/solo-browser/solo.spec.mjs` (9 tests): launch enable → the recommended cable-repair job →
+  both-client verification → note completion; a seeded DNS repair using a hand-computed seed
+  forced to resolve deterministically to D1 (`TF1-HM-2-D-e2edns1`), since a family letter alone
+  picks randomly among its recipes; reloading an active mission (read back from real IndexedDB via
+  an actual page reload, not memory); GUI/CLI agreement in both directions (a VLAN set over the
+  terminal shows up in the Configure form; a port disabled from the form shows up in
+  `show interfaces status`); backup import preview being cancellable without replacing anything;
+  390px tab navigation and the `>=900px` split (tabs hidden, all panels visible); and, using
+  manually created browser contexts (which don't inherit the project's `use` options — baseURL/
+  viewport are passed explicitly), the same case code producing an identical fault in two
+  independent fresh profiles, and storage persisting across a full reload in a fresh context.
+  Nothing mocks the network evaluator anywhere.
+- `package.json` gained the `solo:e2e` script (`playwright test --config=playwright.solo.config.mjs`).
 
-Next command: read `the-field-solo-week/tasks/S18.md`, then implement its files and run its
+**Three real bugs, all in the test file itself, caught only by actually running it against the
+built app rather than assuming the selectors were right:**
+1. Test results (pass/fail) only ever render as Findings rows, never inline under the Tests
+   buttons — several assertions expected "passed" text directly under a just-clicked test button,
+   which never existed there.
+2. The completion note field deliberately skips re-rendering after typing (documented in
+   `main.js`: re-rendering would tear down the textarea and lose focus/cursor) — checking the
+   completion checklist immediately after filling the note asserts a real, intentional lag; it
+   only catches up at the next actual render (Submit itself).
+3. In the Playwright project config, spreading `devices['Desktop Chrome']` pulls in its own
+   1280x720 viewport, silently overriding the phone-first default declared above it — fixed by
+   restating the viewport after the spread so the intended default wins.
+
+**Verified via the real `npm run solo:e2e` command, twice for stability:** 9/9 passing against
+the actual `dist/` build, not the dev server.
+
+## Next task: S19
+
+Continues DAY7 (S19: offline installation and update behavior). Read only
+`the-field-solo-week/tasks/S19.md` and whatever contracts it names before starting — its own
+`verify` command in `TASKS.json` is `npm run solo:e2e` again (the same Playwright harness S18 just
+built), so S19 likely adds offline/PWA-specific flows (service worker caching, a fresh install
+working with the network cut, an update not silently losing local data) to the existing
+`tests/solo-browser/` suite rather than building new infrastructure — but confirm scope against
+the actual task file rather than assuming.
+
+Next command: read `the-field-solo-week/tasks/S19.md`, then implement its files and run its
 listed checks.

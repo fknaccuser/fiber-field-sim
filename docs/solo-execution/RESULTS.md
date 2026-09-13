@@ -490,3 +490,36 @@ confirmed (`previewBackup` alone never calls `replaceData`; a separate test prov
 mutates storage).
 
 **Status:** complete.
+
+## S18 — Browser integration tests (Day 6)
+
+**Built:** `@playwright/test` devDependency; `playwright.solo.config.mjs` (webServer builds then
+serves `dist/` via the existing `preview` script; explicit Chromium `executablePath` pointing at
+the pre-installed browser; 390px phone-first default viewport). `tests/solo-browser/solo.spec.mjs`
+(9 tests). `package.json`'s new `solo:e2e` script.
+
+**Three bugs found and fixed, all in the test file itself (not the app), caught only by running it
+against the actual built app:**
+1. Several assertions expected "passed" text directly under a Tests button; test results only
+   ever render as Findings rows.
+2. An assertion checked the completion checklist immediately after filling the note field, which
+   deliberately skips re-rendering (to avoid destroying the textarea/losing focus) — a real,
+   documented, intentional lag, not a bug to assert against.
+3. The Playwright project config's `...devices['Desktop Chrome']` spread silently overrode the
+   declared phone-first default viewport with its own 1280x720 — fixed by restating the viewport
+   after the spread.
+
+**Checks:** `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm run solo:e2e` — exit 0, 9/9, stable over 2
+runs, against the real production build (not the dev server). `npm run solo:test` — exit 0,
+249/249. `npx tsc -b`/`npm run build` — exit 0. Vitest — 73/1030, unaffected.
+
+**Acceptance:** met. "All browser flows execute against the production build" — confirmed
+(`webServer` always runs `npm run build` first; `baseURL` points at the `preview` server serving
+`dist/`, never `vite dev`). "Failures produce screenshot/trace artifacts" — confirmed via
+`use: { screenshot: 'only-on-failure', trace: 'retain-on-failure' }` (exercised directly while
+debugging this task's own selector fixes, before they were corrected). "Record actual command
+outcome; do not call a test passed if browsers could not install" — no browser install was
+attempted (the pre-installed Chromium was used directly via `executablePath`); the actual
+`npm run solo:e2e` command was run to completion and its real 9/9 result is what's recorded here.
+
+**Status:** complete.
