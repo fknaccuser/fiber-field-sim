@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:pwa": "node scripts/check-pwa.mjs",
-    "build:standalone": "node scripts/build-standalone.mjs"
+    "build:standalone": "node scripts/build-standalone.mjs",
+    "solo:test": "node --test tests/solo/*.test.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",

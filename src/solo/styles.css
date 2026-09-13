@@ -1,0 +1,134 @@
+:root {
+  color-scheme: dark;
+  --field-black: #000000;
+  --field-bg: #090f18;
+  --field-panel: #142031;
+  --field-text: #ecf3fc;
+  --field-muted: #aec0d5;
+  --field-cyan: #5adbef;
+  --field-success: #73d5a4;
+  --field-warning: #ffd180;
+  --field-error: #ff9b9b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--field-bg);
+  color: var(--field-text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.opening-screen {
+  background: var(--field-black);
+  color: #ffffff;
+  height: 100%;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  padding: 24px;
+}
+
+.opening-line {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.opening-typed {
+  white-space: pre;
+}
+
+.opening-cursor {
+  display: inline-block;
+  width: 0.6em;
+  height: 1.1em;
+  background: #ffffff;
+  margin-left: 2px;
+  animation: opening-cursor-blink 1s steps(1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opening-cursor {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+@keyframes opening-cursor-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.opening-error {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  color: var(--field-error);
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 15px;
+}
+
+.init-screen {
+  background: var(--field-black);
+  color: var(--field-muted);
+  height: 100%;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.init-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 15px;
+}
+
+.init-lines li {
+  margin-bottom: 4px;
+}
+
+.home-screen {
+  min-height: 100vh;
+  padding: 24px;
+  background: var(--field-bg);
+}
+
+.home-screen h1 {
+  color: var(--field-text);
+}
+
+button,
+input {
+  min-height: 44px;
+}
