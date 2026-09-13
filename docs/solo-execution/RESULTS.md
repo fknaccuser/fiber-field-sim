@@ -200,3 +200,31 @@ confirmed (panels are hidden via the `hidden` attribute, never unmounted; a real
 starting S09, so this is re-verified then).
 
 **Status:** complete.
+
+## S08 — Device inspection and editing (Day 3)
+
+**Built:** `src/solo/devices.js` (action-builders, `runMissionTest`, form/test rendering),
+`app.js` additions (`applyMissionActions`, reconnect flow, `recordTestEvent`), `diagram.js`
+cable selection, `view.js` Configure forms + reconnect panel + real Findings, `main.js` autosave.
+`tests/solo/devices.test.mjs`, `tests/solo/app.editing.test.mjs` (17 cases together).
+
+**Bug found and fixed while building this:** error feedback for forms/reconnect was being
+written to DOM nodes already discarded by this app's full-teardown `render()`, called
+synchronously inside the same handler before the error text was ever set. Moved to `state.error`.
+
+**Checks:** `node --test tests/solo/devices.test.mjs tests/solo/app.editing.test.mjs` — exit 0,
+17/17. `npm run solo:test` — exit 0, 133/133, stable over 3 runs. `npx tsc -b`/`npm run build` —
+exit 0. Vitest — 73/1030, unaffected. Manual scripted Chromium check (390px, not committed):
+Configure change alters a real Test result; Cancel restores the true value; invalid IP shows its
+specific error and leaves the network untouched; cable tap/source/destination/Connect reconnects.
+
+**Acceptance:** met. "GUI changes affect actual tests" — confirmed (breaking a gateway via
+Configure changed "Open portal" from passed to failed). "Cancel changes nothing" — confirmed both
+at the form level (input reverts) and the network level (failed Apply never touches the device).
+"Invalid forms show specific errors" — confirmed (`ip is not a valid IPv4 address.`, etc., one
+per action's real rejection code). "Reconnecting P1 fixes link state" — confirmed at the engine
+level (`tests/solo/app.editing.test.mjs`) and the reconnect UI wiring confirmed live in-browser.
+"Setting a valid but wrong gateway causes a real failed test" — confirmed
+(`applyMissionActions` + `testService` test, and live in-browser).
+
+**Status:** complete.

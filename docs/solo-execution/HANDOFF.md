@@ -247,13 +247,56 @@ equivalent list; a keyboard-focused SVG device selects on Enter; no horizontal p
 390px viewport in any layout; switching the mobile tab away from Device and back preserves the
 current selection exactly (before/after device name matched).
 
-## Next task: S08
+## What S08 added
 
-Continues DAY3 (S07–S09: clickable graph, editable devices, supported CLI). Read only
-`the-field-solo-week/tasks/S08.md` and whatever contracts it names before starting — likely the
-Configure/Terminal sub-tabs of the Device panel and wiring `actions.js` into the UI (Apply/Cancel
-draft state per UI_AND_STORAGE.md's "Device configuration" section), but confirm against the
-actual task file.
+- `src/solo/devices.js` — pure draft-to-action builders (`buildClientActions`, `buildPortActions`,
+  `buildRouterSegmentActions`, `buildDnsRecordActions`, `parseVlanList`) that only ever produce
+  actions for fields that actually changed, and `runMissionTest` (all five documented test kinds:
+  pingGateway, pingServer, resolvePortal, openPortal, checkProtected — via `forward.js`). Plus
+  DOM-rendering form/test functions.
+- `src/solo/app.js` — `applyMissionActions(state, actions, {deviceId})` dispatches a batch
+  through `applyAction` only, atomic from the caller's point of view (the first rejection returns
+  the original state untouched; every accepted action appends its own `'change'` event with a
+  before/after snapshot of just the touched entity). The reconnect flow (`beginReconnect` /
+  `chooseReconnectSource` / `confirmReconnect` / `cancelReconnect`) implements "tap cable → source
+  port → destination port → Connect." **Important finding while building this:** `moveCable` has
+  no `connected` field in its action envelope (ENGINE_RULES.md) and is a no-op when the endpoints
+  don't change — so confirming a reconnect to the *same* two ports (exactly P1's repair: the cable
+  was never mis-wired, just unplugged) would do nothing at all. `confirmReconnect` now always also
+  dispatches `setLinkConnected {connected:true}` when the link wasn't already connected, so
+  "Connect" always means plugged in, whatever the chosen endpoints. `recordTestEvent` logs a real
+  `forward.js` result as a `'test'` event.
+- `src/solo/diagram.js` — cables are now selectable too (SVG `<line>` and the equivalent list),
+  keyboard-focusable the same way devices are, highlighted while a reconnect is in progress.
+- `src/solo/view.js` — Configure sub-tab content per device kind (client address; router LAN
+  segments; server DNS records; every port's admin/VLAN fields), a reconnect panel, and a real
+  Findings tab listing recorded test events pass/fail (selecting supporting rows for a completion
+  submission is `grade.js`'s job, a later task).
+- `src/solo/main.js` — autosaves the mission (`store.saveMission`) after every accepted
+  configuration change or test, per MASTER_DESIGN.md §10.
 
-Next command: read `the-field-solo-week/tasks/S08.md`, then implement its files and run its
+**A real architectural bug found and fixed before it shipped:** this codebase's `render()` is a
+full teardown-and-rebuild on every state change. The first draft of the Configure forms and the
+reconnect panel set their error text directly on a local DOM node from inside their own
+submit/click handler, *after* calling `onApply`/`onConfirmReconnect` — but those synchronously
+call `render()` before returning, which had already deleted that very node from the document.
+The error was being written to a detached, invisible element. Fixed by moving all such feedback
+into `state.error`, rendered fresh on the next pass like everything else. Worth remembering for
+any future addition: nothing set on a DOM node survives past the `onXxx` call that changed state.
+
+**Verified in a real browser** (390px viewport, Playwright): changing a client's gateway through
+Configure and then running "Open portal" actually reports the new failure (GUI changes affect
+real tests); Cancel restores the true current value, not the typed draft; a malformed IP shows
+its specific message and leaves the device's actual address untouched; tapping a cable, choosing
+source/destination and Connect reconnects it and the equivalent list shows "connected".
+
+## Next task: S09
+
+Closes DAY3 (S07–S09: clickable graph, editable devices, supported CLI) with the terminal/CLI.
+Read only `the-field-solo-week/tasks/S09.md` and whatever contracts it names before starting —
+`cli.js`'s `executeCommand`/`getHelp` and ENGINE_RULES.md's "Small CLI" section (switch/router/
+client/server command sets, mode transitions, unambiguous-prefix resolution) are the likely core,
+but confirm against the actual task file.
+
+Next command: read `the-field-solo-week/tasks/S09.md`, then implement its files and run its
 listed checks.
