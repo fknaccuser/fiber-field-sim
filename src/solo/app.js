@@ -674,6 +674,74 @@ export function showHarmlessDetail(mission) {
   return mission.mode === 'repair' && mission.tier === 3;
 }
 
+// Opening the reference sheet during an active repair mission marks it
+// assisted (MASTER_DESIGN.md §6: "opening the cheat sheet ... marks the run
+// assisted"), the same way requestHint does. Opening it from Home, or during
+// a configure session (which has no repair evidence to protect), is a pure
+// no-op here — main.js still navigates to the reference screen either way.
+export function openReference(state) {
+  if (!state.mission || state.mission.mode !== 'repair' || state.mission.status !== 'active') return state;
+  const mission = state.mission;
+  const index = mission.compactedEventCount + mission.events.length;
+  const event = {
+    id: String(index),
+    index,
+    kind: 'assistance',
+    revision: mission.network.revision,
+    deviceId: null,
+    details: { type: 'reference' },
+    assistance: true,
+  };
+  return { ...state, mission: { ...mission, assisted: true, events: [...mission.events, event] } };
+}
+
+// --- Study (S16) ---
+
+// studySession tracks only Study's own navigation (selected family and open
+// lesson) — never persisted, the same way missionTab isn't; the actual
+// study progress (studyAnswers/cardReviews) lives on the profile and is
+// updated through the existing generic applyProfileUpdate/
+// updateAndPersistProfile, so study.js's pure grading functions need no new
+// persistence path of their own.
+export function openStudy(state) {
+  return {
+    ...state,
+    screen: 'study',
+    studySession: { family: 'all', lessonId: null, revealedCardIds: [] },
+    error: null,
+  };
+}
+
+export function closeStudy(state) {
+  return { ...state, screen: 'home', studySession: null };
+}
+
+export function selectStudyFamily(state, family) {
+  if (!state.studySession) return state;
+  return { ...state, studySession: { ...state.studySession, family, lessonId: null, revealedCardIds: [] } };
+}
+
+export function openLesson(state, lessonId) {
+  if (!state.studySession) return state;
+  return { ...state, studySession: { ...state.studySession, lessonId, revealedCardIds: [] } };
+}
+
+export function closeLesson(state) {
+  if (!state.studySession) return state;
+  return { ...state, studySession: { ...state.studySession, lessonId: null, revealedCardIds: [] } };
+}
+
+// A flashcard's "revealed" state is transient Study navigation (like
+// lessonId), not part of the persisted profile — reviewForCard/
+// recordCardReview (study.js) are what actually persist Got it/Review again.
+export function revealCard(state, cardId) {
+  if (!state.studySession) return state;
+  const revealedCardIds = state.studySession.revealedCardIds.includes(cardId)
+    ? state.studySession.revealedCardIds
+    : [...state.studySession.revealedCardIds, cardId];
+  return { ...state, studySession: { ...state.studySession, revealedCardIds } };
+}
+
 // --- Findings, note and completion (S13) ---
 
 export function toggleFinding(state, eventId) {

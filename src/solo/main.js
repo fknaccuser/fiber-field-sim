@@ -32,12 +32,21 @@ import {
   toggleFinding,
   setCompletionNote,
   completeRun,
+  openReference,
+  openStudy,
+  closeStudy,
+  selectStudyFamily,
+  openLesson,
+  closeLesson,
+  revealCard,
+  updateAndPersistProfile,
 } from './app.js';
 import { openStore } from './store.js';
-import { renderHome, renderMission, renderDebrief, renderProgress } from './view.js';
+import { renderHome, renderMission, renderDebrief, renderProgress, renderStudy, renderReference } from './view.js';
 import { runMissionTest } from './devices.js';
 import { executeCommand } from './cli.js';
 import { recommendMission, recommendedTier } from './progress.js';
+import { recordStudyAnswer, recordCardReview } from './study.js';
 
 const INIT_LINES = ['Initializing local session.', 'Preparing The Field.', 'Ready.'];
 const INIT_LINE_DELAY_MS = 200;
@@ -49,6 +58,13 @@ let state = createInitialState();
 // switching tabs never discards terminal or selection state because nothing
 // is unmounted, only hidden (see renderMission).
 let missionTab = 'network';
+// Which screen Reference was opened from ('home' or 'mission'), so closing
+// it returns there with that screen's own state untouched (S16.md: "Returning
+// from reference preserves mission state"). Transient, like missionTab.
+let screenBeforeReference = 'home';
+// Reference's search text. Transient view state, not persisted or part of
+// the tracked app state.
+let referenceQuery = '';
 
 function render() {
   const root = document.getElementById('root');
@@ -69,11 +85,33 @@ function render() {
         onConfirmReplace: confirmReplace,
         onCancelReplace: cancelReplace,
         onOpenProgress: openProgress,
+        onOpenStudy: openStudyScreen,
+        onOpenReference: openReferenceScreen,
         recommendation: recommendMission(state.profile),
       }),
     );
   } else if (state.screen === 'progress') {
     root.appendChild(renderProgress(state, { onHome: progressToHome }));
+  } else if (state.screen === 'study') {
+    root.appendChild(
+      renderStudy(state, {
+        onHome: closeStudyScreen,
+        onSelectFamily: pickStudyFamily,
+        onOpenLesson: openStudyLesson,
+        onCloseLesson: closeStudyLesson,
+        onAnswerQuestion: answerStudyQuestion,
+        onRevealCard: revealStudyCard,
+        onReviewCard: reviewStudyCard,
+      }),
+    );
+  } else if (state.screen === 'reference') {
+    root.appendChild(
+      renderReference(state, {
+        onClose: closeReferenceScreen,
+        onSearch: searchReferenceAction,
+        query: referenceQuery,
+      }),
+    );
   } else if (state.screen === 'mission') {
     root.appendChild(
       renderMission(
@@ -90,6 +128,7 @@ function render() {
           onRequestReset: requestResetAction,
           onConfirmReset: confirmResetAction,
           onCancelReset: cancelResetAction,
+          onOpenReference: openReferenceScreen,
           onApplyDeviceForm: applyDeviceForm,
           onRunTest: runTest,
           onSubmitCommand: submitTerminalCommand,
@@ -210,6 +249,73 @@ function openProgress() {
 
 function progressToHome() {
   state = { ...state, screen: 'home' };
+  render();
+}
+
+function openStudyScreen() {
+  state = openStudy(state);
+  render();
+}
+
+function closeStudyScreen() {
+  state = closeStudy(state);
+  render();
+}
+
+function pickStudyFamily(family) {
+  state = selectStudyFamily(state, family);
+  render();
+}
+
+function openStudyLesson(lessonId) {
+  state = openLesson(state, lessonId);
+  render();
+}
+
+function closeStudyLesson() {
+  state = closeLesson(state);
+  render();
+}
+
+async function answerStudyQuestion(questionId, optionId) {
+  const { studyAnswers } = recordStudyAnswer(state.profile, questionId, optionId);
+  state = await updateAndPersistProfile(state, store, { studyAnswers });
+  render();
+}
+
+function revealStudyCard(cardId) {
+  state = revealCard(state, cardId);
+  render();
+}
+
+async function reviewStudyCard(cardId, remembered) {
+  const { cardReviews } = recordCardReview(state.profile, cardId, remembered);
+  state = await updateAndPersistProfile(state, store, { cardReviews });
+  render();
+}
+
+// Reachable from Home or from within a mission (MASTER_DESIGN.md §7's
+// per-mission "Reference" bottom action); opening it during an active
+// repair mission marks the run assisted (app.js's openReference), then
+// navigation returns to whichever screen it was opened from, leaving that
+// screen's own state (mission tab, selection, drafts) untouched.
+function openReferenceScreen() {
+  const hadRepairMission = state.mission?.mode === 'repair' && state.mission.status === 'active';
+  state = openReference(state);
+  screenBeforeReference = state.screen;
+  referenceQuery = '';
+  state = { ...state, screen: 'reference' };
+  render();
+  if (hadRepairMission) persistMission();
+}
+
+function closeReferenceScreen() {
+  state = { ...state, screen: screenBeforeReference };
+  render();
+}
+
+function searchReferenceAction(query) {
+  referenceQuery = query;
   render();
 }
 

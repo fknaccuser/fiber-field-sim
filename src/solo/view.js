@@ -11,9 +11,27 @@ import {
   renderTests,
   renderTerminal,
 } from './devices.js';
-import { CUSTOMER_QUESTIONS, CUSTOMER_FACTS, HARMLESS_DETAILS, HINTS, renderHintText, TIER_GOAL_MS } from './content.js';
+import {
+  CUSTOMER_QUESTIONS,
+  CUSTOMER_FACTS,
+  HARMLESS_DETAILS,
+  HINTS,
+  renderHintText,
+  TIER_GOAL_MS,
+  STUDY_PACK,
+  REFERENCE_ENTRIES,
+} from './content.js';
 import { evaluateCompletion, evaluateConfigureChecklist } from './grade.js';
 import { allFamilyStats, recommendedTier } from './progress.js';
+import {
+  lessonsForFamily,
+  lessonById,
+  questionsForLesson,
+  cardsForLesson,
+  answerForQuestion,
+  reviewForCard,
+  searchReference,
+} from './study.js';
 
 function describeSaveStatus(status) {
   switch (status) {
@@ -196,6 +214,20 @@ export function renderHome(state, actions = {}) {
   progressButton.addEventListener('click', () => actions.onOpenProgress?.());
   container.appendChild(progressButton);
 
+  const studyButton = document.createElement('button');
+  studyButton.type = 'button';
+  studyButton.className = 'home-study-button';
+  studyButton.textContent = 'Study';
+  studyButton.addEventListener('click', () => actions.onOpenStudy?.());
+  container.appendChild(studyButton);
+
+  const referenceButton = document.createElement('button');
+  referenceButton.type = 'button';
+  referenceButton.className = 'home-reference-button';
+  referenceButton.textContent = 'Reference';
+  referenceButton.addEventListener('click', () => actions.onOpenReference?.());
+  container.appendChild(referenceButton);
+
   return container;
 }
 
@@ -263,6 +295,207 @@ export function renderProgress(state, actions = {}) {
       historyList.appendChild(item);
     }
     container.appendChild(historyList);
+  }
+
+  return container;
+}
+
+// Study screen (MASTER_DESIGN.md §9): family filter, a lesson view, quiz
+// questions with immediate feedback and an expandable explanation for every
+// option, and flashcards with reveal + Got it / Review again. Fully local —
+// everything comes from the copied STUDY_PACK and the profile's own
+// studyAnswers/cardReviews, no fetch. Quiz correctness never gates anything;
+// it is shown only as a completed/not-yet indicator.
+export function renderStudy(state, actions = {}) {
+  const session = state.studySession ?? { family: 'all', lessonId: null };
+  const container = document.createElement('div');
+  container.className = 'study-screen';
+
+  const heading = document.createElement('h1');
+  heading.textContent = 'Study';
+  container.appendChild(heading);
+
+  const backButton = document.createElement('button');
+  backButton.type = 'button';
+  backButton.textContent = 'Back';
+  backButton.addEventListener('click', () => actions.onHome?.());
+  container.appendChild(backButton);
+
+  if (session.lessonId) {
+    const lesson = lessonById(session.lessonId);
+    const lessonBackButton = document.createElement('button');
+    lessonBackButton.type = 'button';
+    lessonBackButton.textContent = 'Back to lessons';
+    lessonBackButton.addEventListener('click', () => actions.onCloseLesson?.());
+    container.appendChild(lessonBackButton);
+
+    const title = document.createElement('h2');
+    title.textContent = lesson.title;
+    container.appendChild(title);
+    const text = document.createElement('p');
+    text.className = 'study-lesson-text';
+    text.textContent = lesson.text;
+    container.appendChild(text);
+
+    const questionsHeading = document.createElement('h3');
+    questionsHeading.textContent = 'Check your understanding';
+    container.appendChild(questionsHeading);
+    for (const question of questionsForLesson(lesson.id)) {
+      container.appendChild(renderStudyQuestion(state, actions, question));
+    }
+
+    const cardsHeading = document.createElement('h3');
+    cardsHeading.textContent = 'Flashcards';
+    container.appendChild(cardsHeading);
+    for (const card of cardsForLesson(lesson.id)) {
+      container.appendChild(renderStudyCard(state, actions, card));
+    }
+    return container;
+  }
+
+  const filterRow = document.createElement('div');
+  filterRow.className = 'study-family-filter';
+  for (const option of [{ family: 'all', label: 'All' }, ...SKILLS]) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = option.family === session.family ? 'study-family-active' : '';
+    button.textContent = option.label;
+    button.addEventListener('click', () => actions.onSelectFamily?.(option.family));
+    filterRow.appendChild(button);
+  }
+  container.appendChild(filterRow);
+
+  const lessonList = document.createElement('ul');
+  lessonList.className = 'study-lesson-list';
+  for (const lesson of lessonsForFamily(session.family)) {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = lesson.title;
+    button.addEventListener('click', () => actions.onOpenLesson?.(lesson.id));
+    item.appendChild(button);
+    lessonList.appendChild(item);
+  }
+  container.appendChild(lessonList);
+
+  return container;
+}
+
+function renderStudyQuestion(state, actions, question) {
+  const container = document.createElement('div');
+  container.className = 'study-question';
+  const prompt = document.createElement('p');
+  prompt.textContent = question.prompt;
+  container.appendChild(prompt);
+
+  const existingAnswer = answerForQuestion(state.profile, question.id);
+  const list = document.createElement('ul');
+  list.className = 'study-question-options';
+  for (const option of question.options) {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = `${option.id}. ${option.text}`;
+    if (existingAnswer?.optionId === option.id) {
+      button.className = existingAnswer.correct ? 'study-option-selected-correct' : 'study-option-selected-wrong';
+    }
+    button.addEventListener('click', () => actions.onAnswerQuestion?.(question.id, option.id));
+    item.appendChild(button);
+    // Every option's explanation is visible once any answer has been
+    // submitted (S16.md: "expandable explanation for every option"), not
+    // only the chosen one.
+    if (existingAnswer) {
+      const explanation = document.createElement('p');
+      explanation.className = 'study-option-explanation';
+      explanation.textContent = `${option.correct ? '✓' : '✗'} ${option.explanation}`;
+      item.appendChild(explanation);
+    }
+    list.appendChild(item);
+  }
+  container.appendChild(list);
+  return container;
+}
+
+function renderStudyCard(state, actions, card) {
+  const container = document.createElement('div');
+  container.className = 'study-card';
+  const front = document.createElement('p');
+  front.className = 'study-card-front';
+  front.textContent = card.front;
+  container.appendChild(front);
+
+  const revealed = state.studySession?.revealedCardIds?.includes(card.id) ?? false;
+  if (!revealed) {
+    const revealButton = document.createElement('button');
+    revealButton.type = 'button';
+    revealButton.textContent = 'Reveal';
+    revealButton.addEventListener('click', () => actions.onRevealCard?.(card.id));
+    container.appendChild(revealButton);
+  } else {
+    const back = document.createElement('p');
+    back.className = 'study-card-back';
+    back.textContent = card.back;
+    container.appendChild(back);
+
+    const review = reviewForCard(state.profile, card.id);
+    const gotItButton = document.createElement('button');
+    gotItButton.type = 'button';
+    gotItButton.className = review?.remembered === true ? 'study-card-active' : '';
+    gotItButton.textContent = 'Got it';
+    gotItButton.addEventListener('click', () => actions.onReviewCard?.(card.id, true));
+    const reviewAgainButton = document.createElement('button');
+    reviewAgainButton.type = 'button';
+    reviewAgainButton.className = review?.remembered === false ? 'study-card-active' : '';
+    reviewAgainButton.textContent = 'Review again';
+    reviewAgainButton.addEventListener('click', () => actions.onReviewCard?.(card.id, false));
+    container.append(gotItButton, reviewAgainButton);
+  }
+  return container;
+}
+
+// Searchable in-app reference (S16.md). Reachable from Home or from within
+// a mission; main.js is responsible for returning to whichever screen was
+// active before, so mission state (tab, selection, drafts) is preserved.
+export function renderReference(state, actions = {}) {
+  const container = document.createElement('div');
+  container.className = 'reference-screen';
+
+  const heading = document.createElement('h1');
+  heading.textContent = 'Reference';
+  container.appendChild(heading);
+
+  const backButton = document.createElement('button');
+  backButton.type = 'button';
+  backButton.textContent = 'Back';
+  backButton.addEventListener('click', () => actions.onClose?.());
+  container.appendChild(backButton);
+
+  const searchLabel = document.createElement('label');
+  searchLabel.className = 'form-row';
+  const searchSpan = document.createElement('span');
+  searchSpan.textContent = 'Search';
+  const searchInput = document.createElement('input');
+  searchInput.type = 'search';
+  searchInput.value = actions.query ?? '';
+  searchInput.addEventListener('input', () => actions.onSearch?.(searchInput.value));
+  searchLabel.append(searchSpan, searchInput);
+  container.appendChild(searchLabel);
+
+  const results = searchReference(REFERENCE_ENTRIES, actions.query ?? '');
+  const list = document.createElement('dl');
+  list.className = 'reference-list';
+  for (const entry of results) {
+    const dt = document.createElement('dt');
+    dt.textContent = entry.deviceKind ? `${entry.title} [${entry.deviceKind}]` : entry.title;
+    const dd = document.createElement('dd');
+    dd.textContent = entry.body;
+    list.append(dt, dd);
+  }
+  container.appendChild(list);
+  if (results.length === 0) {
+    const empty = document.createElement('p');
+    empty.textContent = 'No matching reference entries.';
+    container.appendChild(empty);
   }
 
   return container;
@@ -723,6 +956,12 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
     resetButton.addEventListener('click', () => actions.onRequestReset?.());
     header.appendChild(resetButton);
   }
+  const referenceButton = document.createElement('button');
+  referenceButton.type = 'button';
+  referenceButton.className = 'mission-reference';
+  referenceButton.textContent = 'Reference';
+  referenceButton.addEventListener('click', () => actions.onOpenReference?.());
+  header.appendChild(referenceButton);
   const exitButton = document.createElement('button');
   exitButton.type = 'button';
   exitButton.className = 'mission-exit';

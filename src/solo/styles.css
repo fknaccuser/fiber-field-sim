@@ -744,6 +744,136 @@ input {
   padding-left: 20px;
 }
 
+.home-study-button,
+.home-reference-button {
+  background: var(--field-panel);
+  color: var(--field-text);
+  border: 1px solid var(--field-cyan);
+  border-radius: 6px;
+  padding: 0 16px;
+  margin-top: 16px;
+  margin-left: 8px;
+}
+
+.mission-reference {
+  background: transparent;
+  color: var(--field-text);
+  border: 1px solid var(--field-muted);
+  border-radius: 6px;
+  padding: 0 12px;
+  margin-right: 8px;
+}
+
+.study-screen,
+.reference-screen {
+  min-height: 100vh;
+  padding: 16px;
+  background: var(--field-bg);
+  color: var(--field-text);
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.study-family-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.study-family-filter button {
+  background: var(--field-panel);
+  color: var(--field-text);
+  border: 1px solid var(--field-muted);
+  border-radius: 6px;
+  padding: 0 14px;
+}
+
+.study-family-filter button.study-family-active {
+  border-color: var(--field-cyan);
+  color: var(--field-cyan);
+}
+
+.study-lesson-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.study-lesson-list button {
+  width: 100%;
+  text-align: left;
+  background: var(--field-panel);
+  color: var(--field-text);
+  border: 1px solid var(--field-muted);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.study-lesson-text {
+  color: var(--field-text);
+  line-height: 1.5;
+}
+
+.study-question,
+.study-card {
+  background: var(--field-panel);
+  border: 1px solid var(--field-muted);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.study-question-options {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.study-question-options button {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: var(--field-text);
+  border: 1px solid var(--field-muted);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.study-option-selected-correct {
+  border-color: var(--field-success) !important;
+  color: var(--field-success) !important;
+}
+
+.study-option-selected-wrong {
+  border-color: var(--field-error) !important;
+  color: var(--field-error) !important;
+}
+
+.study-option-explanation {
+  color: var(--field-muted);
+  margin: 4px 0 0;
+}
+
+.study-card-active {
+  border-color: var(--field-cyan) !important;
+  color: var(--field-cyan) !important;
+}
+
+.reference-list dt {
+  font-weight: 600;
+  margin-top: 12px;
+}
+
+.reference-list dd {
+  color: var(--field-muted);
+  margin: 4px 0 0;
+}
+
 @media (min-width: 900px) {
   /* Tablet+: topology left (40%), selected device right (60%), both visible
      at once (MASTER_DESIGN.md §7) — so the tab control that switches between
