@@ -305,3 +305,36 @@ always-invalid layout/tier combination exhausts `nextCase`'s 100 tries and surfa
 a real `boot()`/`saveLocal()` round-trip and live in the browser.
 
 **Status:** complete.
+
+## S12 — Tiered guidance and customer facts (Day 4)
+
+**Built:** `src/solo/content.js` (hints, customer facts, harmless details, tier goals), `app.js`
+(`isRecipeRepaired`, `currentHintRecipeId`, `requestHint`, `showCauseCount`,
+`showHarmlessDetail`, `pauseMissionTimer`, `resumeMissionTimer`), mission-brief UI in `view.js`,
+Page Visibility wiring in `main.js`. `tests/solo/content.test.mjs` (17 cases), plus a regression
+case added to `tests/solo/model.test.mjs`.
+
+**Two real bugs found and fixed (in S08/S10 code, caught by this task's testing):**
+1. `isRecipeRepaired`'s P2/V1/V2 checks read the target client's own port instead of the switch
+   port it connects through — hint progression could never detect those three as repaired. Caught
+   by a failing tier4-pair test before any browser check.
+2. `layouts.js`'s `deriveRequirements` had the same confusion for VLANs — `protectedVlan` silently
+   returned 10 instead of 20 for every layout since S10, masked because every prior test happened
+   to use VLAN 10 as its target anyway. Caught live in the browser, fixed, regression-tested
+   across HM/BR/OF.
+
+**Checks:** `node --test tests/solo/content.test.mjs` — exit 0, 17/17 (14 in this file + 3 added
+elsewhere counted separately). `npm run solo:test` — exit 0, 197/197, stable over 3 runs (after
+both fixes). `npx tsc -b`/`npm run build` — exit 0. Vitest — 73/1030, unaffected. Manual scripted
+Chromium check (390px, not committed): tier1 brief shows facts/cause count; two hint requests
+accumulate nudge-then-clue text and survive Exit+Continue; untimed tier shows elapsed-only;
+protected-VLAN fix confirmed live.
+
+**Acceptance:** met. "Hints remain available at tier4" — confirmed. "Tier3 starts without a cause
+label" — confirmed (`showCauseCount` false at tier3; no recipe ID ever appears in customer-facing
+text). "Tier4 progresses hints to the remaining fault after the first is repaired" — confirmed for
+all six approved pairs. "Paused app time does not increase active elapsed time" — confirmed with
+injected fake clock values (active-active-paused-active sequencing).
+
+**Status:** complete. **DAY4 checkpoint (S10-S12) reached**: eight faults, deterministic
+variations, tiers and hints all work and are tested.

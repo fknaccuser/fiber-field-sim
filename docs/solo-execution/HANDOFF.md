@@ -389,13 +389,60 @@ is active shows the Resume/Replace prompt, Resume keeps the original untouched, 
 the new one; an invalid code offered as a replacement reports its specific error and leaves the
 original mission running; a skill button starts a freshly generated variation.
 
-## Next task: S12
+## What S12 added
 
-Closes DAY4 (S10–S12: eight faults, deterministic variations, tiers and hints). Read only
-`the-field-solo-week/tasks/S12.md` and whatever contracts it names before starting — likely the
-four difficulty tiers' behavioral differences (MASTER_DESIGN.md §5: guidance level, hidden
-cause/count for tiers 3–4, suggested time) and the fading-hints mechanism (nudge/clue/step/debrief
-per fault, MASTER_DESIGN.md §6) — but confirm against the actual task file.
+- `src/solo/content.js` — SCENARIOS.md's hint copy (nudge/clue/step) verbatim per recipe, with
+  address-bearing steps (I1, D1) as small template functions rendering the case's real X. Three
+  customer-fact questions with original authored answers per recipe (**note:** S12.md's own list
+  — when it began/who is affected/what changed — differs slightly from MASTER_DESIGN.md §6's
+  paraphrase of the same idea; followed S12.md's explicit list, which also matches
+  DATA_CONTRACTS.md's worked TF1-HM-1-P-START example fact triplet). Three harmless tier3
+  details, and tier time goals (§5's "Time" column). Debrief text is *not* here — SCENARIOS.md
+  gives no debrief copy and S12.md's own scope names only three hint levels; that's a later
+  task's addition once grade.js exists.
+- `src/solo/app.js` — `isRecipeRepaired` derives each recipe's live pass/fail purely from the
+  Attempt's own `network`+`requirements` (no separate stored "healthy" snapshot needed — every
+  recipe's correct value is independently recoverable, e.g. the server's own address is never
+  corrupted by any recipe, so it's always the true DNS/portal target). `currentHintRecipeId`/
+  `requestHint` target the earliest still-broken fault in the case's own pair order and progress
+  to the remaining one once the first is fixed; requesting any hint marks the run `assisted` and
+  logs a distinct `'assistance'` event (cli.js's ordinary `?` never touches this).
+  `showCauseCount`/`showHarmlessDetail` gate tier1-2 vs tier3-4 brief content.
+  `pauseMissionTimer`/`resumeMissionTimer` accrue `elapsedMs` only between resume and pause,
+  driven by `main.js`'s Page Visibility listener plus Exit/Continue — `now` is always supplied by
+  the caller, per ENGINE_RULES.md's "application code supplies elapsed time" convention (applied
+  here for testability even though app.js isn't one of the engine files that rule binds).
 
-Next command: read `the-field-solo-week/tasks/S12.md`, then implement its files and run its
+**Two real bugs found and fixed, both in earlier tasks' code, both caught by this task's own
+testing rather than shipping silently:**
+1. `isRecipeRepaired`'s P2/V1/V2 checks read the target client's *own* port instead of the switch
+   port its cable actually terminates on (a client's own port is always `mode:"routed"` and never
+   touched by those recipes) — hint progression could never detect P2/V1/V2 as fixed. A tier4-pair
+   test failed immediately once written; not something a browser click would have surfaced quickly.
+2. `layouts.js`'s `deriveRequirements` (from S10) had the identical confusion for VLANs: a
+   client's own port's `accessVlan` is ignored per ENGINE_RULES.md's binding clarifications and
+   just carries whatever the golden fixture happened to set — which is 10 for *both* PC1 and PC2,
+   masking `protectedVlan` silently returning 10 instead of the real 20 for every layout since S10
+   was written. No existing test caught this because every prior repair-action test happened to
+   target VLAN 10 anyway. Caught live in the browser (the mission brief read "protected subnet
+   .../24 (VLAN 10)"), fixed, and given a regression test across all three layouts.
+
+**Verified live in a browser, not just Node tests:** the tier1 brief shows the customer facts and
+cause count; requesting a hint twice accumulates nudge-then-clue text; the timer shows
+elapsed-only for an untimed tier; hint levels survive Exit + Continue; the VLAN fix confirmed
+directly (brief now reads "(VLAN 20)" for the protected subnet).
+
+**DAY4 checkpoint (S10-S12) reached**: eight faults, deterministic variations, tiers and hints all
+work and are tested. 197/197 solo tests, `tsc -b` clean, build clean, legacy suite unaffected.
+
+## Next task: S13
+
+Starts DAY5 (S13–S15: verification/debrief, local skill progress and configure mode). Read only
+`the-field-solo-week/tasks/S13.md` and whatever contracts it names before starting — likely
+`grade.js` (`evaluateCompletion`/`summarizeRun`) and the completion/debrief flow
+(MASTER_DESIGN.md §11's Definition of done, §9's per-skill progress, §6's debrief content) — but
+confirm against the actual task file. This is also where debrief copy (deferred from S12) most
+plausibly lands.
+
+Next command: read `the-field-solo-week/tasks/S13.md`, then implement its files and run its
 listed checks.

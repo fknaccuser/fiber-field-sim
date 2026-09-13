@@ -1,12 +1,12 @@
 {
   "spec": "SOLO-1",
   "branch": "claude/field-solo-implementation-am520q",
-  "lastWorkingCommit": "7f32b4e77c48943bfcfb03e68660a7cf174f82f4",
-  "day": 4,
-  "task": "S12",
+  "lastWorkingCommit": "99a28cd40a134654f5481dc9b7fb53fdaee1ca4f",
+  "day": 5,
+  "task": "S13",
   "substep": "read-contracts",
   "status": "not-started",
-  "completedTasks": ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10", "S11"],
+  "completedTasks": ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10", "S11", "S12"],
   "changedFiles": [
     "index.html",
     "package.json",
@@ -39,48 +39,50 @@
     "tests/solo/cli.test.mjs",
     "tests/solo/generate.test.mjs",
     "tests/solo/app.session.test.mjs",
+    "src/solo/content.js",
+    "tests/solo/content.test.mjs",
     "docs/solo-execution/STATE.json",
     "docs/solo-execution/HANDOFF.md",
     "docs/solo-execution/RESULTS.md"
   ],
   "tests": [
     {
-      "command": "node --test tests/solo/app.session.test.mjs",
+      "command": "node --test tests/solo/content.test.mjs",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T06:03:00Z"
+      "observedAt": "2026-09-13T06:20:00Z"
     },
     {
-      "command": "npm run solo:test (x3 for stability)",
+      "command": "npm run solo:test (x3 for stability, after both bugfixes)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T06:04:00Z"
+      "observedAt": "2026-09-13T06:24:00Z"
     },
     {
       "command": "npx tsc -b",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T06:04:15Z"
+      "observedAt": "2026-09-13T06:24:15Z"
     },
     {
       "command": "npm run build",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T06:04:20Z"
+      "observedAt": "2026-09-13T06:24:20Z"
     },
     {
       "command": "npm test -- --run (pre-existing vitest suite, unaffected)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T06:04:25Z"
+      "observedAt": "2026-09-13T06:24:25Z"
     },
     {
-      "command": "manual: npm run dev + scripted Chromium check (390px) — recommended start survives refresh, Resume/Replace prompt on second code, invalid replacement leaves original mission intact, skill button starts a fresh variation (not committed to the repo)",
+      "command": "manual: npm run dev + scripted Chromium check (390px) — tier1 brief shows facts+cause count, hint levels accumulate and survive exit/continue, timer shows elapsed-only when untimed, protectedVlan displays 20 after the fix (not committed to the repo)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T06:10:00Z"
+      "observedAt": "2026-09-13T06:26:00Z"
     }
   ],
   "blockers": [],
-  "nextCommand": "Read the-field-solo-week/tasks/S12.md and its referenced contracts, then close DAY4 (S10-S12: eight faults, deterministic variations, tiers and hints) with tiers and hints."
+  "nextCommand": "DAY4 checkpoint reached (S10-S12). Read the-field-solo-week/tasks/S13.md and its referenced contracts to start DAY5 (S13-S15: verification/debrief, local skill progress and configure mode)."
 }
