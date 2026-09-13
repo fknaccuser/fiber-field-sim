@@ -401,3 +401,35 @@ progress" — confirmed via a JSON serialize/reload round-trip producing identic
 runs do not inflate repair counts" — confirmed (every derivation filters to `mode === 'repair'`).
 
 **Status:** complete.
+
+## S15 — Configure a supplied network (Day 5)
+
+**Built:** `src/solo/app.js` (`disconnectLink`, `requestReset`/`cancelReset`/`confirmReset`,
+`completeRun` now selects `evaluateCompletion` vs. the new `evaluateConfigureChecklist` by mode).
+`src/solo/grade.js` (`evaluateConfigureChecklist` — department/portal-access checks only, reusing
+`remainsInDepartment`, now exported, rather than re-deriving its VLAN resolution). `view.js` (a
+Disconnect button in the reconnect panel; a confirmed Reset button in the mission header for
+configure missions; Findings/Submit now render for both modes with mode-appropriate wording).
+`tests/solo/configure.test.mjs` (8 cases).
+
+**Gaps found and fixed, all pre-existing rather than introduced by this task:** configure sessions
+had no way to disconnect a cable outside the full reconnect flow; `replayMission` was silently a
+no-op for configure attempts (no caseCode to regenerate from), leaving no way to recover a broken
+configure session at all; and Findings only ever rendered its note/checklist/submit block in
+repair mode, so a configure session's checklist was always empty and Submit did not exist for it.
+
+**Checks:** `node --test tests/solo/configure.test.mjs` — exit 0, 8/8. `npm run solo:test` —
+exit 0, 229/229, stable over 3 runs. `npx tsc -b`/`npm run build` — exit 0. Vitest — 73/1030,
+unaffected. Manual scripted Chromium check (390px, not committed): a configure mission shows
+Reset instead of Replay/New variation; disconnecting a cable directly fails the checklist with a
+concrete message; Reset's Cancel leaves the broken network untouched, confirming restores the
+healthy snapshot; Submit with no documentation reaches a "Configuration complete" debrief;
+Progress stays at zero afterward.
+
+**Acceptance:** met. "Learner can configure, break, save, reload and recover a supplied network"
+— confirmed (disconnect/field changes break it, autosave persists it, Reset recovers it). "Reset
+requires confirmation" — confirmed (a cancelled reset leaves the broken network byte-for-byte
+unchanged). "Repair progression does not change after a configure session" — confirmed
+(`counters`/`evidence`/`completedRuns` are deep-equal before and after, with or without a note).
+
+**Status:** complete.

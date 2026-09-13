@@ -505,13 +505,54 @@ recommendation to the least-practiced family, bumps Link/port's skill button to 
 static recommended-tier line on the debrief, and the Progress screen's Link/port card reflects the
 new completed/independent/distinct-causes/best-time values.
 
-## Next task: S15
+## What S15 added
 
-Continues DAY5 (S15: configure a supplied network). Read only `the-field-solo-week/tasks/S15.md`
-and whatever contracts it names before starting — confirm scope against the actual task file
-rather than assuming; configure mode's Attempt shape and Home's "Configure a network" buttons
-already exist (S07/S11), so S15 likely refines/completes that flow (its own test target is
-`tests/solo/configure.test.mjs`) rather than starting it from scratch.
+Configure sessions could already be started from Home (S07/S11), but had three real gaps: no way
+to *break* one outside the full reconnect flow (no plain "unplug"), no way to *un-break* one
+(Replay only regenerates a caseCode-based repair case, and configure attempts have no caseCode —
+`replayMission` was silently a no-op for them), and no way to *complete* one at all (Findings only
+ever rendered the note/checklist/submit block in repair mode, so a configure session's checklist
+was always an empty array and Submit did not exist).
 
-Next command: read `the-field-solo-week/tasks/S15.md`, then implement its files and run its
+- `src/solo/app.js` — `disconnectLink(state, linkId)`: a direct unplug via `setLinkConnected`,
+  independent of choosing a destination port. `requestReset`/`cancelReset`/`confirmReset`: a
+  confirmed Reset that restores the mission's own stored `initialNetwork` snapshot (clone it,
+  clear events/findings/note/hintLevels/elapsedMs, keep the same attempt id) — the one recovery
+  path that works for configure sessions, unlike Replay. `completeRun` now picks the evaluator by
+  `mission.mode`: `evaluateCompletion` for repair, the new `evaluateConfigureChecklist` for
+  configure; the profile-update block was already gated to `mode === 'repair'` (S13), so configure
+  completion still awards no repair evidence.
+- `src/solo/grade.js` — `evaluateConfigureChecklist(attempt)`: the same live department/portal-
+  access checks as `evaluateCompletion` (reusing its `remainsInDepartment`, now exported, to avoid
+  re-deriving the client-port-vs-switch-port VLAN resolution a fourth time — that exact confusion
+  caused three earlier bugs), without the same-revision test-event, genuine-finding or note-length
+  requirements, since those document a repair investigation a configure session never claims to be.
+- `src/solo/view.js` — a "Disconnect" button in the reconnect panel's initial step (only shown
+  while the cable is currently connected); a "Reset" button in the mission header for configure
+  missions (in place of Replay/New variation, which need a caseCode) with a confirmation prompt;
+  Findings/Submit now render for both modes — configure's note field reads "Documentation
+  (optional)" instead of the 10-500-character repair requirement — and the debrief heading/status
+  read "Configuration complete"/"Configure session saved." for configure mode instead of the
+  repair-specific wording.
+- `tests/solo/configure.test.mjs` (8 cases): configure/break/save/recover a supplied network,
+  Reset requiring confirmation (a cancelled reset leaves the broken network untouched), and repair
+  progression (`counters`/`evidence`/`completedRuns`) staying byte-for-byte unchanged after a
+  configure completion, with or without documentation.
+
+**Verified live in a browser, not just Node tests:** a configure mission shows Reset (not
+Replay/New variation); disconnecting a cable directly fails the checklist immediately with a
+concrete message; Reset's confirmation Cancel leaves the broken state alone, Reset restores the
+healthy snapshot; Submit with no documentation at all reaches a "Configuration complete" debrief;
+the Progress screen still reads zero everywhere afterward.
+
+## Next task: S16
+
+Continues DAY6 (S16: small study and reference pack). Read only
+`the-field-solo-week/tasks/S16.md` and whatever contracts it names before starting — likely
+`src/solo/study.js` (question/card session logic per UI_AND_STORAGE.md's file list) plus lesson/
+question/flashcard/reference content in `content.js` (MASTER_DESIGN.md §9: "eight short lessons,
+24 questions, 24 flashcards and a reference sheet") and Study/Reference screens in `view.js` — but
+confirm scope against the actual task file rather than assuming.
+
+Next command: read `the-field-solo-week/tasks/S16.md`, then implement its files and run its
 listed checks.
