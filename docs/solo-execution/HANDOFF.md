@@ -183,12 +183,42 @@ runs, all 42/42.
   exact codes, DNS case/trailing-dot handling, and WRONG_SERVICE on a reachable-but-wrong
   address.
 
-## Next task: S06
+## What S06 added
 
-Closes DAY2 (S04–S06: link/IP/VLAN/DNS evaluator and configuration actions). Read only
-`the-field-solo-week/tasks/S06.md` and whatever contracts it names before starting — this is
-most likely `src/solo/actions.js` (`applyAction`), per ENGINE_RULES.md's "Configuration actions"
-and "Action envelope" sections, but confirm against the actual task file rather than assuming.
+- `src/solo/actions.js` — `applyAction(state, action)` for all ten action types ENGINE_RULES.md
+  actually enumerates (setLinkConnected, moveCable, setPortAdmin, setAccessVlan,
+  setTrunkAllowedVlans, setClientAddress, setClientGateway, setClientDns,
+  setRouterSegmentAddress, setDnsRecord). **Note:** S06.md's acceptance text says "all eleven
+  action types," but no eleventh type is named anywhere in DATA_CONTRACTS.md or ENGINE_RULES.md
+  — implemented exactly the ten documented ones rather than inventing an unspecified one; flagging
+  this as a likely typo in the package rather than a real gap.
+  Every handler: rejects unknown extra fields and unknown entity IDs before doing anything,
+  rejects `setAccessVlan`/`setTrunkAllowedVlans` on the wrong port mode, is a no-op (success,
+  revision untouched) on an identical replacement, and — via a shared `commit()` helper — clones,
+  mutates, then re-runs `validateNetwork` on the clone before accepting it. That last step is
+  what makes `moveCable` correctly reject a cycle for free, and `setRouterSegmentAddress`
+  correctly reject a segment overlap for free, without duplicating those checks.
+- Consolidated `model.js` onto `ip.js`'s `parseIPv4` (dropping the local duplicate flagged since
+  S03/S04) and exported `isValidVlan`/`checkAddressField` so `actions.js` reuses the same address
+  rules instead of a third copy.
+- `tests/solo/actions.test.mjs` (24 cases): one valid + one invalid case per action type, plus
+  no-op-preserves-revision, unknown-action-type, unknown-field, shutdown breaking and no-shutdown
+  restoring connectivity (proven via `testService`), cable-move-to-an-occupied-port rejecting
+  unchanged, cable-move-closing-a-cycle rejecting, and a wrong-but-valid gateway saving
+  successfully and being diagnosable (`GATEWAY_UNREACHABLE` on direct ping, `DNS_UNREACHABLE` on
+  the name test).
 
-Next command: read `the-field-solo-week/tasks/S06.md`, then implement its files and run its
+**DAY2 checkpoint (S04-S06) reached**: link/IP/VLAN/DNS evaluator and configuration actions all
+work and are tested. 108/108 solo tests, `tsc -b` clean, build clean, legacy suite unaffected
+(73 files/1030 tests) throughout.
+
+## Next task: S07
+
+Starts DAY3 (S07–S09: clickable graph, editable devices, supported CLI). Read only
+`the-field-solo-week/tasks/S07.md` and whatever contracts it names before starting — this is the
+first task that touches the UI/rendering layer again since S02, so re-check UI_AND_STORAGE.md's
+screen details for the Network/Device/Findings tabs and `diagram.js`'s SVG topology before
+assuming scope.
+
+Next command: read `the-field-solo-week/tasks/S07.md`, then implement its files and run its
 listed checks.

@@ -155,3 +155,27 @@ for the name test, and directly as `RETURN_PATH_FAILED` for a raw ping — verif
 Alternate valid target IP (.131) passes.
 
 **Status:** complete.
+
+## S06 — Configuration actions (Day 2)
+
+**Built:** `src/solo/actions.js` (`applyAction`, all ten documented action types).
+`tests/solo/actions.test.mjs` (24 cases). Consolidated `model.js` onto `ip.js`'s `parseIPv4`;
+exported `isValidVlan`/`checkAddressField` for reuse.
+
+**Checks:** `node --test tests/solo/actions.test.mjs` — exit 0, 24/24. `npm run solo:test` —
+exit 0, 108/108, stable over 3 runs. `npx tsc -b`/`npm run build` — exit 0. Vitest — 73/1030,
+unaffected.
+
+**Acceptance:** met, with one documented discrepancy. S06.md's acceptance text says "all eleven
+action types have one valid and one invalid-input case," but ENGINE_RULES.md's Action envelope
+and Configuration actions sections both enumerate exactly ten, and no eleventh is named anywhere
+in DATA_CONTRACTS.md either — implemented and tested all ten actually specified rather than
+inventing one. "Applying a no-op preserves revision" — confirmed. "Invalid actions return the
+original state unchanged" — confirmed (`assert.deepEqual(result.state, network)` on rejections).
+"A wrong but valid gateway can be saved and diagnosed" — confirmed (saves, then `GATEWAY_UNREACHABLE`
+on direct ping / `DNS_UNREACHABLE` on the name test). Shutdown breaking and no-shutdown restoring
+connectivity, and a cable move to an occupied port rejecting unchanged, both confirmed via the
+evaluator (`testService`) as instructed.
+
+**Status:** complete. **DAY2 checkpoint (S04-S06) reached**: link/IP/VLAN/DNS evaluator and
+configuration actions all work and are tested.
