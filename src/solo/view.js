@@ -41,9 +41,65 @@ function describeSaveStatus(status) {
       return 'Saved';
     case 'error':
       return 'Save failed';
+    case 'quota':
+      return 'Storage is full — not saved';
     default:
       return '';
   }
+}
+
+// Shared by Home and the mission header (S19.md: "Quota failures offer
+// export rather than false Saved" — retrying the identical write just
+// fails again under quota pressure, but Export is a small serialization,
+// not a new write, so it still works. UI_AND_STORAGE.md: "show Retry/
+// Export, and block closing that mission ... until handled" — the caller
+// is responsible for that block; this only renders the prompt).
+function renderSaveStatusBanner(state, actions) {
+  const container = document.createElement('div');
+  const status = describeSaveStatus(state.saveStatus);
+  if (status) {
+    const line = document.createElement('p');
+    line.className = 'home-save-status';
+    line.setAttribute('role', 'status');
+    line.textContent = status;
+    container.appendChild(line);
+  }
+  if (state.saveStatus === 'error' || state.saveStatus === 'quota') {
+    const retryButton = document.createElement('button');
+    retryButton.type = 'button';
+    retryButton.className = 'home-retry-save';
+    retryButton.textContent = 'Retry';
+    retryButton.addEventListener('click', () => actions.onRetrySave?.());
+    container.appendChild(retryButton);
+  }
+  if (state.saveStatus === 'quota') {
+    const exportButton = document.createElement('button');
+    exportButton.type = 'button';
+    exportButton.className = 'home-export-button';
+    exportButton.textContent = 'Export backup';
+    exportButton.addEventListener('click', () => actions.onExportBackup?.());
+    container.appendChild(exportButton);
+  }
+  return container;
+}
+
+// A new version has finished downloading and is waiting, not yet in
+// control (S19.md: "Queue update activation until current state is saved
+// and user chooses Reload") — shown above whatever screen is active so the
+// choice is available regardless of where the learner is, without forcing
+// them off it.
+export function renderUpdateBanner(actions = {}) {
+  const container = document.createElement('div');
+  container.className = 'update-banner';
+  container.setAttribute('role', 'status');
+  const message = document.createElement('span');
+  message.textContent = 'An update is ready.';
+  const reloadButton = document.createElement('button');
+  reloadButton.type = 'button';
+  reloadButton.textContent = 'Reload';
+  reloadButton.addEventListener('click', () => actions.onReload?.());
+  container.append(message, reloadButton);
+  return container;
 }
 
 const SKILLS = [
@@ -88,6 +144,18 @@ export function renderHome(state, actions = {}) {
   heading.textContent = 'The Field';
   container.appendChild(heading);
 
+  // S19.md: "Show Ready offline only after worker activation and successful
+  // required-cache checks" — actions.offlineReady is set only once the
+  // service worker's onOfflineReady fires, which Workbox only calls after
+  // precaching every required asset succeeds.
+  if (actions.offlineReady) {
+    const offlineNote = document.createElement('p');
+    offlineNote.className = 'home-offline-ready';
+    offlineNote.setAttribute('role', 'status');
+    offlineNote.textContent = 'Ready offline';
+    container.appendChild(offlineNote);
+  }
+
   if (state.pendingMissionRequest) {
     container.appendChild(renderPendingMissionPrompt(state, actions));
   }
@@ -104,23 +172,7 @@ export function renderHome(state, actions = {}) {
   }
   container.appendChild(continueButton);
 
-  const status = describeSaveStatus(state.saveStatus);
-  if (status) {
-    const saveStatus = document.createElement('p');
-    saveStatus.className = 'home-save-status';
-    saveStatus.setAttribute('role', 'status');
-    saveStatus.textContent = status;
-    container.appendChild(saveStatus);
-  }
-
-  if (state.saveStatus === 'error') {
-    const retryButton = document.createElement('button');
-    retryButton.type = 'button';
-    retryButton.className = 'home-retry-save';
-    retryButton.textContent = 'Retry';
-    retryButton.addEventListener('click', () => actions.onRetrySave?.());
-    container.appendChild(retryButton);
-  }
+  container.appendChild(renderSaveStatusBanner(state, actions));
 
   if (state.error) {
     const error = document.createElement('p');
@@ -1042,6 +1094,16 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   exitButton.addEventListener('click', () => actions.onExit?.());
   header.appendChild(exitButton);
   container.appendChild(header);
+  if (state.saveStatus === 'error' || state.saveStatus === 'quota') {
+    container.appendChild(renderSaveStatusBanner(state, actions));
+  }
+  if (state.error) {
+    const error = document.createElement('p');
+    error.className = 'form-error';
+    error.setAttribute('role', 'alert');
+    error.textContent = state.error;
+    container.appendChild(error);
+  }
   if (state.pendingReset) {
     const resetPrompt = document.createElement('div');
     resetPrompt.className = 'home-pending-prompt';

@@ -10,6 +10,14 @@ import { inSubnet } from './ip.js';
 import { evaluateCompletion, evaluateConfigureChecklist, summarizeRun } from './grade.js';
 
 export const RECOMMENDED_CODE = 'TF1-HM-1-P-START';
+
+// A quota failure needs a different remedy than a generic one (S19.md:
+// "Quota failures offer export rather than false Saved") — retrying the
+// exact same write just fails again, but exporting (a small serialization,
+// not a new write) still works, so the UI needs to tell the two apart.
+export function isQuotaExceeded(error) {
+  return error instanceof DOMException && error.name === 'QuotaExceededError';
+}
 const RECENT_FINGERPRINT_LIMIT = 20;
 
 export function createInitialState() {
@@ -127,8 +135,8 @@ export async function persistProfile(state, store) {
   try {
     await store.saveProfile(state.profile);
     return { ...state, saveStatus: 'saved' };
-  } catch {
-    return { ...state, saveStatus: 'error', error: 'Save failed' };
+  } catch (error) {
+    return { ...state, saveStatus: isQuotaExceeded(error) ? 'quota' : 'error', error: 'Save failed' };
   }
 }
 

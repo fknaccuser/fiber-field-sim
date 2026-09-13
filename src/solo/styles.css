@@ -146,6 +146,29 @@ body {
   color: var(--field-muted);
 }
 
+.home-offline-ready {
+  color: var(--field-success);
+}
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--field-panel);
+  border-bottom: 1px solid var(--field-cyan);
+  color: var(--field-text);
+}
+
+.update-banner button {
+  background: transparent;
+  color: var(--field-cyan);
+  border: 1px solid var(--field-cyan);
+  border-radius: 6px;
+  padding: 0 16px;
+}
+
 .home-retry-save {
   background: var(--field-panel);
   color: var(--field-error);

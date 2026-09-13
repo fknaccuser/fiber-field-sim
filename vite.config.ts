@@ -7,8 +7,14 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      // S19.md: "Queue update activation until current state is saved and
+      // user chooses Reload" — autoUpdate calls skipWaiting()/clientsClaim()
+      // the instant a new version installs, which could hand control to a
+      // schema-incompatible bundle mid-mission. 'prompt' (with manual
+      // registration below, injectRegister: false) leaves that decision to
+      // src/solo/main.js's own onNeedRefresh handler instead.
+      registerType: 'prompt',
+      injectRegister: false,
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,yaml}'],
         navigateFallback: '/index.html',

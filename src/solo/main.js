@@ -3,7 +3,6 @@ import {
   submitOpeningCommand,
   completeInitialization,
   boot,
-  persistProfile,
   startConfigureSession,
   exitMission,
   resumeMission,
@@ -40,9 +39,18 @@ import {
   closeLesson,
   revealCard,
   updateAndPersistProfile,
+  isQuotaExceeded,
 } from './app.js';
 import { openStore, previewBackup } from './store.js';
-import { renderHome, renderMission, renderDebrief, renderProgress, renderStudy, renderReference } from './view.js';
+import {
+  renderHome,
+  renderMission,
+  renderDebrief,
+  renderProgress,
+  renderStudy,
+  renderReference,
+  renderUpdateBanner,
+} from './view.js';
 import { runMissionTest } from './devices.js';
 import { executeCommand } from './cli.js';
 import { recommendMission, recommendedTier } from './progress.js';
@@ -71,10 +79,21 @@ let referenceQuery = '';
 let importPreview = null;
 let importBackup = null;
 let importError = null;
+// Service worker lifecycle (S19.md), all transient view state like the rest
+// of this block: offlineReady flips true once Workbox's onOfflineReady
+// fires; updateAvailable flips true once a new version has installed and is
+// waiting (onNeedRefresh); updateServiceWorkerFn is registerSW()'s own
+// returned callback, used only once the learner explicitly chooses Reload.
+let offlineReady = false;
+let updateAvailable = false;
+let updateServiceWorkerFn = null;
 
 function render() {
   const root = document.getElementById('root');
   root.textContent = '';
+  if (updateAvailable) {
+    root.appendChild(renderUpdateBanner({ onReload: reloadForUpdate }));
+  }
   if (state.screen === 'opening') {
     root.appendChild(renderOpening());
   } else if (state.screen === 'initializing') {
@@ -95,6 +114,7 @@ function render() {
         onOpenReference: openReferenceScreen,
         recommendation: recommendMission(state.profile),
         onExportBackup: exportBackupAction,
+        offlineReady,
         onImportFile: importFileAction,
         onCancelImport: cancelImportAction,
         onConfirmImport: confirmImportAction,
@@ -130,6 +150,8 @@ function render() {
         state,
         {
           onExit: exitToHome,
+          onRetrySave: retrySave,
+          onExportBackup: exportBackupAction,
           onTabChange: changeMissionTab,
           onSelectDevice: pickDevice,
           onSelectLink: pickLink,
@@ -168,8 +190,24 @@ function render() {
   }
 }
 
+// Retries whatever the last failure actually was: a mission autosave writes
+// both profile and mission together (persistMission/persistProfileAndMission
+// use saveMission/saveLocal), so retrying with saveProfile alone would leave
+// a still-unsaved mission looking falsely resolved. Saving both here covers
+// every failure site with one Retry action.
 async function retrySave() {
-  state = await persistProfile(state, store);
+  state = { ...state, saveStatus: 'saving' };
+  render();
+  try {
+    if (state.mission) {
+      await store.saveLocal(state.profile, state.mission);
+    } else {
+      await store.saveProfile(state.profile);
+    }
+    state = { ...state, saveStatus: 'saved' };
+  } catch (error) {
+    state = { ...state, saveStatus: isQuotaExceeded(error) ? 'quota' : 'error' };
+  }
   render();
 }
 
@@ -182,8 +220,8 @@ async function persistMission() {
   try {
     await store.saveMission(state.mission);
     state = { ...state, saveStatus: 'saved' };
-  } catch {
-    state = { ...state, saveStatus: 'error' };
+  } catch (error) {
+    state = { ...state, saveStatus: isQuotaExceeded(error) ? 'quota' : 'error' };
   }
   render();
 }
@@ -197,8 +235,8 @@ async function persistProfileAndMission() {
   try {
     await store.saveLocal(state.profile, state.mission);
     state = { ...state, saveStatus: 'saved' };
-  } catch {
-    state = { ...state, saveStatus: 'error' };
+  } catch (error) {
+    state = { ...state, saveStatus: isQuotaExceeded(error) ? 'quota' : 'error' };
   }
   render();
 }
@@ -442,7 +480,16 @@ function cancelReplace() {
   render();
 }
 
+// UI_AND_STORAGE.md: "On failure ... block closing that mission through
+// in-app navigation until handled" — a save failure (quota or otherwise)
+// keeps the mission on screen with its Retry/Export prompt until the
+// learner resolves it, rather than silently losing the unsaved change.
 function exitToHome() {
+  if (state.saveStatus === 'error' || state.saveStatus === 'quota') {
+    state = { ...state, error: 'Resolve the save failure above before leaving this job.' };
+    render();
+    return;
+  }
   state = exitMission(state);
   missionTab = 'network';
   render();
@@ -684,9 +731,63 @@ function runInitializationSequence() {
   });
 }
 
+// Manual registration (vite.config.ts's registerType: 'prompt',
+// injectRegister: false) — the auto-injected script would call
+// skipWaiting()/reload the instant an update installs; this instead only
+// flips a flag and waits for reloadForUpdate to be invoked explicitly.
+// `virtual:pwa-register` only resolves in a PWA-enabled build (plain
+// `vite dev`/a non-PWA build has no service worker at all), so a failed
+// import just means there is no offline/update behavior to wire up.
+async function setupServiceWorkerRegistration() {
+  if (!('serviceWorker' in navigator)) return;
+  // onOfflineReady only fires the moment precaching first completes, not on
+  // every later load — a page already controlled by an active worker from a
+  // prior visit is just as ready offline, so that state needs checking too.
+  if (navigator.serviceWorker.controller) {
+    offlineReady = true;
+    render();
+  }
+  try {
+    const { registerSW } = await import('virtual:pwa-register');
+    updateServiceWorkerFn = registerSW({
+      immediate: true,
+      onOfflineReady() {
+        offlineReady = true;
+        render();
+      },
+      onNeedRefresh() {
+        updateAvailable = true;
+        render();
+      },
+    });
+  } catch {
+    // No installed PWA plugin/service worker in this build — nothing to do.
+  }
+}
+
+// S19.md: "Queue update activation until current state is saved and user
+// chooses Reload." Flushes whatever the active screen would otherwise still
+// be autosaving before handing control to the new service worker, so an
+// update never races an in-flight save.
+async function reloadForUpdate() {
+  try {
+    if (state.mission) {
+      await store.saveLocal(state.profile, state.mission);
+    } else if (state.profile) {
+      await store.saveProfile(state.profile);
+    }
+  } catch {
+    // A failed final flush still shouldn't block the update the learner
+    // explicitly asked for; whatever synced before this point is safe.
+  }
+  updateAvailable = false;
+  await updateServiceWorkerFn?.();
+}
+
 async function start() {
   state = await boot(store);
   render();
+  setupServiceWorkerRegistration();
 }
 
 if (document.readyState === 'loading') {
