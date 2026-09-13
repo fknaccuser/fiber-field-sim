@@ -3,9 +3,9 @@
 //
 // validateNetwork checks structural integrity and syntactically valid addresses,
 // not whether the network works — "wrong gateway is valid structure" per
-// ENGINE_RULES.md. A local IPv4-syntax check is used here rather than importing
-// ip.js's parseIPv4 (that file does not exist until a later task); once it does,
-// this can be consolidated to avoid duplicated logic.
+// ENGINE_RULES.md.
+
+import { parseIPv4 } from './ip.js';
 
 const DEVICE_KINDS = new Set(['client', 'switch', 'router', 'server']);
 const PORT_MODES = new Set(['access', 'trunk', 'routed']);
@@ -18,25 +18,18 @@ function fail(code, message) {
 }
 
 function isSyntacticIPv4(text) {
-  if (typeof text !== 'string') return false;
-  const parts = text.split('.');
-  if (parts.length !== 4) return false;
-  return parts.every((part) => {
-    if (!/^\d{1,3}$/.test(part)) return false;
-    const value = Number(part);
-    return value >= 0 && value <= 255;
-  });
+  return typeof text === 'string' && parseIPv4(text) !== null;
 }
 
 function hostOctet(ip) {
   return Number(ip.split('.')[3]);
 }
 
-function isValidVlan(vlan) {
+export function isValidVlan(vlan) {
   return Number.isInteger(vlan) && vlan >= 1 && vlan <= 4094;
 }
 
-function checkAddressField(label, ip, prefix, { requirePrefix24 = true } = {}) {
+export function checkAddressField(label, ip, prefix, { requirePrefix24 = true } = {}) {
   if (ip === undefined || ip === null) return null;
   if (!isSyntacticIPv4(ip)) return fail('INVALID_IP', `${label} is not a valid IPv4 address.`);
   if (prefix !== undefined && prefix !== null) {
