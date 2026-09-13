@@ -138,3 +138,20 @@ exports) need the one-way IP pseudocode on top of L2, which S04.md's own task te
 for — left for the next task that lists them.
 
 **Status:** complete.
+
+## S05 — Routed connectivity and DNS (Day 2)
+
+**Built:** `canReach`, `resolveName`, `testService` added to `src/solo/forward.js`.
+`tests/solo/forward.test.mjs` (24 cases).
+
+**Checks:** `node --test tests/solo/forward.test.mjs` — exit 0, 24/24. `npm run solo:test` —
+exit 0, 84/84, stable over 3 runs. `npx tsc -b`/`npm run build` — exit 0. Vitest — 73/1030,
+unaffected.
+
+**Acceptance:** met. Healthy target/protected pass. D1 fails name tests (`DNS_UNREACHABLE`)
+while a direct server ping works. D2 fails both clients. A missing server return-gateway breaks
+the return path (surfaces as `DNS_UNREACHABLE` with `details.transport: 'RETURN_PATH_FAILED'`
+for the name test, and directly as `RETURN_PATH_FAILED` for a raw ping — verified both ways).
+Alternate valid target IP (.131) passes.
+
+**Status:** complete.

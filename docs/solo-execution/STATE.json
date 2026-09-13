@@ -1,12 +1,12 @@
 {
   "spec": "SOLO-1",
   "branch": "claude/field-solo-implementation-am520q",
-  "lastWorkingCommit": "cf38f34ce7910c4e24d77cbd220ecbefb32913c1",
+  "lastWorkingCommit": "a026e1f4bcfdacdd921331d54eed613768b20265",
   "day": 2,
-  "task": "S05",
+  "task": "S06",
   "substep": "read-contracts",
   "status": "not-started",
-  "completedTasks": ["S01", "S02", "S03", "S04"],
+  "completedTasks": ["S01", "S02", "S03", "S04", "S05"],
   "changedFiles": [
     "index.html",
     "package.json",
@@ -25,42 +25,43 @@
     "tests/solo/model.test.mjs",
     "tests/solo/ip.test.mjs",
     "tests/solo/l2.test.mjs",
+    "tests/solo/forward.test.mjs",
     "docs/solo-execution/STATE.json",
     "docs/solo-execution/HANDOFF.md",
     "docs/solo-execution/RESULTS.md"
   ],
   "tests": [
     {
-      "command": "node --test tests/solo/ip.test.mjs tests/solo/l2.test.mjs",
+      "command": "node --test tests/solo/forward.test.mjs",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T05:00:00Z"
+      "observedAt": "2026-09-13T05:11:00Z"
     },
     {
       "command": "npm run solo:test (x3 for stability)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T05:04:00Z"
+      "observedAt": "2026-09-13T05:12:00Z"
     },
     {
       "command": "npx tsc -b",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T05:04:30Z"
+      "observedAt": "2026-09-13T05:12:15Z"
     },
     {
       "command": "npm run build",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T05:04:45Z"
+      "observedAt": "2026-09-13T05:12:30Z"
     },
     {
       "command": "npm test -- --run (pre-existing vitest suite, unaffected)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T05:05:00Z"
+      "observedAt": "2026-09-13T05:12:33Z"
     }
   ],
   "blockers": [],
-  "nextCommand": "Read the-field-solo-week/tasks/S05.md and its referenced contracts, then continue DAY2 (S04-S06: link/IP/VLAN/DNS evaluator and configuration actions)."
+  "nextCommand": "Read the-field-solo-week/tasks/S06.md and its referenced contracts, then close DAY2 (S04-S06: link/IP/VLAN/DNS evaluator and configuration actions)."
 }

@@ -160,10 +160,35 @@ runs, all 42/42.
   VLAN/V2) plus linkUsable's power/adminUp/connected combinations, run against `layouts.js`'s
   real BR fixture rather than synthetic state.
 
-## Next task: S05
+## What S05 added
 
-DAY2 (S04–S06: link/IP/VLAN/DNS evaluator and configuration actions). Read only
-`the-field-solo-week/tasks/S05.md` and whatever contracts it names before starting.
+- `src/solo/forward.js` gains `canReach`, `resolveName`, `testService` (the one-way IP
+  pseudocode from reference/L2_PSEUDOCODE.md, run both directions). Failure codes:
+  `INVALID_ADDRESS`/`DUPLICATE_IP` (malformed or shared source/destination address),
+  `LINK_DOWN` (the immediate local attachment of whichever endpoint initiates an L2 hop is
+  down — covers P1/P2), `VLAN_PATH_BLOCKED` (a deeper L2/VLAN mismatch once the immediate link
+  is fine — covers V1/V2), `GATEWAY_UNREACHABLE` (no on-subnet router owns the configured
+  gateway — covers I2), `NO_ROUTE` (destination/route unknown), `RETURN_PATH_FAILED` (forward
+  path fine, reverse path fails). `resolveName` requires round-trip reachability to the
+  client's resolver first and wraps *any* transport failure as `DNS_UNREACHABLE` with the real
+  reason kept in `details.transport` — this matters: a reverse-path break on the DNS server
+  itself surfaces as `DNS_UNREACHABLE`, not `RETURN_PATH_FAILED`, exactly per ENGINE_RULES.md's
+  "DNS tests wrap resolver transport failures." `testService` additionally requires the
+  resolved address to belong to the one real `server`-kind device, else `WRONG_SERVICE`.
+- `tests/solo/forward.test.mjs` (24 cases): every DATA_CONTRACTS.md/expected-cases.json fixture
+  (healthy, P1, P2, I1, I2, V1, V2, D1, D2, alternate-valid-ip, protected-outage, P1+D1) applied
+  to the BR layout via a `[collection, id-or-record-name, field, value]` patcher, asserting both
+  clients' `testService` booleans; two cases added beyond the supplied fixture per S05.md's own
+  instruction (server return-gateway failure, duplicate host address); plus targeted checks for
+  exact codes, DNS case/trailing-dot handling, and WRONG_SERVICE on a reachable-but-wrong
+  address.
 
-Next command: read `the-field-solo-week/tasks/S05.md`, then implement its files and run its
+## Next task: S06
+
+Closes DAY2 (S04–S06: link/IP/VLAN/DNS evaluator and configuration actions). Read only
+`the-field-solo-week/tasks/S06.md` and whatever contracts it names before starting — this is
+most likely `src/solo/actions.js` (`applyAction`), per ENGINE_RULES.md's "Configuration actions"
+and "Action envelope" sections, but confirm against the actual task file rather than assuming.
+
+Next command: read `the-field-solo-week/tasks/S06.md`, then implement its files and run its
 listed checks.
