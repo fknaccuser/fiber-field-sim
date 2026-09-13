@@ -677,6 +677,64 @@ input {
   padding: 0 16px;
 }
 
+.debrief-progress-feedback {
+  color: var(--field-cyan);
+}
+
+.home-progress-button {
+  background: var(--field-panel);
+  color: var(--field-text);
+  border: 1px solid var(--field-cyan);
+  border-radius: 6px;
+  padding: 0 16px;
+  margin-top: 16px;
+}
+
+.progress-screen {
+  min-height: 100vh;
+  padding: 16px;
+  background: var(--field-bg);
+  color: var(--field-text);
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.progress-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.progress-skill-card {
+  background: var(--field-panel);
+  border: 1px solid var(--field-muted);
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 160px;
+  flex: 1 1 160px;
+}
+
+.progress-skill-card dl {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.progress-skill-card dt {
+  color: var(--field-muted);
+}
+
+.progress-skill-card dd {
+  margin: 0;
+  text-align: right;
+}
+
+.progress-history {
+  padding-left: 20px;
+}
+
 @media (min-width: 900px) {
   /* Tablet+: topology left (40%), selected device right (60%), both visible
      at once (MASTER_DESIGN.md §7) — so the tab control that switches between

@@ -13,6 +13,7 @@ import {
 } from './devices.js';
 import { CUSTOMER_QUESTIONS, CUSTOMER_FACTS, HARMLESS_DETAILS, HINTS, renderHintText, TIER_GOAL_MS } from './content.js';
 import { evaluateCompletion } from './grade.js';
+import { allFamilyStats, recommendedTier } from './progress.js';
 
 function describeSaveStatus(status) {
   switch (status) {
@@ -33,6 +34,10 @@ const SKILLS = [
   { family: 'V', label: 'VLAN' },
   { family: 'D', label: 'DNS' },
 ];
+
+function familyLabel(family) {
+  return SKILLS.find((s) => s.family === family)?.label ?? 'Mixed challenge';
+}
 
 function renderPendingMissionPrompt(state, actions) {
   const request = state.pendingMissionRequest;
@@ -114,11 +119,15 @@ export function renderHome(state, actions = {}) {
   const recommendedRow = document.createElement('div');
   recommendedRow.className = 'home-recommended-row';
   const recommendedText = document.createElement('span');
-  recommendedText.textContent = actions.recommendedCode ?? 'TF1-HM-1-P-START';
+  const recommendation = actions.recommendation ?? { kind: 'code', code: 'TF1-HM-1-P-START' };
+  recommendedText.textContent =
+    recommendation.kind === 'code'
+      ? recommendation.code
+      : `${familyLabel(recommendation.family)}, tier ${recommendation.tier}`;
   const startRecommended = document.createElement('button');
   startRecommended.type = 'button';
   startRecommended.textContent = 'Start';
-  startRecommended.addEventListener('click', () => actions.onStartCode?.(actions.recommendedCode ?? 'TF1-HM-1-P-START'));
+  startRecommended.addEventListener('click', () => actions.onStartRecommended?.());
   recommendedRow.append(recommendedText, startRecommended);
   container.appendChild(recommendedRow);
 
@@ -131,7 +140,8 @@ export function renderHome(state, actions = {}) {
   for (const skill of SKILLS) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = skill.label;
+    const tier = recommendedTier(state.profile, skill.family);
+    button.textContent = `${skill.label} · Tier ${tier}`;
     button.addEventListener('click', () => actions.onStartVariation?.(skill.family));
     skillsRow.appendChild(button);
   }
@@ -178,6 +188,82 @@ export function renderHome(state, actions = {}) {
     configureRow.appendChild(button);
   }
   container.appendChild(configureRow);
+
+  const progressButton = document.createElement('button');
+  progressButton.type = 'button';
+  progressButton.className = 'home-progress-button';
+  progressButton.textContent = 'Progress';
+  progressButton.addEventListener('click', () => actions.onOpenProgress?.());
+  container.appendChild(progressButton);
+
+  return container;
+}
+
+// Local completion history and assisted/independent evidence by skill
+// (MASTER_DESIGN.md §9). Practice indicators only — no XP, currency or
+// certification-readiness claims.
+export function renderProgress(state, actions = {}) {
+  const container = document.createElement('div');
+  container.className = 'progress-screen';
+
+  const heading = document.createElement('h1');
+  heading.textContent = 'Progress';
+  container.appendChild(heading);
+
+  const backButton = document.createElement('button');
+  backButton.type = 'button';
+  backButton.textContent = 'Back';
+  backButton.addEventListener('click', () => actions.onHome?.());
+  container.appendChild(backButton);
+
+  const stats = allFamilyStats(state.profile);
+  const statsList = document.createElement('div');
+  statsList.className = 'progress-skills';
+  for (const stat of stats) {
+    const card = document.createElement('section');
+    card.className = 'progress-skill-card';
+    const skillHeading = document.createElement('h2');
+    skillHeading.textContent = familyLabel(stat.family);
+    card.appendChild(skillHeading);
+    const dl = document.createElement('dl');
+    const addRow = (term, value) => {
+      const dt = document.createElement('dt');
+      dt.textContent = term;
+      const dd = document.createElement('dd');
+      dd.textContent = value;
+      dl.append(dt, dd);
+    };
+    addRow('Completed runs', String(stat.completed));
+    addRow('Independent', String(stat.independent));
+    addRow('Assisted', String(stat.assisted));
+    addRow('Distinct causes solved', String(stat.distinctCauses));
+    addRow('Highest tier reached', stat.highestTier > 0 ? String(stat.highestTier) : '—');
+    addRow('Recommended tier', String(stat.recommendedTier));
+    addRow('Best verified time', stat.bestElapsedMs != null ? formatDuration(stat.bestElapsedMs) : '—');
+    card.appendChild(dl);
+    statsList.appendChild(card);
+  }
+  container.appendChild(statsList);
+
+  const historyHeading = document.createElement('h2');
+  historyHeading.textContent = 'Recent history';
+  container.appendChild(historyHeading);
+  const recentRuns = state.profile.completedRuns.slice(0, 10);
+  if (recentRuns.length === 0) {
+    const empty = document.createElement('p');
+    empty.textContent = 'No completed jobs yet.';
+    container.appendChild(empty);
+  } else {
+    const historyList = document.createElement('ol');
+    historyList.className = 'progress-history';
+    for (const run of recentRuns) {
+      const item = document.createElement('li');
+      const statusText = run.assisted ? 'Completed with support' : 'Completed independently';
+      item.textContent = `${familyLabel(run.family)} · tier ${run.tier} · ${statusText} · ${formatDuration(run.elapsedMs)}`;
+      historyList.appendChild(item);
+    }
+    container.appendChild(historyList);
+  }
 
   return container;
 }
@@ -740,6 +826,16 @@ export function renderDebrief(state, actions = {}) {
   container.appendChild(timer);
 
   if (mission.mode === 'repair') {
+    // Short, static (reduced-motion-safe) practice feedback tied to real
+    // evidence — no XP, currency or certification-readiness claim (S14.md).
+    const families = [...new Set(mission.recipeIds.map((recipeId) => recipeId[0]))];
+    const feedback = document.createElement('p');
+    feedback.className = 'debrief-progress-feedback';
+    feedback.textContent = families
+      .map((family) => `Recommended tier for ${familyLabel(family)}: ${recommendedTier(state.profile, family)}.`)
+      .join(' ');
+    container.appendChild(feedback);
+
     const causesHeading = document.createElement('h2');
     causesHeading.textContent = 'Causes';
     container.appendChild(causesHeading);

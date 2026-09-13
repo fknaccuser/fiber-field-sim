@@ -22,7 +22,6 @@ import {
   cancelReplaceMission,
   replayMission,
   startNewVariation,
-  RECOMMENDED_CODE,
   requestHint,
   pauseMissionTimer,
   resumeMissionTimer,
@@ -31,9 +30,10 @@ import {
   completeRun,
 } from './app.js';
 import { openStore } from './store.js';
-import { renderHome, renderMission, renderDebrief } from './view.js';
+import { renderHome, renderMission, renderDebrief, renderProgress } from './view.js';
 import { runMissionTest } from './devices.js';
 import { executeCommand } from './cli.js';
+import { recommendMission, recommendedTier } from './progress.js';
 
 const INIT_LINES = ['Initializing local session.', 'Preparing The Field.', 'Ready.'];
 const INIT_LINE_DELAY_MS = 200;
@@ -61,11 +61,15 @@ function render() {
         onContinue: continueMission,
         onStartCode: startCode,
         onStartVariation: startSkillVariation,
+        onStartRecommended: startRecommended,
         onConfirmReplace: confirmReplace,
         onCancelReplace: cancelReplace,
-        recommendedCode: RECOMMENDED_CODE,
+        onOpenProgress: openProgress,
+        recommendation: recommendMission(state.profile),
       }),
     );
+  } else if (state.screen === 'progress') {
+    root.appendChild(renderProgress(state, { onHome: progressToHome }));
   } else if (state.screen === 'mission') {
     root.appendChild(
       renderMission(
@@ -161,12 +165,44 @@ function startCode(caseCode) {
   if (state.mission !== before) persistProfileAndMission();
 }
 
+// Jumps straight to whatever tier progress.js currently recommends for this
+// family (S14.md: recommendation influences the quick skill buttons, not
+// just the Home summary text); tier4 is always the mixed family
+// (SCENARIOS.md: "tier 4 must use M"). Every tier stays reachable manually
+// through the seed-entry field regardless of this shortcut.
 function startSkillVariation(family) {
+  const tier = recommendedTier(state.profile, family);
+  const effectiveFamily = tier === 4 ? 'M' : family;
   const before = state.mission;
-  state = startNewVariation(state, 'BR', 1, family);
+  state = startNewVariation(state, 'BR', tier, effectiveFamily);
   missionTab = 'network';
   render();
   if (state.mission !== before) persistProfileAndMission();
+}
+
+// Home's "Recommended job" Start button: the fixed first job by code, or a
+// generated variation at the least-practiced family's recommended tier
+// (progress.js's recommendMission) once any run has completed.
+function startRecommended() {
+  const recommendation = recommendMission(state.profile);
+  const before = state.mission;
+  state =
+    recommendation.kind === 'code'
+      ? attemptStartMission(state, recommendation.code)
+      : startNewVariation(state, 'BR', recommendation.tier, recommendation.family);
+  missionTab = 'network';
+  render();
+  if (state.mission !== before) persistProfileAndMission();
+}
+
+function openProgress() {
+  state = { ...state, screen: 'progress' };
+  render();
+}
+
+function progressToHome() {
+  state = { ...state, screen: 'home' };
+  render();
 }
 
 function familyForRecipe(recipeId) {
