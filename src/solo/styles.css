@@ -615,6 +615,68 @@ input {
   margin: 2px 0;
 }
 
+.findings-list label {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.completion-checklist {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+}
+
+.checklist-pass {
+  color: var(--field-success);
+}
+
+.checklist-fail {
+  color: var(--field-error);
+}
+
+.findings-submit {
+  background: var(--field-panel);
+  color: var(--field-text);
+  border: 1px solid var(--field-cyan);
+  border-radius: 6px;
+  padding: 0 20px;
+}
+
+.debrief-screen {
+  min-height: 100vh;
+  padding: 16px;
+  background: var(--field-bg);
+  color: var(--field-text);
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.debrief-status {
+  color: var(--field-success);
+  font-weight: 600;
+}
+
+.debrief-lesson-note {
+  color: var(--field-muted);
+  font-style: italic;
+}
+
+.debrief-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.debrief-actions button {
+  background: var(--field-panel);
+  color: var(--field-text);
+  border: 1px solid var(--field-cyan);
+  border-radius: 6px;
+  padding: 0 16px;
+}
+
 @media (min-width: 900px) {
   /* Tablet+: topology left (40%), selected device right (60%), both visible
      at once (MASTER_DESIGN.md §7) — so the tab control that switches between

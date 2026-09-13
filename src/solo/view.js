@@ -12,6 +12,7 @@ import {
   renderTerminal,
 } from './devices.js';
 import { CUSTOMER_QUESTIONS, CUSTOMER_FACTS, HARMLESS_DETAILS, HINTS, renderHintText, TIER_GOAL_MS } from './content.js';
+import { evaluateCompletion } from './grade.js';
 
 function describeSaveStatus(status) {
   switch (status) {
@@ -390,28 +391,94 @@ const TEST_LABELS = {
 // Findings rows (UI_AND_STORAGE.md "Findings rows show observation, device and
 // sequence"). Selecting supporting rows for a completion submission is
 // grade.js's job, a later task — this is the read-only observation record.
-function renderFindings(mission) {
-  const container = document.createElement('div');
-  const testEvents = mission.events.filter((event) => event.kind === 'test');
-  if (testEvents.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'findings-empty';
-    empty.textContent = 'Run a test to record what you observe.';
-    container.appendChild(empty);
-    return container;
-  }
-  const list = document.createElement('ol');
-  list.className = 'findings-list';
-  for (const event of testEvents) {
-    const device = mission.network.devices.find((d) => d.id === event.deviceId);
+function describeEvent(mission, event) {
+  const device = mission.network.devices.find((d) => d.id === event.deviceId);
+  const deviceName = device?.name ?? event.deviceId ?? 'network';
+  if (event.kind === 'test') {
     const label = TEST_LABELS[event.details.testKind] ?? event.details.testKind;
     const outcome = event.details.result.ok ? 'passed' : `failed (${event.details.result.code})`;
-    const item = document.createElement('li');
-    item.className = event.details.result.ok ? 'findings-row findings-row-pass' : 'findings-row findings-row-fail';
-    item.textContent = `#${event.index} · ${label} from ${device?.name ?? event.deviceId}: ${outcome}`;
-    list.appendChild(item);
+    return `${label} from ${deviceName}: ${outcome}`;
   }
-  container.appendChild(list);
+  if (event.kind === 'inspection') {
+    return `Inspected ${deviceName} (power ${event.details.powered ? 'on' : 'off'}${event.details.ip ? `, ${event.details.ip}` : ''})`;
+  }
+  if (event.kind === 'change') {
+    const action = event.details.action;
+    const entityLabel = device ? deviceName : (action?.linkId ?? action?.portId ?? 'the network');
+    return `${action?.type ?? 'Configuration change'} on ${entityLabel}`;
+  }
+  return `${event.kind} on ${deviceName}`;
+}
+
+// Findings: automatically captured inspection/test observations, selectable
+// as evidence, plus the completion note and a live checklist of unmet
+// requirements (UI_AND_STORAGE.md/S13.md: "Present unmet checks as concrete
+// next actions").
+function renderFindings(state, actions) {
+  const mission = state.mission;
+  const container = document.createElement('div');
+
+  const capturedEvents = mission.events.filter((e) => e.kind === 'inspection' || e.kind === 'test');
+  if (capturedEvents.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'findings-empty';
+    empty.textContent = 'Select a device or run a test to record what you observe.';
+    container.appendChild(empty);
+  } else {
+    const list = document.createElement('ol');
+    list.className = 'findings-list';
+    for (const event of capturedEvents) {
+      const item = document.createElement('li');
+      item.className =
+        event.kind === 'test'
+          ? event.details.result.ok
+            ? 'findings-row findings-row-pass'
+            : 'findings-row findings-row-fail'
+          : 'findings-row';
+      const label = document.createElement('label');
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = mission.selectedFindingIds.includes(event.id);
+      checkbox.addEventListener('change', () => actions.onToggleFinding?.(event.id));
+      const text = document.createElement('span');
+      text.textContent = ` #${event.index} · ${describeEvent(mission, event)}`;
+      label.append(checkbox, text);
+      item.appendChild(label);
+      list.appendChild(item);
+    }
+    container.appendChild(list);
+  }
+
+  if (mission.mode === 'repair') {
+    const noteLabel = document.createElement('label');
+    noteLabel.className = 'form-row';
+    const noteSpan = document.createElement('span');
+    noteSpan.textContent = 'Completion note (10-500 characters)';
+    const noteInput = document.createElement('textarea');
+    noteInput.value = mission.completionNote ?? '';
+    noteInput.rows = 3;
+    noteInput.addEventListener('input', () => actions.onNoteChange?.(noteInput.value));
+    noteLabel.append(noteSpan, noteInput);
+    container.appendChild(noteLabel);
+
+    const checklist = document.createElement('ul');
+    checklist.className = 'completion-checklist';
+    for (const check of actions.completionChecks ?? []) {
+      const item = document.createElement('li');
+      item.className = check.passed ? 'checklist-pass' : 'checklist-fail';
+      item.textContent = `${check.passed ? '✓' : '✗'} ${check.message}`;
+      checklist.appendChild(item);
+    }
+    container.appendChild(checklist);
+
+    const submitButton = document.createElement('button');
+    submitButton.type = 'button';
+    submitButton.className = 'findings-submit';
+    submitButton.textContent = 'Submit';
+    submitButton.addEventListener('click', () => actions.onSubmit?.());
+    container.appendChild(submitButton);
+  }
+
   return container;
 }
 
@@ -605,7 +672,12 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   const findingsPanel = document.createElement('div');
   findingsPanel.className = 'mission-panel mission-panel-findings';
   findingsPanel.hidden = activeTab !== 'findings';
-  findingsPanel.appendChild(renderFindings(mission));
+  findingsPanel.appendChild(
+    renderFindings(state, {
+      ...actions,
+      completionChecks: mission.mode === 'repair' ? evaluateCompletion(mission).checks : [],
+    }),
+  );
   panels.appendChild(findingsPanel);
 
   container.appendChild(panels);
@@ -628,6 +700,106 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
     }
     container.appendChild(recent);
   }
+
+  return container;
+}
+
+// MASTER_DESIGN.md §9's expert methodology, as a fixed authored checklist —
+// SCENARIOS.md gives no per-recipe example investigation distinct from the
+// hint copy already shown during the run.
+const EXPERT_SEQUENCE = [
+  'Check physical state (cables and port status).',
+  "Check the client's addressing (IP and mask).",
+  'Test the gateway/IP path.',
+  'Check the relevant VLAN path (access membership and trunk allowance).',
+  'Check DNS (direct IP test vs. name test).',
+  'Apply the repair.',
+  'Verify both the target and the protected client.',
+];
+
+// The debrief (MASTER_DESIGN.md §9/§11 and S13.md step 3). "Linked lesson" is
+// a placeholder until the study pack exists (a later task) — everything else
+// is real: actual causes, elapsed time, the full action history, assistance
+// used, and the fixed expert-sequence example investigation.
+export function renderDebrief(state, actions = {}) {
+  const mission = state.mission;
+  const container = document.createElement('div');
+  container.className = 'debrief-screen';
+
+  const heading = document.createElement('h1');
+  heading.textContent = 'Service restored';
+  container.appendChild(heading);
+
+  const status = document.createElement('p');
+  status.className = 'debrief-status';
+  status.textContent = mission.assisted ? 'Completed with support.' : 'Completed independently.';
+  container.appendChild(status);
+
+  const timer = document.createElement('p');
+  timer.textContent = `Elapsed ${formatDuration(mission.elapsedMs)}.`;
+  container.appendChild(timer);
+
+  if (mission.mode === 'repair') {
+    const causesHeading = document.createElement('h2');
+    causesHeading.textContent = 'Causes';
+    container.appendChild(causesHeading);
+    const causesList = document.createElement('ul');
+    const x = xFromNetwork(mission.network);
+    for (const recipeId of mission.recipeIds) {
+      const hint = HINTS[recipeId];
+      const item = document.createElement('li');
+      item.textContent = `${hint.clue} ${renderHintText(hint.step, x)}`;
+      causesList.appendChild(item);
+    }
+    container.appendChild(causesList);
+  }
+
+  const historyHeading = document.createElement('h2');
+  historyHeading.textContent = 'Your key observations and changes';
+  container.appendChild(historyHeading);
+  const historyList = document.createElement('ol');
+  for (const event of mission.events) {
+    const item = document.createElement('li');
+    item.textContent = describeEvent(mission, event);
+    historyList.appendChild(item);
+  }
+  container.appendChild(historyList);
+
+  const investigationHeading = document.createElement('h2');
+  investigationHeading.textContent = 'Example investigation';
+  container.appendChild(investigationHeading);
+  const investigationList = document.createElement('ol');
+  for (const step of EXPERT_SEQUENCE) {
+    const item = document.createElement('li');
+    item.textContent = step;
+    investigationList.appendChild(item);
+  }
+  container.appendChild(investigationList);
+
+  const lessonNote = document.createElement('p');
+  lessonNote.className = 'debrief-lesson-note';
+  lessonNote.textContent = 'Related lesson: available once the study pack is built.';
+  container.appendChild(lessonNote);
+
+  const actionsRow = document.createElement('div');
+  actionsRow.className = 'debrief-actions';
+  if (mission.caseCode) {
+    const replayButton = document.createElement('button');
+    replayButton.type = 'button';
+    replayButton.textContent = 'Replay';
+    replayButton.addEventListener('click', () => actions.onReplay?.());
+    const variationButton = document.createElement('button');
+    variationButton.type = 'button';
+    variationButton.textContent = 'New variation';
+    variationButton.addEventListener('click', () => actions.onNewVariation?.());
+    actionsRow.append(replayButton, variationButton);
+  }
+  const homeButton = document.createElement('button');
+  homeButton.type = 'button';
+  homeButton.textContent = 'Home';
+  homeButton.addEventListener('click', () => actions.onHome?.());
+  actionsRow.append(homeButton);
+  container.appendChild(actionsRow);
 
   return container;
 }

@@ -26,9 +26,12 @@ import {
   requestHint,
   pauseMissionTimer,
   resumeMissionTimer,
+  toggleFinding,
+  setCompletionNote,
+  completeRun,
 } from './app.js';
 import { openStore } from './store.js';
-import { renderHome, renderMission } from './view.js';
+import { renderHome, renderMission, renderDebrief } from './view.js';
 import { runMissionTest } from './devices.js';
 import { executeCommand } from './cli.js';
 
@@ -84,9 +87,20 @@ function render() {
           onConfirmReplace: confirmReplace,
           onCancelReplace: cancelReplace,
           onRequestHint: requestHintAction,
+          onToggleFinding: toggleFindingAction,
+          onNoteChange: noteChange,
+          onSubmit: submitCompletion,
         },
         missionTab,
       ),
+    );
+  } else if (state.screen === 'debrief') {
+    root.appendChild(
+      renderDebrief(state, {
+        onReplay: replay,
+        onNewVariation: newVariation,
+        onHome: debriefToHome,
+      }),
     );
   }
 }
@@ -240,7 +254,11 @@ function applyDeviceForm(actions) {
 
 function runTest(testKind, deviceId) {
   const result = runMissionTest(state.mission, testKind, deviceId);
-  state = recordTestEvent(state, testKind, deviceId, result);
+  // checkProtected always verifies the protected client regardless of which
+  // device's Tests panel triggered it; log the event against the client it
+  // actually verified, not the one clicked, so grade.js can find it.
+  const loggedDeviceId = testKind === 'checkProtected' ? state.mission.protectedClientId : deviceId;
+  state = recordTestEvent(state, testKind, loggedDeviceId, result);
   render();
   persistMission();
 }
@@ -249,6 +267,34 @@ function requestHintAction() {
   state = requestHint(state);
   render();
   persistMission();
+}
+
+function toggleFindingAction(eventId) {
+  state = toggleFinding(state, eventId);
+  render();
+  persistMission();
+}
+
+function noteChange(text) {
+  state = setCompletionNote(state, text);
+  // Not persisted on every keystroke (UI_AND_STORAGE.md: "Never persist on
+  // every cursor blink or animation frame"); it's captured on the next
+  // autosave-triggering action (a test, a config change, or Submit itself).
+}
+
+function submitCompletion() {
+  const { state: nextState, result } = completeRun(state);
+  state = nextState;
+  missionTab = 'network';
+  render();
+  if (result.ok) {
+    persistProfileAndMission();
+  }
+}
+
+function debriefToHome() {
+  state = { ...state, screen: 'home' };
+  render();
 }
 
 // Leaving the tab (backgrounding, switching apps) pauses elapsed time the

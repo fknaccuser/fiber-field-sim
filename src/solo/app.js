@@ -7,6 +7,7 @@ import { applyAction } from './actions.js';
 import { createTerminalSession } from './cli.js';
 import { generateCase, nextCase, fingerprintForCode } from './generate.js';
 import { inSubnet } from './ip.js';
+import { evaluateCompletion, summarizeRun } from './grade.js';
 
 export const RECOMMENDED_CODE = 'TF1-HM-1-P-START';
 const RECENT_FINGERPRINT_LIMIT = 20;
@@ -315,15 +316,49 @@ export function startNewVariation(state, layout, tier, family) {
 
 const RECENT_DEVICES_LIMIT = 4;
 
+function captureObservedFields(network, device) {
+  return {
+    powered: device.powered,
+    ip: device.ip ?? null,
+    prefix: device.prefix ?? null,
+    gateway: device.gateway ?? null,
+    dns: device.dns ?? null,
+    ports: network.ports
+      .filter((p) => p.deviceId === device.id)
+      .map((p) => ({ id: p.id, label: p.label, adminUp: p.adminUp, mode: p.mode, accessVlan: p.accessVlan, allowedVlans: p.allowedVlans })),
+  };
+}
+
+// Selecting a device automatically captures an inspection event of its
+// observed fields only (DATA_CONTRACTS.md: "Inspection emits kind inspection
+// with observed fields only"), so Findings has real evidence to select from
+// without a separate "record this" step.
 export function selectDevice(state, deviceId) {
   if (!state.mission) return state;
-  const exists = state.mission.network.devices.some((d) => d.id === deviceId);
-  if (!exists) return state;
+  const device = state.mission.network.devices.find((d) => d.id === deviceId);
+  if (!device) return state;
   const recentDevices = [deviceId, ...state.recentDevices.filter((id) => id !== deviceId)].slice(
     0,
     RECENT_DEVICES_LIMIT,
   );
-  return { ...state, selectedDeviceId: deviceId, recentDevices, error: null };
+  const mission = state.mission;
+  const index = mission.compactedEventCount + mission.events.length;
+  const event = {
+    id: String(index),
+    index,
+    kind: 'inspection',
+    revision: mission.network.revision,
+    deviceId,
+    details: captureObservedFields(mission.network, device),
+    assistance: false,
+  };
+  return {
+    ...state,
+    selectedDeviceId: deviceId,
+    recentDevices,
+    error: null,
+    mission: { ...mission, events: [...mission.events, event] },
+  };
 }
 
 // The specific entity an action touches, before/after — not the whole network
@@ -576,4 +611,78 @@ export function showCauseCount(mission) {
 
 export function showHarmlessDetail(mission) {
   return mission.mode === 'repair' && mission.tier === 3;
+}
+
+// --- Findings, note and completion (S13) ---
+
+export function toggleFinding(state, eventId) {
+  if (!state.mission) return state;
+  const current = state.mission.selectedFindingIds;
+  const selectedFindingIds = current.includes(eventId)
+    ? current.filter((id) => id !== eventId)
+    : [...current, eventId];
+  return { ...state, mission: { ...state.mission, selectedFindingIds } };
+}
+
+export function setCompletionNote(state, note) {
+  if (!state.mission) return state;
+  return { ...state, mission: { ...state.mission, completionNote: note } };
+}
+
+// Evaluates and, on success, freezes the run: status becomes 'completed', the
+// screen moves to the debrief, and (repair mode only — "Configure mode never
+// awards independent repair evidence") the profile's counters/evidence/
+// completedRuns update in the same step so they can never diverge from the
+// completion itself. Rejects a repeat completion outright.
+export function completeRun(state, now = Date.now()) {
+  if (!state.mission) {
+    return { state, result: { ok: false, code: 'NO_MISSION', checks: [] } };
+  }
+  if (state.mission.status === 'completed') {
+    return { state, result: { ok: false, code: 'ALREADY_COMPLETED', checks: [] } };
+  }
+  const evaluation = evaluateCompletion(state.mission);
+  if (!evaluation.passed) {
+    return { state, result: { ok: false, code: 'CHECKS_FAILED', checks: evaluation.checks } };
+  }
+
+  const completedAt = new Date(now).toISOString();
+  const summary = summarizeRun(state.mission, completedAt);
+  const mission = { ...state.mission, status: 'completed' };
+
+  let profile = state.profile;
+  if (mission.mode === 'repair') {
+    const counters = {
+      ...profile.counters,
+      runs: profile.counters.runs + 1,
+      assisted: profile.counters.assisted + (mission.assisted ? 1 : 0),
+      independent: profile.counters.independent + (mission.assisted ? 0 : 1),
+    };
+    let evidence = profile.evidence;
+    if (!mission.assisted) {
+      // "A mixed independent run adds evidence to each recipe's family at
+      // tier4 only" falls out naturally: each recipe's own family gets its
+      // own count, whether there's one recipe or a tier4 pair of two.
+      for (const recipeId of mission.recipeIds) {
+        const family = recipeId[0];
+        evidence = {
+          ...evidence,
+          [family]: { ...evidence[family], [recipeId]: (evidence[family][recipeId] ?? 0) + 1 },
+        };
+      }
+    }
+    const completedRuns = [summary, ...profile.completedRuns].slice(0, 100);
+    profile = {
+      ...profile,
+      counters,
+      evidence,
+      completedRuns,
+      countedAttemptIds: [...profile.countedAttemptIds, mission.id],
+    };
+  }
+
+  return {
+    state: { ...state, screen: 'debrief', mission, profile },
+    result: { ok: true, checks: evaluation.checks, summary },
+  };
 }
