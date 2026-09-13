@@ -40,3 +40,41 @@ in the package text vs. the actual checkout, and Vite/TypeScript tooling vs. the
 assumed `scripts/build.mjs`/`scripts/serve.mjs`.
 
 **Status:** complete.
+
+## S02 — Local save foundation (Day 1)
+
+**Built:** `src/solo/store.js` (IndexedDB adapter + memory adapter + `openStore` binding
+`loadLocal`/`saveLocal`/`loadProfile`/`saveProfile`/`loadMission`/`saveMission`/`exportData`/
+`replaceData`), `src/solo/view.js` (`renderHome`), extended `src/solo/app.js`
+(`createInitialProfile`, `boot`, `applyProfileUpdate`, `persistProfile`,
+`updateAndPersistProfile`), extended `src/solo/main.js` to boot through storage and delegate
+Home rendering to `view.js`. Tests: `tests/solo/store.test.mjs` (11 cases),
+`tests/solo/app.store.test.mjs` (8 cases).
+
+**Checks run:**
+- `npm run solo:test` — exit 0, 25/25 passing (includes S01's 6).
+- `npx tsc -b` — exit 0.
+- `npm run build` — exit 0, 8 modules transformed.
+- `npm test -- --run` (Vitest) — exit 0, 73 files / 1030 tests, unaffected.
+- Manual scripted Chromium check against real `npm run dev` + real browser IndexedDB (not
+  the memory adapter the Node tests use): Continue disabled with no mission; the saved profile
+  in IndexedDB has the full contract shape (`schema`, `openingEnabled`, `textScale`,
+  `completedRuns`, `studyAnswers`, `cardReviews`, `recentFingerprints`, `counters`, `evidence`,
+  `countedAttemptIds`); writing `openingEnabled: false` + `textScale: 1.25` into that record and
+  reloading skips straight to Home with `textScale` still `1.25`. No console errors.
+
+**Acceptance (S02.md):** met. "Refresh preserves the skip-opening preference and text size" —
+confirmed against real IndexedDB, not just the in-memory test adapter. "Forced storage failure
+displays failure rather than Saved" — confirmed by `tests/solo/app.store.test.mjs`'s failing-store
+case (`saveStatus` becomes `'error'`, message `'Save failed'`, and the in-memory profile change is
+retained rather than rolled back, matching UI_AND_STORAGE.md's dispatch order). "Real IndexedDB
+reload coverage is completed in S18" — the manual browser check here already exercises real
+IndexedDB as a sanity check; S18 is where this becomes a committed, repeatable browser test.
+
+**Deferred, and why (recorded in HANDOFF.md):** `replaceData`'s validation of "allowed enums/IDs,
+graph bounds" per DATA_CONTRACTS.md needs the mission/device schema that doesn't exist until the
+engine tasks (S04+); everything checkable today (format, version, profile shape, 5MiB size) is
+validated now. No visible Settings screen yet to hand-toggle opening/text scale — the underlying
+`boot`/`applyProfileUpdate` mechanism is complete and tested, but nothing in the UI calls it yet.
+
+**Status:** complete.

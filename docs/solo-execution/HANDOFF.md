@@ -36,49 +36,78 @@ current release. That work is untouched on disk but no longer reachable from `in
   (case-insensitive/trimmed), rejection of an unrecognized/empty command, and initialization
   completion (including the no-op guard outside `initializing`).
 
-No profile/mission persistence exists yet — that's S02. Reload always returns to the opening
-screen, which matches S01's acceptance line exactly ("reload shows opening by default").
+S01 shipped with no persistence — reload always returned to the opening screen, matching S01's
+acceptance line exactly ("reload shows opening by default"). S02 (below) adds it.
+
+## What S02 added
+
+- `src/solo/store.js` — `createIndexedDBAdapter()` (real IndexedDB, `the-field-solo` v1, stores
+  `profile`/`mission`/`recovery`) and `createMemoryAdapter()` (a trivial in-memory adapter with
+  the same `readMany`/`writeMany`/`listKeys` shape, for Node tests — no IndexedDB emulation).
+  `openStore(adapter)` binds the DATA_CONTRACTS.md atomic pair `loadLocal()`/`saveLocal(profile,
+  mission)` (one transaction each, resolving on `transaction.oncomplete`), plus the wrapper
+  helpers `loadProfile`/`saveProfile`/`loadMission`/`saveMission` (each round-trips through
+  `loadLocal`/`saveLocal` so profile and mission can never be written out of step), and
+  `exportData`/`replaceData`. `replaceData` validates format/version/profile shape and a 5MiB
+  size limit, keeps at most one pre-restore `recovery` record (deletes older ones in the same
+  write transaction), and never executes imported values (it only ever does `JSON`-safe field
+  access).
+- `src/solo/app.js` — added `createInitialProfile()` (the full UI_AND_STORAGE.md shape plus the
+  DATA_CONTRACTS.md progress fields: `counters`, `evidence`, `countedAttemptIds`, so the profile
+  schema doesn't need a mid-week migration when progress tracking lands), `boot(store)` (loads
+  or creates the profile, restores any saved mission, and starts on Home instead of Opening when
+  `openingEnabled === false`), and the pure/impure split `applyProfileUpdate` (pure, marks
+  `saveStatus: 'saving'`) + `persistProfile` (the actual save attempt, reusable as Retry) +
+  `updateAndPersistProfile` (convenience wrapper), matching UI_AND_STORAGE.md's dispatch order.
+- `src/solo/view.js` — `renderHome(state, actions)`: Continue is disabled (and
+  `aria-disabled`) until `state.mission` is truthy; shows Saving…/Saved/Save failed; a Retry
+  button appears on failure and calls `actions.onRetrySave`.
+- `src/solo/main.js` — now boots through `store.js`/`app.js` on startup and delegates Home
+  rendering to `view.js`.
+
+**Deferred, and why:** DATA_CONTRACTS.md's "allowed enums/IDs, graph bounds" validation for
+`replaceData` needs the mission/device schema, which doesn't exist until the engine tasks
+(S04+). `replaceData` validates everything checkable today (format, version, profile shape,
+size); deeper structural validation must be added once `model.js`/`generate.js` exist — this is
+a recorded gap, not a silent stub. The visible Settings screen (to toggle opening/text scale by
+hand) isn't built yet either — the underlying mechanism is fully wired and tested via `boot`/
+`applyProfileUpdate`, but no UI calls them yet; that lands whenever `view.js`'s Settings screen
+does.
 
 ## Actual results (see docs/solo-execution/STATE.json for machine-readable form)
 
-- `npx tsc -b` — exit 0, clean (unchanged from baseline).
-- `npm run solo:test` — exit 0, 6/6 passing.
+- `npx tsc -b` — exit 0, clean throughout S01 and S02.
+- `npm run solo:test` — exit 0, 25/25 passing (6 shell + 8 app/store boot-and-save + 11 store).
 - `npm run build` — exit 0. Bundle dropped from the baseline 851 modules / ~850KB main chunk to
-  6 modules / ~3KB main chunk, confirming the old React/Three.js code is no longer reachable
+  8 modules / ~8KB main chunk, confirming the old React/Three.js code is no longer reachable
   from the new entry (it is still present on disk, untouched, per S01's "without deleting old
   modules").
 - `npm test -- --run` (pre-existing Vitest suite) — exit 0, 73 files / 1030 tests, unaffected
-  (baseline was identical: recorded before any change, same numbers).
-- Manual scripted check with the pre-installed Chromium via Playwright (not committed; a
-  throwaway script under the session scratchpad, not part of this repo) against `npm run dev`:
-  opening screen renders; typing `nope` + Enter shows "Command not recognized." and stays on
-  opening; typing `  ENABLE  ` + Enter reaches Home (`<h1>The Field</h1>`) after the init
-  sequence; a full page reload returns to the opening screen; the command input is a real
-  `<input type="text">` (computed `display: block`, not `none`) with an associated `<label>`.
-  No console errors.
+  throughout (baseline was identical: recorded before any change, same numbers both times).
+- Manual scripted Chromium checks (Playwright, pre-installed browser, throwaway scripts under
+  the session scratchpad, not committed) against `npm run dev`:
+  - S01: opening screen renders; `nope` + Enter shows "Command not recognized." and stays on
+    opening; `  ENABLE  ` + Enter reaches Home after the init sequence; reload returns to
+    opening; command field is a real `<input type="text">` (`display: block`, not `none`) with
+    an associated `<label>`. No console errors.
+  - S02: after `enable`, Continue is disabled (`isDisabled() === true`) with no mission. The
+    real browser IndexedDB (`the-field-solo` v1, `profile` store, key `"local"`) holds the full
+    profile shape after boot. Writing `openingEnabled: false` and `textScale: 1.25` directly into
+    that IndexedDB record and reloading skips straight to Home (0 `.opening-screen` elements)
+    with `textScale` still `1.25` — the skip-opening preference and text scale both survive a
+    real reload against real IndexedDB, not just the in-memory adapter used by the Node tests.
+    No console errors.
 
 No baseline failures existed to preserve — `tsc -b`, the Vitest suite, and `npm run build` were
-all green before S01 started.
+all green before S01 started, and stayed green through S02.
 
-## Next task: S02 — Local save foundation
+## Next task: S03
 
-Read (only): `the-field-solo-week/tasks/S02.md`, `DATA_CONTRACTS.md`, `UI_AND_STORAGE.md`.
+Read (only): `the-field-solo-week/tasks/S03.md` and whatever contracts it names. Per
+BUILD_AND_HANDOFF.md's Day1 row, S03 is the remaining Day1 piece: "exact healthy network
+fixture." `fixtures/healthy-branch.json` in the package (not yet copied into the repo) is almost
+certainly the referenced contract — copy it into `src/solo/` (or wherever S03 says) rather than
+inventing a network shape ahead of the model.js/ip.js/forward.js engine tasks that consume it.
 
-Files: `src/solo/store.js`, `src/solo/app.js`, `src/solo/view.js`.
-
-Exact next steps per S02.md:
-1. Implement `openStore`, `loadProfile`, `saveProfile`, `loadMission`, `saveMission`,
-   `exportData`, `replaceData` against the IndexedDB stores named in UI_AND_STORAGE.md
-   (`the-field-solo` v1; `profile` key `"local"`, `mission` key `"active"`, `recovery` key ISO
-   timestamp). Resolve writes on `transaction.oncomplete`, not on request success. Keep storage
-   behind a small adapter so Node tests can inject memory storage — do not attempt to emulate
-   IndexedDB in engine code.
-2. Create an initial profile when none exists; persist the opening-skip preference and text
-   scale; implement Saved/Saving/"Save failed" states with Retry on failure.
-3. Render Home (in the new `view.js`) with a disabled Continue until a real mission exists.
-
-Acceptance: refresh preserves the skip-opening preference and text size; a forced storage
-failure shows failure, not Saved. (Real IndexedDB reload coverage is deferred to S18's browser
-tests, per DATA_CONTRACTS.md/S02.md.)
-
-Next command: `npm run solo:test` after implementing store.js/app.js/view.js additions.
+Next command: read `the-field-solo-week/tasks/S03.md`, then `npm run solo:test` once its files
+are in place. DAY1 checkpoint (S01–S03) closes once S03's acceptance passes.
