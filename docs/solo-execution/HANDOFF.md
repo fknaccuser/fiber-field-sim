@@ -579,14 +579,52 @@ it/Review again works; Reference's search filters correctly; opening Reference f
 active repair mission marks it assisted (the debrief read "Completed with support" afterward) and
 returns to the same mission tab untouched.
 
-## Next task: S17
+## What S17 added
 
-Continues DAY6 (S17: backup and restore). Read only `the-field-solo-week/tasks/S17.md` and
-whatever contracts it names before starting — `store.js`'s `exportData`/`replaceData` and the
-recovery-record logic already exist from S02 (see that task's tests in `store.test.mjs`), so S17
-likely wires actual Export/Import UI and a preview/Replace-or-Cancel flow on top of that existing
-engine rather than building the underlying mechanism from scratch — but confirm scope against the
-actual task file rather than assuming.
+- `src/solo/store.js` — `validateBackup` (from S02) went from a shallow shape check to full
+  structural validation: profile counters/evidence/array-limit checks, and per-mission enum
+  (mode/status/every event's kind) plus model-invariant checks by reusing `model.js`'s own
+  `validateNetwork` for both `network` and `initialNetwork` (never re-deriving that logic), plus a
+  target/protected-client device-reference check. New `previewBackup(rawText)`: parses and
+  validates without touching storage, returning either a rejection reason or preview counts
+  (completed runs, independent repairs, whether a mission is present) — corrupt JSON is caught and
+  reported the same way as every other rejection, never thrown.
+- `src/solo/main.js` — `exportBackupAction` triggers a plain versioned JSON Blob download (no
+  executable content, network requests or secrets — the same object `exportData()` already
+  returns). Import is two steps: `importFileAction` only previews a chosen file (storage untouched
+  either way), and a separate explicit `confirmImportAction` calls `store.replaceData` and then
+  reloads the page — so every piece of in-memory state, not just profile/mission, starts fresh
+  from what was just installed, the same guarantee an actual restart gives.
+- `src/solo/view.js` — a new Backup section on Home: Export button, a file input for Import, an
+  error message on rejection, and (on a valid preview) a confirmation box with "Export current
+  backup first", Cancel and Replace — all preview/rejection text rendered via `textContent`, never
+  `innerHTML`.
+- `tests/solo/backup.test.mjs` (6 cases): export+preview+replace round-trips active configuration
+  and progress exactly; corrupt JSON, wrong format/version and invalid device references are all
+  rejected without mutating current work; previewing alone never replaces anything.
+- `tests/solo/store.test.mjs` — its `replaceData` fixtures were upgraded from minimal stubs
+  (`{schema:1}`) to fully valid profile/mission shapes to satisfy the new stricter validation, plus
+  two new tests for the model-invariant rejections (an invalid network shape; a mission
+  referencing a device its own network doesn't have).
 
-Next command: read `the-field-solo-week/tasks/S17.md`, then implement its files and run its
+**Verified live in a browser, not just Node tests:** completed a real repair, exported it via a
+captured browser download, inspected the saved JSON's shape/counters, re-imported that exact file
+(the preview showed the correct counts and an "active mission" notice, without touching storage),
+confirmed Replace (the page reloaded), re-entered `enable`, and confirmed Progress still showed
+the same completed run. A corrupt-JSON file was rejected with a visible error and no confirmation
+prompt appeared.
+
+## Next task: S18
+
+Continues DAY6 (S18: browser integration tests). Read only `the-field-solo-week/tasks/S18.md` and
+whatever contracts it names before starting — its own `verify` command in `TASKS.json` is
+`npm run solo:e2e`, a script that doesn't exist in `package.json` yet, so S18 likely both writes
+Playwright-based end-to-end journeys and adds that npm script — but confirm scope against the
+actual task file rather than assuming. This session has already been running ad hoc Playwright
+checks against `npm run dev` at 390px for every prior task's manual verification (see
+`/opt/pw-browsers/chromium-1194/chrome-linux/chrome`, launched via the globally-installed
+`/opt/node22/lib/node_modules/playwright/index.mjs`) — S18 is likely about turning that same kind
+of check into committed, repeatable test files.
+
+Next command: read `the-field-solo-week/tasks/S18.md`, then implement its files and run its
 listed checks.

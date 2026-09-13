@@ -461,3 +461,32 @@ prerequisite gate" — confirmed (`recordStudyAnswer` never blocks on correctnes
 `studyAnswers` to gate any other feature).
 
 **Status:** complete.
+
+## S17 — Backup and restore (Day 6)
+
+**Built:** `store.js` (`validateBackup` strengthened to full structural validation reusing
+`model.js`'s `validateNetwork`; new `previewBackup`). `main.js` (`exportBackupAction` — Blob
+download; `importFileAction`/`confirmImportAction` — preview then explicit Replace, reloading the
+page on success). `view.js` (Home's Backup section: Export, Import, error, and a preview/Replace
+confirmation, all `textContent`-rendered). `tests/solo/backup.test.mjs` (6 cases). `store.test.mjs`
+fixtures upgraded to fully valid shapes plus 2 new model-invariant rejection tests.
+
+**No app bugs found this task** — S02's `exportData`/`replaceData`/recovery-record mechanism
+already worked; this task deepened its validation and built the UI on top of it.
+
+**Checks:** `node --test tests/solo/backup.test.mjs` — exit 0, 6/6. `node --test
+tests/solo/store.test.mjs` — exit 0, 13/13. `npm run solo:test` — exit 0, 249/249, stable over 3
+runs. `npx tsc -b`/`npm run build` — exit 0. Vitest — 73/1030, unaffected. Manual scripted
+Chromium check (390px, not committed): completed a real repair, exported it via a captured
+browser download, re-imported that exact file (preview showed correct counts, no storage
+mutation), confirmed Replace (page reloaded), and Progress showed the same completed run
+afterward; a corrupt-JSON file was rejected with a visible error and no confirmation prompt.
+
+**Acceptance:** met. "Corrupt JSON, wrong format/version and invalid references reject without
+mutation" — confirmed directly (each leaves `loadLocal()` byte-for-byte unchanged). "Export/import
+round trip preserves active configuration and progress" — confirmed (profile and mission are
+deep-equal after a full export→preview→replace cycle). "Restore requires explicit Replace" —
+confirmed (`previewBackup` alone never calls `replaceData`; a separate test proves a preview never
+mutates storage).
+
+**Status:** complete.
