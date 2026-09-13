@@ -290,13 +290,53 @@ real tests); Cancel restores the true current value, not the typed draft; a malf
 its specific message and leaves the device's actual address untouched; tapping a cable, choosing
 source/destination and Connect reconnects it and the equivalent list shows "connected".
 
-## Next task: S09
+## What S09 added
 
-Closes DAY3 (S07–S09: clickable graph, editable devices, supported CLI) with the terminal/CLI.
-Read only `the-field-solo-week/tasks/S09.md` and whatever contracts it names before starting —
-`cli.js`'s `executeCommand`/`getHelp` and ENGINE_RULES.md's "Small CLI" section (switch/router/
-client/server command sets, mode transitions, unambiguous-prefix resolution) are the likely core,
-but confirm against the actual task file.
+- `src/solo/cli.js` — `executeCommand(state, terminal, commandText, origin)` and
+  `getHelp(terminal, prefix)`. Table-driven commands per device kind/mode (ENGINE_RULES.md's
+  exact lists for switch/router/client/server), matched by unambiguous per-token prefix (0
+  matches → "Not supported by this simulator yet." + one example; >1 matches → same, never
+  guesses). Every mutating command (`shutdown`/`no shutdown`/`switchport ...`) dispatches through
+  `applyAction`, never by string-editing rendered output. `show running-config`/`show interfaces
+  status`/`show vlan brief`/`show interfaces trunk`/`show ip route`/`show ip interface brief` all
+  read the live network passed in on each call, so a GUI change shows up immediately. A
+  builder-origin submission (`origin=true`) marks its change event `assistance:true` and appends
+  a separate `'assistance'` event; a typed submission never does.
+- **Two genuine, non-blocking gaps against the given contracts, both documented rather than
+  silently resolved:** (1) ENGINE_RULES.md names no specific command for the server terminal's
+  "read-only status" — reused `show running-config` (already established elsewhere for exactly
+  this purpose) instead of inventing new terminology. (2) `getHelp`'s declared signature is
+  `(terminal, prefix)` — two arguments — but resolving a command table needs the device's *kind*,
+  which DATA_CONTRACTS.md's Terminal session shape doesn't include. `createTerminalSession` now
+  also stores `deviceKind` alongside the documented fields (`deviceId`, `mode`, `interfacePortId`,
+  `history`, `output`, `builderOrigin`) — additive, not a contradiction of the given shape.
+- `src/solo/devices.js` gains `renderTerminal` (output, input, Enter, `?` help, command-builder
+  suggestion buttons); `app.js` gains `terminalSessionFor`/`setTerminalSession`/
+  `markTerminalBuilderOrigin` (sessions keyed by deviceId, so switching devices keeps each one's
+  mode/history separate, per UI_AND_STORAGE.md). Inspect/Configure/Terminal are one stacked panel
+  rather than sub-tabs of the Device tab — a deliberate simplification, not a missing piece;
+  everything is present and functional.
 
-Next command: read `the-field-solo-week/tasks/S09.md`, then implement its files and run its
+**Verified against the literal acceptance sequence, both in Node tests and live in a real
+browser:** `enable` → `conf t` → `interface Gi0/1` → `shutdown` breaks the target's service;
+`no shut` restores it; a fresh terminal's user-mode `shutdown` is rejected (mode and network both
+unchanged); `show running-config` reflects a change made outside the terminal (a GUI-applied
+`setPortAdmin`); a builder-inserted-then-submitted command is recorded assisted, a typed one
+never is regardless of whether the builder was opened.
+
+**DAY3 checkpoint (S07-S09) reached**: clickable graph, editable devices, and the supported CLI
+all work and are tested. 144/144 solo tests, `tsc -b` clean, build clean, legacy suite unaffected
+throughout.
+
+## Next task: S10
+
+Starts DAY4 (S10–S12: eight faults, deterministic variations, tiers and hints). Read only
+`the-field-solo-week/tasks/S10.md` and whatever contracts it names before starting. This is where
+`src/solo/seed.js` (copied verbatim from `reference/seed.mjs`, per SCENARIOS.md/BUILD_AND_HANDOFF.md)
+and `src/solo/generate.js` (`generateCase`/`nextCase`) most likely land — the eight fault recipes
+from SCENARIOS.md, applied as fixture-style patches to `layouts.js`'s healthy networks. Read
+`reference/seed.mjs` itself before implementing anything that depends on its exact PRNG/pool
+behavior; do not approximate it.
+
+Next command: read `the-field-solo-week/tasks/S10.md`, then implement its files and run its
 listed checks.

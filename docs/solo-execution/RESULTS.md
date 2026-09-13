@@ -228,3 +228,31 @@ level (`tests/solo/app.editing.test.mjs`) and the reconnect UI wiring confirmed 
 (`applyMissionActions` + `testService` test, and live in-browser).
 
 **Status:** complete.
+
+## S09 — Terminal and command builder (Day 3)
+
+**Built:** `src/solo/cli.js` (`executeCommand`, `getHelp`, `createTerminalSession`),
+`devices.js`'s `renderTerminal`, `app.js` terminal-session helpers. `tests/solo/cli.test.mjs`
+(11 cases).
+
+**Documented gaps against the given contracts (non-blocking, both recorded in HANDOFF.md):**
+no specific server "status" command is named anywhere — reused `show running-config`. `getHelp`'s
+declared 2-arg signature can't resolve a command table without the device's kind, which the
+documented Terminal session shape doesn't carry — added `deviceKind` to it.
+
+**Checks:** `node --test tests/solo/cli.test.mjs` — exit 0, 11/11. `npm run solo:test` — exit 0,
+144/144, stable over 3 runs. `npx tsc -b`/`npm run build` — exit 0. Vitest — 73/1030, unaffected.
+Manual scripted Chromium check (390px, not committed): the full enable/conf t/interface/shutdown
+sequence breaks then (no shut) restores PC1's service; user-mode shutdown rejected on a fresh
+terminal; a builder-inserted command fills the input and submits correctly.
+
+**Acceptance:** met exactly. "enable then conf t then interface Gi0/1 then shutdown breaks the
+link; no shut restores it" — confirmed both at the engine level and live in-browser. "User-mode
+shutdown rejects" — confirmed (network and mode both unchanged, explicit unsupported message).
+"show run reflects GUI changes" — confirmed (a `setPortAdmin` applied outside the terminal shows
+up in the next `show running-config`). "Builder-edited execution is assisted" — confirmed (a
+builder-then-edited-then-submitted command records `assistance:true`; the same text typed by
+hand never does).
+
+**Status:** complete. **DAY3 checkpoint (S07-S09) reached**: clickable graph, editable devices,
+and the supported CLI all work and are tested.
