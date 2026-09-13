@@ -523,3 +523,34 @@ attempted (the pre-installed Chromium was used directly via `executablePath`); t
 `npm run solo:e2e` command was run to completion and its real 9/9 result is what's recorded here.
 
 **Status:** complete.
+
+## S19 — Offline installation and update behavior (Day 7)
+
+**Built:** `vite.config.ts` (`registerType: 'prompt'`, `injectRegister: false`). `main.js`
+(`setupServiceWorkerRegistration`/`reloadForUpdate` via `virtual:pwa-register`'s `registerSW`).
+`view.js` (`renderUpdateBanner`; `renderSaveStatusBanner` shared between Home and the mission
+screen; a "Ready offline" note on Home). `app.js` (`isQuotaExceeded`; `persistProfile` now sets
+`saveStatus:'quota'` for a quota failure specifically). `tests/solo-browser/offline.spec.mjs`
+(4 tests).
+
+**Gap found and fixed, pre-existing rather than introduced by this task:** save failures (of any
+kind, not just quota) were only ever surfaced on the Home screen — a failure while a mission was
+active had no visible Retry/Export anywhere and Exit was never blocked, contradicting
+UI_AND_STORAGE.md's own stated rule. Fixed by rendering the same save-status banner inside the
+mission screen and refusing to navigate away from an unresolved failure there.
+
+**Checks:** `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm run solo:e2e` — exit 0, 13/13 (9 from S18 plus
+4 new), stable over 2 runs, against the real production build. `npm run solo:test` — exit 0,
+249/249, stable over 3 runs. `npx tsc -b`/`npm run build` — exit 0. Vitest — 73/1030, unaffected.
+Manual scripted Chromium check against `npx vite preview` (not committed): a simulated
+`QuotaExceededError` on the next IndexedDB write produces "Storage is full — not saved" with
+visible Retry/Export inside the mission screen, and Exit is refused with an explanatory message.
+
+**Acceptance:** met. "Released scenarios and study work without network after initial download"
+— confirmed (offline.spec.mjs's fresh-seeded-case-offline test). "An update does not silently
+regenerate an existing attempt" — confirmed both by inspecting the built `sw.js` directly (no
+unconditional `skipWaiting()`) and by the queued-reload flow only ever activating on an explicit
+user Reload after a flush. "Quota failures offer export rather than false Saved" — confirmed
+(`saveStatus:'quota'` renders Retry and Export, never a false "Saved").
+
+**Status:** complete.

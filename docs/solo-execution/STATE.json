@@ -1,17 +1,18 @@
 {
   "spec": "SOLO-1",
   "branch": "claude/field-solo-implementation-am520q",
-  "lastWorkingCommit": "e0580cee813a92a2ed199255611eec5d1101d43b",
+  "lastWorkingCommit": "1c7b51ff01ee1e0a503c9096f48c6ebaadc8bc66",
   "day": 7,
-  "task": "S19",
+  "task": "S20",
   "substep": "read-contracts",
   "status": "not-started",
-  "completedTasks": ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10", "S11", "S12", "S13", "S14", "S15", "S16", "S17", "S18"],
+  "completedTasks": ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10", "S11", "S12", "S13", "S14", "S15", "S16", "S17", "S18", "S19"],
   "changedFiles": [
     "index.html",
     "package.json",
     "package-lock.json",
     ".gitignore",
+    "vite.config.ts",
     "playwright.solo.config.mjs",
     "src/solo/app.js",
     "src/solo/main.js",
@@ -52,42 +53,49 @@
     "src/solo/study.js",
     "tests/solo/backup.test.mjs",
     "tests/solo-browser/solo.spec.mjs",
+    "tests/solo-browser/offline.spec.mjs",
     "docs/solo-execution/STATE.json",
     "docs/solo-execution/HANDOFF.md",
     "docs/solo-execution/RESULTS.md"
   ],
   "tests": [
     {
-      "command": "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm run solo:e2e (x2 for stability)",
+      "command": "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm run solo:e2e (x2 for stability, 13/13)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T10:52:00Z"
+      "observedAt": "2026-09-13T11:09:30Z"
     },
     {
       "command": "npm run solo:test (x3 for stability)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T10:52:30Z"
+      "observedAt": "2026-09-13T11:09:00Z"
     },
     {
       "command": "npx tsc -b",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T10:52:40Z"
+      "observedAt": "2026-09-13T11:09:09Z"
     },
     {
       "command": "npm run build",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T10:52:45Z"
+      "observedAt": "2026-09-13T11:09:10Z"
     },
     {
       "command": "npm test -- --run (pre-existing vitest suite, unaffected)",
       "exitCode": 0,
       "resultPath": null,
-      "observedAt": "2026-09-13T10:52:57Z"
+      "observedAt": "2026-09-13T11:09:20Z"
+    },
+    {
+      "command": "manual: npx vite preview + scripted Chromium check — 'Ready offline' badge appears on Home; a simulated IndexedDB QuotaExceededError produces 'Storage is full — not saved' with visible Retry and Export buttons inside the mission screen, and Exit is refused with an explanatory message until resolved (not committed to the repo)",
+      "exitCode": 0,
+      "resultPath": null,
+      "observedAt": "2026-09-13T11:10:00Z"
     }
   ],
   "blockers": [],
-  "nextCommand": "Read the-field-solo-week/tasks/S19.md and its referenced contracts, then continue DAY7 (S19: offline installation and update behavior)."
+  "nextCommand": "Read the-field-solo-week/tasks/S20.md and its referenced contracts, then continue DAY7 (S20: owner phone acceptance and fixes)."
 }

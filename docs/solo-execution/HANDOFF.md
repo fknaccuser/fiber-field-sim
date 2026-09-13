@@ -654,15 +654,54 @@ built app rather than assuming the selectors were right:**
 **Verified via the real `npm run solo:e2e` command, twice for stability:** 9/9 passing against
 the actual `dist/` build, not the dev server.
 
-## Next task: S19
+## What S19 added
 
-Continues DAY7 (S19: offline installation and update behavior). Read only
-`the-field-solo-week/tasks/S19.md` and whatever contracts it names before starting — its own
-`verify` command in `TASKS.json` is `npm run solo:e2e` again (the same Playwright harness S18 just
-built), so S19 likely adds offline/PWA-specific flows (service worker caching, a fresh install
-working with the network cut, an update not silently losing local data) to the existing
-`tests/solo-browser/` suite rather than building new infrastructure — but confirm scope against
-the actual task file rather than assuming.
+- Inspecting the existing generated service worker first (S19.md's own step 1) showed every solo
+  module/data/icon was already precached correctly — the study pack and reference entries live in
+  `content.js` as JS literals, not fetched files, so they were already inside the precached JS
+  bundle; nothing needed adding to `globPatterns`. The real gap was the update lifecycle:
+  `registerType: 'autoUpdate'` called `skipWaiting()`/`clientsClaim()` the instant a new version
+  installed — no chance to save first, no user choice.
+- `vite.config.ts`: `registerType: 'prompt'`, `injectRegister: false`. `main.js` now calls
+  `virtual:pwa-register`'s `registerSW` itself: `onOfflineReady` sets a flag (also checked directly
+  via `navigator.serviceWorker.controller` at boot, since `onOfflineReady` only fires on the
+  first-ever activation, not later loads of an already-controlled page); `onNeedRefresh` sets a
+  separate flag instead of reloading immediately. `view.js`'s new `renderUpdateBanner` appears
+  above whatever screen is active; its Reload button flushes profile/mission to IndexedDB first,
+  then calls the registered `updateServiceWorker` callback, which sends the `SKIP_WAITING` message
+  the built `sw.js` now waits for instead of activating unconditionally (confirmed directly by
+  inspecting the built artifact: `self.addEventListener("message", ...)` gates `skipWaiting()`,
+  no unconditional call).
+- Also closed a real, separate gap in the save-failure story that S19.md's own acceptance names
+  ("Quota failures offer export rather than false Saved") but UI_AND_STORAGE.md had already
+  specified and nothing implemented yet ("show Retry/Export, and block closing that mission ...
+  until handled"): `app.js`'s `isQuotaExceeded` distinguishes a quota failure (retrying the exact
+  same write under quota pressure just fails again) from any other save failure (Export, a small
+  serialization rather than a new write, still works); `persistProfile`/`persistMission`/
+  `persistProfileAndMission` now set `saveStatus:'quota'` accordingly. A save-status banner (Retry,
+  plus Export only for quota) now renders inside the mission screen too, not just Home, and
+  `exitToHome` refuses to navigate away while a save failure is unresolved.
+- `tests/solo-browser/offline.spec.mjs` (4 tests): the built `sw.js` queues activation behind an
+  explicit message; visiting online reaches Ready offline and a reload while offline still serves
+  the app from cache; a fresh seeded case can be configured, tested and its study material read
+  entirely offline, surviving closing and reopening the page; offline first-ever visit (no prior
+  online load) is confirmed unsupported, as documented.
 
-Next command: read `the-field-solo-week/tasks/S19.md`, then implement its files and run its
+**Verified live in a browser (a separate, ad hoc Chromium script, not committed to the repo):** a
+simulated `QuotaExceededError` on the next IndexedDB write produces "Storage is full — not saved"
+with visible Retry and Export buttons inside the mission screen, and Exit is refused with an
+explanatory message until resolved. **Verified via `npm run solo:e2e`, twice for stability:**
+13/13 passing (9 from S18 plus the 4 new offline tests).
+
+## Next task: S20
+
+Continues DAY7 (S20: owner phone acceptance and repairs). Read only
+`the-field-solo-week/tasks/S20.md` and whatever contracts it names before starting — its `verify`
+command in `TASKS.json` is `npm run solo:test && npm run solo:e2e && npm run build`, all three of
+which already pass cleanly, so S20 is likely a real-device/manual acceptance pass (MASTER_DESIGN.md
+§11's "definition of done": install on a phone, go offline, generate scenarios, tap devices,
+configure, verify, retain/export progress) followed by fixing whatever it finds — not new
+infrastructure — but confirm scope against the actual task file rather than assuming.
+
+Next command: read `the-field-solo-week/tasks/S20.md`, then implement its files and run its
 listed checks.
