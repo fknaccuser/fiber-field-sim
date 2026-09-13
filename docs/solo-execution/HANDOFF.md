@@ -356,13 +356,46 @@ both faults present, *still* broken after either single repair, restored only af
 `generateCase` is fully deterministic (two calls with the same code produce a deep-equal Attempt).
 A sweep of 200 tier4 codes never produced anything outside the six approved pairs.
 
-## Next task: S11
+## What S11 added
 
-Continues DAY4 (S10–S12: eight faults, deterministic variations, tiers and hints). Read only
-`the-field-solo-week/tasks/S11.md` and whatever contracts it names before starting — likely where
-`generateCase`/`nextCase` actually get wired into `app.js`/Home's Start-a-job flow, plus
-difficulty tiers and the fading-hints mechanism (MASTER_DESIGN.md §5–§6). Confirm against the
-actual task file rather than this guess.
+- `src/solo/app.js` — `attemptStartMission`/`confirmReplaceMission`/`cancelReplaceMission`
+  protect the one active mission behind an explicit Resume/Replace choice (`pendingMissionRequest`,
+  generalized to cover both a generated code and a configure-mode layout — `startConfigureSession`
+  now goes through the same gate). `replayMission` regenerates the identical faulted initial
+  state under a fresh attempt id, without touching `profile.recentFingerprints` (replays aren't
+  new distinct causes). `startNewVariation` wires `nextCase` to a real local `candidateSeed`
+  (`Math.random` — fine here since this is the application layer supplying randomness *to* a pure
+  engine function, not the engine calling it itself) and records the result into
+  `recentFingerprints`, capped at 20.
+- `src/solo/view.js`/`main.js` — Home gained the recommended job card (`TF1-HM-1-P-START`), four
+  skill buttons (Link/port·IPv4·VLAN·DNS, each starting a tier-1 BR-layout variation — tier/layout
+  recommendation logic is progress-tracking's job, a later task), seed entry, and the
+  Resume/Replace prompt (shared with the mission screen). The mission header gained Replay and
+  New variation. Starting/replaying a mission persists profile+mission together via
+  `store.saveLocal` so the fingerprint history and the mission can never diverge.
 
-Next command: read `the-field-solo-week/tasks/S11.md`, then implement its files and run its
+**A real bug found and fixed while verifying "refresh resumes current state" live in a
+browser:** `exitMission` (written back in S07, before resume was ever actually exercised
+end-to-end) was setting `mission: null` — Exit was silently abandoning the active mission instead
+of just navigating to Home, so "Continue mission" would already be disabled the moment you left
+the workspace. Fixed to preserve the mission, the selected device and the recent-device list,
+matching MASTER_DESIGN.md §10 exactly ("Resume keeps the scenario, current device, input draft and
+history"); only an explicit replace or a future completion actually ends a mission. The existing
+S07 test asserting the old (wrong) behavior was updated to assert the corrected one.
+
+**Verified live in a browser, not just Node tests:** the recommended mission starts and survives
+a hard page reload (Continue restores the identical mission); requesting a second code while one
+is active shows the Resume/Replace prompt, Resume keeps the original untouched, Replace swaps in
+the new one; an invalid code offered as a replacement reports its specific error and leaves the
+original mission running; a skill button starts a freshly generated variation.
+
+## Next task: S12
+
+Closes DAY4 (S10–S12: eight faults, deterministic variations, tiers and hints). Read only
+`the-field-solo-week/tasks/S12.md` and whatever contracts it names before starting — likely the
+four difficulty tiers' behavioral differences (MASTER_DESIGN.md §5: guidance level, hidden
+cause/count for tiers 3–4, suggested time) and the fading-hints mechanism (nudge/clue/step/debrief
+per fault, MASTER_DESIGN.md §6) — but confirm against the actual task file.
+
+Next command: read `the-field-solo-week/tasks/S12.md`, then implement its files and run its
 listed checks.

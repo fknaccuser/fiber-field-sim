@@ -274,3 +274,34 @@ generated task uses unsupported protocols" — the engine only models Ethernet/I
 this holds by construction; also confirmed generated faulted networks stay `validateNetwork`-valid.
 
 **Status:** complete.
+
+## S11 — New mission, replay and seed entry (Day 4)
+
+**Built:** `app.js` mission-lifecycle functions (`attemptStartMission`, `confirmReplaceMission`,
+`cancelReplaceMission`, `replayMission`, `startNewVariation`, `resumeMission`), Home/mission UI in
+`view.js`/`main.js` (recommended job, skill buttons, seed entry, Resume/Replace prompt, Replay/New
+variation). `tests/solo/app.session.test.mjs` (13 cases).
+
+**Bug found and fixed while verifying live in a browser:** `exitMission` was clearing
+`mission: null` on Exit, silently abandoning the active mission instead of just navigating home —
+"Continue mission" was disabled the instant you left the workspace. Fixed to preserve the mission,
+selected device and recent-device history; updated the one S07 test that asserted the old (wrong)
+behavior.
+
+**Checks:** `node --test tests/solo/app.session.test.mjs` — exit 0, 13/13. `npm run solo:test` —
+exit 0, 182/182, stable over 3 runs. `npx tsc -b`/`npm run build` — exit 0. Vitest — 73/1030,
+unaffected. Manual scripted Chromium check (390px, not committed): recommended mission survives a
+hard reload; Resume/Replace prompt on a second code; Resume keeps the original, Replace swaps in
+the new one; an invalid replacement reports its error and leaves the original mission running; a
+skill button starts a fresh generated variation.
+
+**Acceptance:** met. "Invalid code keeps the active mission" — confirmed both directly (no active
+mission) and as a rejected replacement (active mission untouched, error surfaced). "Same code on a
+new profile yields the same network" — confirmed (two independent starts of the same code produce
+deep-equal `initialNetwork`/`requirements`). "Variation differs from recent fingerprints or
+produces a bounded visible error" — confirmed (a normal variation records a new fingerprint; an
+always-invalid layout/tier combination exhausts `nextCase`'s 100 tries and surfaces
+`"Choose a seed manually."` rather than looping). "Refresh resumes current state" — confirmed via
+a real `boot()`/`saveLocal()` round-trip and live in the browser.
+
+**Status:** complete.
