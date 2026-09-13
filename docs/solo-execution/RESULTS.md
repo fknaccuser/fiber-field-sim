@@ -373,3 +373,31 @@ length are both required" — confirmed. "Repair-mode completion updates skill e
 independent vs. assisted runs" — confirmed.
 
 **Status:** complete.
+
+## S14 — Progress and recommendation (Day 5)
+
+**Built:** `src/solo/progress.js` (new — `familyStats`/`allFamilyStats`, `recommendedTier`,
+`leastPracticedFamily`, `recommendMission`, all pure functions of the stored profile). `main.js`/
+`view.js` (Home's recommended-job card and skill buttons now reflect real progress instead of a
+fixed code/tier1; a new Progress screen; a short static recommended-tier line on the debrief).
+`tests/solo/progress.test.mjs` (13 cases).
+
+**No app bugs found this task** — S14 builds entirely on data S13 already produces correctly
+(`completedRuns`, `evidence`, `counters`); no defects were exposed in either direction.
+
+**Checks:** `node --test tests/solo/progress.test.mjs` — exit 0, 13/13. `npm run solo:test` —
+exit 0, 221/221, stable over 3 runs. `npx tsc -b`/`npm run build` — exit 0. Vitest — 73/1030,
+unaffected. Manual scripted Chromium check (390px, not committed): fresh profile shows the fixed
+first job and Tier 1 on every skill button and an empty Progress screen; completing that job
+updates the recommendation to the least-practiced family, bumps that family's skill button to
+Tier 2, shows the static recommended-tier line on the debrief, and the Progress screen reflects
+the new stats.
+
+**Acceptance:** met. "Ten repeats of one cause do not become two distinct causes" — confirmed
+(distinct causes come from evidence/recipe-ID keys, never a run tally). "Assisted success remains
+visible but is not independent evidence" — confirmed (`completed`/`assisted` count it;
+`distinctCauses`/`independent` and the tier2-3/3-4 thresholds never do). "Restart preserves
+progress" — confirmed via a JSON serialize/reload round-trip producing identical stats. "Configure
+runs do not inflate repair counts" — confirmed (every derivation filters to `mode === 'repair'`).
+
+**Status:** complete.

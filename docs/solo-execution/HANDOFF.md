@@ -469,12 +469,49 @@ shows concrete failing checks (not a blank rejection); reconnecting the cable, t
 clients, selecting a finding and writing a note brings every check to passing and reaches the
 debrief screen with the real action history rendered.
 
-## Next task: S14
+## What S14 added
 
-Continues DAY5 (S13–S15: verification/debrief, local skill progress and configure mode). Read
-only `the-field-solo-week/tasks/S14.md` and whatever contracts it names before starting — likely
-`src/solo/progress.js` (recommendation logic, per-skill completed/independent/highest-tier
-tracking, MASTER_DESIGN.md §9) and a Progress screen — but confirm against the actual task file.
+- `src/solo/progress.js` — `familyStats(profile, family)`/`allFamilyStats(profile)`: per-family
+  completed/assisted/independent counts, distinct causes solved (recipe IDs with at least one
+  independent completion — never seed/run count, so ten repeats of one cause stays one distinct
+  cause), highest tier reached and best verified elapsed time, all derived from the stored
+  profile (`completedRuns`/`evidence`), nothing new persisted. `recommendedTier(profile, family)`:
+  tier1 → tier2 needs only one completion (assisted or not — "guided tier1 unlocks tier2 even
+  though guided"); tier2 → tier3 and tier3 → tier4 each need two *distinct* independently
+  repaired causes at that tier. `leastPracticedFamily(profile)`: fewest completed repair runs,
+  ties broken in P,I,V,D order. `recommendMission(profile)`: the fixed `TF1-HM-1-P-START` job
+  until any run completes, then the least-practiced family at its recommended tier — surfaced as
+  the mixed family once that tier reaches 4, since SCENARIOS.md fixes "tier 4 must use M" and a
+  single-family tier4 case does not exist.
+- `src/solo/main.js`/`view.js` — Home's recommended-job card and Start button now call
+  `recommendMission`/`startRecommended` instead of the old fixed code; the four skill buttons show
+  and start at each family's `recommendedTier` (tier4 substitutes family `'M'`) instead of a
+  hardcoded tier1; a new Progress screen (`renderProgress`, reached via a new Home button) shows
+  each skill's completed/independent/assisted/distinct-causes/highest-tier/recommended-tier/best-
+  time and a recent-history list; the debrief adds one short, static, reduced-motion-safe line
+  per repaired family ("Recommended tier for X: N.") — no XP, currency or certification claim.
+- `tests/solo/progress.test.mjs` (13 cases) covers every S14.md acceptance point directly: ten
+  repeats of one cause staying one distinct cause; an assisted completion staying visible
+  (`completed`/`assisted`) without becoming independent evidence or advancing past its own
+  guided-unlock step; the tier2→3→4 threshold requiring two distinct causes each time, never
+  satisfied by assisted-only runs; a tier4 mixed run crediting both of its recipes' families;
+  configure-mode entries never counted as repair completions; least-practiced tie-breaking in
+  P,I,V,D order; and progress recomputing identically after a JSON serialize/reload round-trip
+  (simulating an app restart).
 
-Next command: read `the-field-solo-week/tasks/S14.md`, then implement its files and run its
+**Verified live in a browser, not just Node tests:** a fresh profile shows the fixed first job and
+Tier 1 on all four skill buttons and an empty Progress screen; completing that job moves the
+recommendation to the least-practiced family, bumps Link/port's skill button to Tier 2, shows the
+static recommended-tier line on the debrief, and the Progress screen's Link/port card reflects the
+new completed/independent/distinct-causes/best-time values.
+
+## Next task: S15
+
+Continues DAY5 (S15: configure a supplied network). Read only `the-field-solo-week/tasks/S15.md`
+and whatever contracts it names before starting — confirm scope against the actual task file
+rather than assuming; configure mode's Attempt shape and Home's "Configure a network" buttons
+already exist (S07/S11), so S15 likely refines/completes that flow (its own test target is
+`tests/solo/configure.test.mjs`) rather than starting it from scratch.
+
+Next command: read `the-field-solo-week/tasks/S15.md`, then implement its files and run its
 listed checks.
