@@ -755,6 +755,26 @@ input {
   margin-left: 8px;
 }
 
+.home-backup-section {
+  margin-top: 16px;
+}
+
+.home-export-button {
+  background: var(--field-panel);
+  color: var(--field-text);
+  border: 1px solid var(--field-cyan);
+  border-radius: 6px;
+  padding: 0 16px;
+}
+
+.home-import-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+  color: var(--field-muted);
+}
+
 .mission-reference {
   background: transparent;
   color: var(--field-text);

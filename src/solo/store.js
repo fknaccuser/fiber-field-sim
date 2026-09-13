@@ -4,6 +4,8 @@
 // Database "the-field-solo" v1, stores: profile (key "local"),
 // mission (key "active"), recovery (key: ISO timestamp).
 
+import { validateNetwork } from './model.js';
+
 const DB_NAME = 'the-field-solo';
 const DB_VERSION = 1;
 const STORE_NAMES = ['profile', 'mission', 'recovery'];
@@ -104,6 +106,121 @@ export function createMemoryAdapter() {
   };
 }
 
+const MISSION_MODES = new Set(['repair', 'configure']);
+const MISSION_STATUSES = new Set(['active', 'completed']);
+const EVENT_KINDS = new Set(['change', 'test', 'inspection', 'assistance']);
+const RUN_SUMMARY_LIMIT = 100; // DATA_CONTRACTS.md "Keep 100 summaries"
+const RECENT_FINGERPRINT_LIMIT = 20; // SCENARIOS.md's freshness window
+
+function validateProfileShape(profile) {
+  if (!profile || typeof profile !== 'object' || profile.schema !== 1) {
+    return { ok: false, error: 'Backup profile is not valid.' };
+  }
+  if (typeof profile.openingEnabled !== 'boolean') {
+    return { ok: false, error: 'Backup profile is missing openingEnabled.' };
+  }
+  if (typeof profile.textScale !== 'number') {
+    return { ok: false, error: 'Backup profile is missing textScale.' };
+  }
+  for (const field of ['completedRuns', 'studyAnswers', 'cardReviews', 'recentFingerprints']) {
+    if (!Array.isArray(profile[field])) {
+      return { ok: false, error: `Backup profile's ${field} must be a list.` };
+    }
+  }
+  if (profile.completedRuns.length > RUN_SUMMARY_LIMIT) {
+    return { ok: false, error: 'Backup profile has too many completed runs.' };
+  }
+  if (profile.recentFingerprints.length > RECENT_FINGERPRINT_LIMIT) {
+    return { ok: false, error: 'Backup profile has too many recent fingerprints.' };
+  }
+  const counters = profile.counters;
+  if (
+    !counters ||
+    typeof counters !== 'object' ||
+    !['runs', 'assisted', 'independent'].every((k) => Number.isInteger(counters[k]) && counters[k] >= 0)
+  ) {
+    return { ok: false, error: 'Backup profile counters are not valid.' };
+  }
+  const evidence = profile.evidence;
+  if (!evidence || typeof evidence !== 'object' || !['P', 'I', 'V', 'D'].every((family) => evidence[family] && typeof evidence[family] === 'object')) {
+    return { ok: false, error: 'Backup profile evidence is not valid.' };
+  }
+  for (const family of ['P', 'I', 'V', 'D']) {
+    for (const count of Object.values(evidence[family])) {
+      if (!Number.isInteger(count) || count < 0) {
+        return { ok: false, error: 'Backup profile evidence counts are not valid.' };
+      }
+    }
+  }
+  if (!Array.isArray(profile.countedAttemptIds ?? [])) {
+    return { ok: false, error: 'Backup profile countedAttemptIds must be a list.' };
+  }
+  return { ok: true };
+}
+
+function validateMissionShape(mission) {
+  if (mission === null) return { ok: true };
+  if (typeof mission !== 'object') {
+    return { ok: false, error: 'Backup mission is not valid.' };
+  }
+  if (mission.schema !== 1) {
+    return { ok: false, error: 'Backup mission schema must be 1.' };
+  }
+  if (typeof mission.id !== 'string' || !mission.id) {
+    return { ok: false, error: 'Backup mission is missing an id.' };
+  }
+  if (!MISSION_MODES.has(mission.mode)) {
+    return { ok: false, error: 'Backup mission has an unrecognized mode.' };
+  }
+  if (!MISSION_STATUSES.has(mission.status)) {
+    return { ok: false, error: 'Backup mission has an unrecognized status.' };
+  }
+  for (const key of ['network', 'initialNetwork']) {
+    const result = validateNetwork(mission[key]);
+    if (!result.ok) {
+      return { ok: false, error: `Backup mission's ${key} is not valid: ${result.message}` };
+    }
+  }
+  const deviceIds = new Set(mission.network.devices.map((d) => d.id));
+  if (!deviceIds.has(mission.targetClientId) || !deviceIds.has(mission.protectedClientId)) {
+    return { ok: false, error: 'Backup mission references a device that does not exist in its own network.' };
+  }
+  if (!Array.isArray(mission.recipeIds)) {
+    return { ok: false, error: 'Backup mission recipeIds must be a list.' };
+  }
+  if (!Array.isArray(mission.events)) {
+    return { ok: false, error: 'Backup mission events must be a list.' };
+  }
+  for (const event of mission.events) {
+    if (!event || !EVENT_KINDS.has(event.kind)) {
+      return { ok: false, error: 'Backup mission has an event with an unrecognized kind.' };
+    }
+  }
+  if (!Array.isArray(mission.selectedFindingIds)) {
+    return { ok: false, error: 'Backup mission selectedFindingIds must be a list.' };
+  }
+  if (typeof mission.elapsedMs !== 'number' || mission.elapsedMs < 0) {
+    return { ok: false, error: 'Backup mission elapsedMs is not valid.' };
+  }
+  if (typeof mission.assisted !== 'boolean') {
+    return { ok: false, error: 'Backup mission assisted flag is not valid.' };
+  }
+  if (!mission.requirements || typeof mission.requirements !== 'object') {
+    return { ok: false, error: 'Backup mission requirements are not valid.' };
+  }
+  if (!mission.hintLevels || typeof mission.hintLevels !== 'object') {
+    return { ok: false, error: 'Backup mission hintLevels are not valid.' };
+  }
+  if (!Number.isInteger(mission.compactedEventCount) || mission.compactedEventCount < 0) {
+    return { ok: false, error: 'Backup mission compactedEventCount is not valid.' };
+  }
+  return { ok: true };
+}
+
+// Validates shape, size, enums and model invariants (S17.md: "validate all
+// shapes/limits/enums and model invariants") — never mutates or partially
+// installs anything; validation is entirely read-only over the parsed
+// object, called before replaceData ever touches storage.
 function validateBackup(backup) {
   if (!backup || typeof backup !== 'object') {
     return { ok: false, error: 'Backup is not a valid file.' };
@@ -114,12 +231,6 @@ function validateBackup(backup) {
   if (typeof backup.exportedAt !== 'string' || !backup.exportedAt) {
     return { ok: false, error: 'Backup is missing an export date.' };
   }
-  if (!backup.profile || typeof backup.profile !== 'object' || backup.profile.schema !== 1) {
-    return { ok: false, error: 'Backup profile is not valid.' };
-  }
-  if (backup.mission !== null && typeof backup.mission !== 'object') {
-    return { ok: false, error: 'Backup mission is not valid.' };
-  }
   let byteLength;
   try {
     byteLength = new TextEncoder().encode(JSON.stringify(backup)).length;
@@ -129,7 +240,41 @@ function validateBackup(backup) {
   if (byteLength > MAX_BACKUP_BYTES) {
     return { ok: false, error: 'Backup is larger than 5MiB.' };
   }
+  const profileResult = validateProfileShape(backup.profile);
+  if (!profileResult.ok) return profileResult;
+  const missionResult = validateMissionShape(backup.mission ?? null);
+  if (!missionResult.ok) return missionResult;
   return { ok: true };
+}
+
+// previewBackup(rawText) -> {ok:true, backup, counts:{...}, exportedAt,
+// hasMission} | {ok:false, error}. Parses and validates without touching
+// storage (S17.md: "show preview counts and replacement notice" before any
+// replacement); corrupt JSON and every rejection above are reported the same
+// way a caller can render directly, never as a thrown exception.
+export function previewBackup(rawText) {
+  let backup;
+  try {
+    backup = JSON.parse(rawText);
+  } catch {
+    return { ok: false, error: 'That file is not valid JSON.' };
+  }
+  const validation = validateBackup(backup);
+  if (!validation.ok) {
+    return validation;
+  }
+  return {
+    ok: true,
+    backup,
+    exportedAt: backup.exportedAt,
+    hasMission: backup.mission !== null,
+    counts: {
+      completedRuns: backup.profile.completedRuns.length,
+      studyAnswers: backup.profile.studyAnswers.length,
+      cardReviews: backup.profile.cardReviews.length,
+      independentRepairs: backup.profile.counters.independent,
+    },
+  };
 }
 
 export function openStore(adapter = createIndexedDBAdapter()) {

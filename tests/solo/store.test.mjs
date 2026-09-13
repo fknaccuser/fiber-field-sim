@@ -1,13 +1,57 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { openStore, createMemoryAdapter } from '../../src/solo/store.js';
+import { createHealthyLayout, deriveRequirements } from '../../src/solo/layouts.js';
+
+function validProfile(overrides = {}) {
+  return {
+    schema: 1,
+    openingEnabled: true,
+    textScale: 1,
+    completedRuns: [],
+    studyAnswers: [],
+    cardReviews: [],
+    recentFingerprints: [],
+    counters: { runs: 0, assisted: 0, independent: 0 },
+    evidence: { P: {}, I: {}, V: {}, D: {} },
+    countedAttemptIds: [],
+    ...overrides,
+  };
+}
+
+function validMission(overrides = {}) {
+  const network = createHealthyLayout('HM', 42, 130);
+  return {
+    schema: 1,
+    id: 'restored-mission',
+    caseCode: null,
+    initialNetwork: network,
+    network,
+    recipeIds: [],
+    targetClientId: 'PC1',
+    protectedClientId: 'PC2',
+    targetName: 'portal.northline.test',
+    startedAt: '2026-09-13T00:00:00.000Z',
+    elapsedMs: 0,
+    assisted: false,
+    events: [],
+    selectedFindingIds: [],
+    completionNote: null,
+    status: 'active',
+    mode: 'configure',
+    requirements: deriveRequirements(network),
+    hintLevels: {},
+    compactedEventCount: 0,
+    ...overrides,
+  };
+}
 
 function validBackup(overrides = {}) {
   return {
     format: 'the-field-solo',
     version: 1,
     exportedAt: '2026-09-13T00:00:00.000Z',
-    profile: { schema: 1, openingEnabled: true, textScale: 1 },
+    profile: validProfile(),
     mission: null,
     ...overrides,
   };
@@ -82,25 +126,39 @@ test('replaceData rejects a backup without a valid profile', async () => {
 
 test('replaceData rejects a backup over the 5MiB limit', async () => {
   const store = openStore(createMemoryAdapter());
-  const big = validBackup({ profile: { schema: 1, padding: 'x'.repeat(6 * 1024 * 1024) } });
+  const big = validBackup({ profile: validProfile({ padding: 'x'.repeat(6 * 1024 * 1024) }) });
   const result = await store.replaceData(big);
   assert.equal(result.ok, false);
   assert.match(result.error, /5MiB/);
 });
 
+test('replaceData rejects a mission with an invalid network (model invariants enforced)', async () => {
+  const store = openStore(createMemoryAdapter());
+  const brokenMission = validMission({ network: { schema: 1, devices: 'not-an-array', ports: [], links: [], dnsRecords: [] } });
+  const result = await store.replaceData(validBackup({ mission: brokenMission }));
+  assert.equal(result.ok, false);
+});
+
+test('replaceData rejects a mission referencing a device that does not exist', async () => {
+  const store = openStore(createMemoryAdapter());
+  const brokenMission = validMission({ targetClientId: 'NOPE' });
+  const result = await store.replaceData(validBackup({ mission: brokenMission }));
+  assert.equal(result.ok, false);
+});
+
 test('replaceData installs a valid backup and keeps exactly one recovery record', async () => {
   const adapter = createMemoryAdapter();
   const store = openStore(adapter);
-  await store.saveLocal({ schema: 1, openingEnabled: true, textScale: 1 }, { id: 'before' });
+  await store.saveLocal(validProfile(), validMission({ id: 'before' }));
 
-  const first = await store.replaceData(validBackup({ mission: { id: 'restored-1' } }));
+  const first = await store.replaceData(validBackup({ mission: validMission({ id: 'restored-1' }) }));
   assert.equal(first.ok, true);
-  assert.deepEqual((await store.loadLocal()).mission, { id: 'restored-1' });
+  assert.equal((await store.loadLocal()).mission.id, 'restored-1');
   assert.equal((await adapter.listKeys('recovery')).length, 1);
 
-  const second = await store.replaceData(validBackup({ mission: { id: 'restored-2' } }));
+  const second = await store.replaceData(validBackup({ mission: validMission({ id: 'restored-2' }) }));
   assert.equal(second.ok, true);
-  assert.deepEqual((await store.loadLocal()).mission, { id: 'restored-2' });
+  assert.equal((await store.loadLocal()).mission.id, 'restored-2');
   assert.equal((await adapter.listKeys('recovery')).length, 1, 'older recovery records are removed');
 });
 

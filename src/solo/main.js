@@ -41,7 +41,7 @@ import {
   revealCard,
   updateAndPersistProfile,
 } from './app.js';
-import { openStore } from './store.js';
+import { openStore, previewBackup } from './store.js';
 import { renderHome, renderMission, renderDebrief, renderProgress, renderStudy, renderReference } from './view.js';
 import { runMissionTest } from './devices.js';
 import { executeCommand } from './cli.js';
@@ -65,6 +65,12 @@ let screenBeforeReference = 'home';
 // Reference's search text. Transient view state, not persisted or part of
 // the tracked app state.
 let referenceQuery = '';
+// Import's staged candidate (S17.md: preview before an explicit Replace).
+// Transient — nothing here is persisted unless/until confirmImportAction
+// actually calls store.replaceData.
+let importPreview = null;
+let importBackup = null;
+let importError = null;
 
 function render() {
   const root = document.getElementById('root');
@@ -88,6 +94,12 @@ function render() {
         onOpenStudy: openStudyScreen,
         onOpenReference: openReferenceScreen,
         recommendation: recommendMission(state.profile),
+        onExportBackup: exportBackupAction,
+        onImportFile: importFileAction,
+        onCancelImport: cancelImportAction,
+        onConfirmImport: confirmImportAction,
+        importPreview,
+        importError,
       }),
     );
   } else if (state.screen === 'progress') {
@@ -317,6 +329,80 @@ function closeReferenceScreen() {
 function searchReferenceAction(query) {
   referenceQuery = query;
   render();
+}
+
+// Export/import (S17.md). Export is a plain versioned JSON Blob download —
+// no executable content, network requests or secrets, just the same object
+// store.exportData() already returns. A download failing (e.g. Blob/URL
+// unsupported) is surfaced as an import-area error rather than thrown.
+async function exportBackupAction() {
+  try {
+    const backup = await store.exportData();
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `the-field-solo-backup-${backup.exportedAt.replace(/[:.]/g, '-')}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch {
+    importError = 'Could not export a backup.';
+    render();
+  }
+}
+
+// Parses and validates without touching storage; only sets up the preview
+// (S17.md: "show preview counts and replacement notice" before any
+// replacement — Replace is a separate, explicit action).
+async function importFileAction(file) {
+  let text;
+  try {
+    text = await file.text();
+  } catch {
+    importError = 'Could not read that file.';
+    importPreview = null;
+    importBackup = null;
+    render();
+    return;
+  }
+  const result = previewBackup(text);
+  if (!result.ok) {
+    importError = result.error;
+    importPreview = null;
+    importBackup = null;
+  } else {
+    importError = null;
+    importPreview = result;
+    importBackup = result.backup;
+  }
+  render();
+}
+
+function cancelImportAction() {
+  importPreview = null;
+  importBackup = null;
+  importError = null;
+  render();
+}
+
+// Restore requires this explicit call (S17.md acceptance) — previewing
+// alone (importFileAction) never touches storage. On success, reloads the
+// page (S17.md: "reload validated state") so every piece of in-memory state
+// — not just profile/mission, but terminal sessions, the reconnect flow,
+// missionTab and the rest — starts completely fresh from what was just
+// installed, the same guarantee an actual restart gives.
+async function confirmImportAction() {
+  const result = await store.replaceData(importBackup);
+  if (!result.ok) {
+    importPreview = null;
+    importBackup = null;
+    importError = result.error;
+    render();
+    return;
+  }
+  window.location.reload();
 }
 
 function familyForRecipe(recipeId) {

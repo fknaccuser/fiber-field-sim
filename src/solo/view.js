@@ -228,6 +228,79 @@ export function renderHome(state, actions = {}) {
   referenceButton.addEventListener('click', () => actions.onOpenReference?.());
   container.appendChild(referenceButton);
 
+  container.appendChild(renderBackupSection(actions));
+
+  return container;
+}
+
+// Export/import (S17.md). Export triggers a Blob download of the current
+// profile/mission (main.js's job — this only calls the action). Import is a
+// two-step flow: choosing a file previews its counts and asks for an
+// explicit Replace (UI_AND_STORAGE.md/S17.md: "Restore requires explicit
+// Replace"); a rejected file shows its reason and changes nothing.
+function renderBackupSection(actions) {
+  const container = document.createElement('div');
+  container.className = 'home-backup-section';
+
+  const heading = document.createElement('h2');
+  heading.className = 'home-section-heading';
+  heading.textContent = 'Backup';
+  container.appendChild(heading);
+
+  const exportButton = document.createElement('button');
+  exportButton.type = 'button';
+  exportButton.className = 'home-export-button';
+  exportButton.textContent = 'Export backup';
+  exportButton.addEventListener('click', () => actions.onExportBackup?.());
+  container.appendChild(exportButton);
+
+  const importLabel = document.createElement('label');
+  importLabel.className = 'home-import-label';
+  const importSpan = document.createElement('span');
+  importSpan.textContent = 'Import backup';
+  const importInput = document.createElement('input');
+  importInput.type = 'file';
+  importInput.accept = 'application/json';
+  importInput.addEventListener('change', () => {
+    const file = importInput.files?.[0];
+    if (file) actions.onImportFile?.(file);
+    importInput.value = '';
+  });
+  importLabel.append(importSpan, importInput);
+  container.appendChild(importLabel);
+
+  if (actions.importError) {
+    const error = document.createElement('p');
+    error.className = 'form-error';
+    error.setAttribute('role', 'alert');
+    error.textContent = actions.importError;
+    container.appendChild(error);
+  }
+
+  if (actions.importPreview) {
+    const preview = actions.importPreview;
+    const box = document.createElement('div');
+    box.className = 'home-pending-prompt';
+    box.setAttribute('role', 'alertdialog');
+    const message = document.createElement('p');
+    message.textContent = `This backup was exported ${preview.exportedAt}. It has ${preview.counts.completedRuns} completed run(s), ${preview.counts.independentRepairs} independent repair(s), and ${preview.hasMission ? 'an active mission' : 'no active mission'}. Replacing will discard your current profile and mission.`;
+    box.appendChild(message);
+    const exportFirstButton = document.createElement('button');
+    exportFirstButton.type = 'button';
+    exportFirstButton.textContent = 'Export current backup first';
+    exportFirstButton.addEventListener('click', () => actions.onExportBackup?.());
+    const cancelButton = document.createElement('button');
+    cancelButton.type = 'button';
+    cancelButton.textContent = 'Cancel';
+    cancelButton.addEventListener('click', () => actions.onCancelImport?.());
+    const replaceButton = document.createElement('button');
+    replaceButton.type = 'button';
+    replaceButton.textContent = 'Replace';
+    replaceButton.addEventListener('click', () => actions.onConfirmImport?.());
+    box.append(exportFirstButton, cancelButton, replaceButton);
+    container.appendChild(box);
+  }
+
   return container;
 }
 
