@@ -45,6 +45,7 @@ import {
 import { openStore, previewBackup } from './store.js';
 import {
   renderHome,
+  renderCareer,
   renderMission,
   renderDebrief,
   renderProgress,
@@ -52,6 +53,7 @@ import {
   renderReference,
   renderUpdateBanner,
 } from './view.js';
+import { assignmentById } from './career.js';
 import { runMissionTest } from './devices.js';
 import { executeCommand } from './cli.js';
 import { recommendMission, recommendedTier } from './progress.js';
@@ -110,7 +112,7 @@ function render() {
       renderHome(state, {
         onRetrySave: retrySave,
         onStartConfigure: startConfigure,
-        onOpenBuilder: () => { builderScreen = createBuilder({ onExit: () => { builderScreen = null; render(); } }); render(); },
+        onOpenBuilder: openBuilder,
         onOpenIssues: () => { libraryScreen = createIssueLibrary({ onExit: () => { libraryScreen = null; render(); }, onLaunch: code => { libraryScreen = null; startCode(code); } }); render(); },
         onContinue: continueMission,
         onStartCode: startCode,
@@ -121,6 +123,7 @@ function render() {
         onOpenProgress: openProgress,
         onOpenStudy: openStudyScreen,
         onOpenReference: openReferenceScreen,
+        onOpenCareer: openCareer,
         recommendation: recommendMission(state.profile),
         onExportBackup: exportBackupAction,
         offlineReady,
@@ -129,6 +132,15 @@ function render() {
         onConfirmImport: confirmImportAction,
         importPreview,
         importError,
+      }),
+    );
+  } else if (state.screen === 'career') {
+    root.appendChild(
+      renderCareer(state, {
+        onHome: careerToHome,
+        onStartAssignment: startAssignment,
+        onConfirmReplace: confirmReplace,
+        onCancelReplace: cancelReplace,
       }),
     );
   } else if (state.screen === 'progress') {
@@ -304,6 +316,40 @@ function startRecommended() {
   missionTab = 'network';
   render();
   if (state.mission !== before) persistProfileAndMission();
+}
+
+function openBuilder() {
+  builderScreen = createBuilder({ onExit: () => { builderScreen = null; render(); } });
+  render();
+}
+
+function openCareer() {
+  state = { ...state, screen: 'career', error: null };
+  render();
+}
+
+function careerToHome() {
+  state = { ...state, screen: 'home', error: null };
+  render();
+}
+
+// Launches a career assignment through the same mission engine the rest of the
+// app uses: a coded first job, a generated variation at the assignment's
+// family/tier, or the design studio for the capstone. If a mission is already
+// active, attemptStartMission stages a replace prompt (rendered on the career
+// screen) rather than discarding work.
+function startAssignment(assignmentId) {
+  const assignment = assignmentById(assignmentId);
+  if (!assignment) return;
+  if (assignment.start.kind === 'design') { openBuilder(); return; }
+  if (assignment.start.kind === 'code') { startCode(assignment.start.code); return; }
+  if (assignment.start.kind === 'family') {
+    const before = state.mission;
+    state = startNewVariation(state, 'BR', assignment.start.tier, assignment.start.family);
+    missionTab = 'network';
+    render();
+    if (state.mission !== before) persistProfileAndMission();
+  }
 }
 
 function openProgress() {

@@ -4,6 +4,8 @@
 import { renderTopology } from './diagram.js';
 import { equipmentIcon } from './equipment.js';
 import { nextGuidance, trainingMode } from './guidance.js';
+import { attachMentor, explainDevice, explainPort, explainConcept } from './mentor.js';
+import { careerProgress } from './career.js';
 
 const canvasViews = new Map();
 const inspectorViews = new Map();
@@ -153,6 +155,35 @@ export function renderHome(state, actions = {}) {
   subtitle.className = 'home-subtitle';
   subtitle.textContent = 'Understand the connection.';
   container.appendChild(subtitle);
+
+  // Career path: the guided, story-driven way in — recommended for beginners.
+  const career = careerProgress(state.profile);
+  const careerCard = document.createElement('section');
+  careerCard.className = 'home-career';
+  const careerCopy = document.createElement('div');
+  const careerKicker = document.createElement('span'); careerKicker.className = 'section-kicker'; careerKicker.textContent = 'CAREER PATH · GUIDED';
+  const careerTitle = document.createElement('h2');
+  careerTitle.textContent = career.allComplete ? 'You made Network Engineer.' : `Start as a Junior Tech. Work your way up.`;
+  const careerText = document.createElement('p');
+  careerText.textContent = career.allComplete
+    ? 'Every rank cleared. Jump back into any ticket or design a network of your own.'
+    : 'A step-by-step path from your first “I can’t get online” ticket to designing whole networks — every device and step explained as you go.';
+  const careerButton = document.createElement('button'); careerButton.type = 'button'; careerButton.className = 'primary-button'; careerButton.textContent = career.completedCount > 0 ? 'Resume career →' : 'Begin your career →';
+  careerButton.addEventListener('click', () => actions.onOpenCareer?.());
+  const careerMeta = document.createElement('p'); careerMeta.className = 'home-career-meta';
+  careerMeta.textContent = `${career.completedCount} of ${career.total} assignments complete`;
+  careerCopy.append(careerKicker, careerTitle, careerText, careerButton, careerMeta);
+  const careerLadder = document.createElement('div'); careerLadder.className = 'home-career-ladder'; careerLadder.setAttribute('aria-hidden', 'true');
+  for (const rank of career.ranks) {
+    const pip = document.createElement('span');
+    pip.className = `career-rank-pip${rank.complete ? ' is-complete' : rank.unlocked ? ' is-active' : ''}`;
+    pip.textContent = rank.badge;
+    pip.title = rank.title;
+    careerLadder.append(pip);
+  }
+  careerCard.append(careerCopy, careerLadder);
+  container.appendChild(careerCard);
+
   const studio = document.createElement('section');
   studio.className = 'home-studio';
   const studioCopy = document.createElement('div');
@@ -309,6 +340,104 @@ export function renderHome(state, actions = {}) {
   container.appendChild(renderBackupSection(actions));
 
   return container;
+}
+
+// The guided career campaign screen (career.js). A themed rank ladder plus the
+// active rank's assignment cards; completed ranks stay open to revisit, locked
+// ones show what's ahead. Each Start hands off to the same mission engine the
+// rest of the app uses.
+export function renderCareer(state, actions = {}) {
+  const container = document.createElement('div');
+  container.className = 'career-screen';
+  const progress = careerProgress(state.profile);
+
+  const header = document.createElement('div');
+  header.className = 'career-header';
+  const back = document.createElement('button');
+  back.type = 'button'; back.className = 'career-back'; back.textContent = '← Home';
+  back.addEventListener('click', () => actions.onHome?.());
+  header.appendChild(back);
+  const kicker = document.createElement('span'); kicker.className = 'section-kicker'; kicker.textContent = 'NORTHLINE · FIELD OPERATIONS';
+  const title = document.createElement('h1'); title.textContent = 'Your career';
+  const lead = document.createElement('p'); lead.className = 'career-lead';
+  lead.textContent = progress.allComplete
+    ? 'You’ve reached Network Engineer. Every ticket is replayable — or design a network of your own.'
+    : 'Clear each assignment to earn the next rank. Everything is explained as you go — hover any device or interface for a plain-language breakdown.';
+  const meter = document.createElement('div'); meter.className = 'career-meter';
+  const meterFill = document.createElement('div'); meterFill.className = 'career-meter-fill';
+  meterFill.style.width = `${Math.round((progress.completedCount / progress.total) * 100)}%`;
+  meter.appendChild(meterFill);
+  const meterLabel = document.createElement('p'); meterLabel.className = 'career-meter-label';
+  meterLabel.textContent = `${progress.completedCount} of ${progress.total} assignments complete`;
+  header.append(kicker, title, lead, meter, meterLabel);
+  container.appendChild(header);
+
+  if (state.pendingMissionRequest) {
+    container.appendChild(renderPendingMissionPrompt(state, actions));
+  }
+  if (state.error) {
+    const error = document.createElement('p'); error.className = 'form-error'; error.setAttribute('role', 'alert'); error.textContent = state.error;
+    container.appendChild(error);
+  }
+
+  for (const rank of progress.ranks) {
+    const section = document.createElement('section');
+    section.className = `career-rank${rank.complete ? ' is-complete' : rank.unlocked ? ' is-unlocked' : ' is-locked'}`;
+    const rankHead = document.createElement('div'); rankHead.className = 'career-rank-head';
+    const badge = document.createElement('span'); badge.className = 'career-rank-badge'; badge.textContent = rank.badge;
+    const rankTitles = document.createElement('div');
+    const rankTitle = document.createElement('h2'); rankTitle.textContent = rank.title;
+    const rankTag = document.createElement('p'); rankTag.className = 'career-rank-tagline'; rankTag.textContent = rank.tagline;
+    rankTitles.append(rankTitle, rankTag);
+    const rankStatus = document.createElement('span'); rankStatus.className = 'career-rank-status';
+    rankStatus.textContent = rank.complete ? 'Complete' : rank.unlocked ? `${rank.doneCount}/${rank.items.length}` : 'Locked';
+    rankHead.append(badge, rankTitles, rankStatus);
+    section.appendChild(rankHead);
+
+    const blurb = document.createElement('p'); blurb.className = 'career-rank-blurb'; blurb.textContent = rank.blurb;
+    section.appendChild(blurb);
+
+    const list = document.createElement('div'); list.className = 'career-assignments';
+    for (const assignment of rank.items) {
+      list.appendChild(renderAssignmentCard(assignment, actions));
+    }
+    section.appendChild(list);
+    container.appendChild(section);
+  }
+
+  return container;
+}
+
+function renderAssignmentCard(assignment, actions) {
+  const card = document.createElement('article');
+  card.className = `career-assignment is-${assignment.status}`;
+  const head = document.createElement('div'); head.className = 'career-assignment-head';
+  const marker = document.createElement('span'); marker.className = 'career-assignment-marker';
+  marker.textContent = assignment.status === 'done' ? '✓' : assignment.status === 'active' ? '▶' : '🔒';
+  const title = document.createElement('h3'); title.textContent = assignment.title;
+  head.append(marker, title);
+  card.appendChild(head);
+
+  const story = document.createElement('p'); story.className = 'career-assignment-story'; story.textContent = assignment.story;
+  card.appendChild(story);
+
+  const foot = document.createElement('div'); foot.className = 'career-assignment-foot';
+  const skill = document.createElement('span'); skill.className = 'career-assignment-skill'; skill.textContent = assignment.skill;
+  foot.appendChild(skill);
+
+  if (assignment.status !== 'locked') {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = assignment.status === 'active' ? 'primary-button' : 'career-replay';
+    button.textContent = assignment.status === 'done' ? 'Replay' : 'Start assignment';
+    button.addEventListener('click', () => actions.onStartAssignment?.(assignment.id));
+    foot.appendChild(button);
+  } else {
+    const locked = document.createElement('span'); locked.className = 'career-assignment-locked'; locked.textContent = 'Finish the previous ticket to unlock';
+    foot.appendChild(locked);
+  }
+  card.appendChild(foot);
+  return card;
 }
 
 // Export/import (S17.md). Export triggers a Blob download of the current
@@ -661,6 +790,7 @@ function renderInspect(network, device) {
     const dd = document.createElement('dd');
     dd.textContent = value;
     list.append(dt, dd);
+    return { dt, dd };
   };
   addRow('Kind', device.kind);
   addRow('Power', device.powered ? 'On' : 'Off');
@@ -675,7 +805,14 @@ function renderInspect(network, device) {
         : port.mode === 'trunk'
           ? ` allows [${port.allowedVlans.join(', ')}]`
           : '';
-    addRow(`Port ${port.label}`, `${port.adminUp ? 'up' : 'administratively down'}, ${port.mode}${vlanNote}`);
+    const { dt, dd } = addRow(`Port ${port.label}`, `${port.adminUp ? 'up' : 'administratively down'}, ${port.mode}${vlanNote}`);
+    // Beginner mentor tooltip: hover the interface row to learn what the
+    // port name means, whether it's up, and what access/trunk implies.
+    dt.classList.add('mentor-hoverable');
+    dd.classList.add('mentor-hoverable');
+    dt.tabIndex = 0;
+    attachMentor(dt, () => explainPort(port, device));
+    attachMentor(dd, () => explainPort(port, device));
   }
   return list;
 }
@@ -744,6 +881,9 @@ function renderDevicePanel(state, actions) {
 
   const heading = document.createElement('h2');
   heading.textContent = device.name;
+  heading.classList.add('mentor-hoverable');
+  heading.tabIndex = 0;
+  attachMentor(heading, () => explainDevice(device));
   container.appendChild(heading);
   const equipment = equipmentIcon(device.kind); equipment.classList.add('inspector-equipment'); container.prepend(equipment);
   const viewKey = `${state.mission.id}:${device.id}`;
@@ -930,6 +1070,13 @@ function describeEvent(mission, event) {
 function renderFindings(state, actions) {
   const mission = state.mission;
   const container = document.createElement('div');
+
+  const findingsHeading = document.createElement('h3');
+  findingsHeading.className = 'findings-heading mentor-hoverable';
+  findingsHeading.textContent = 'Findings — your evidence';
+  findingsHeading.tabIndex = 0;
+  attachMentor(findingsHeading, () => explainConcept('findings'));
+  container.appendChild(findingsHeading);
 
   const capturedEvents = mission.events.filter((e) => e.kind === 'inspection' || e.kind === 'test');
   if (capturedEvents.length === 0) {

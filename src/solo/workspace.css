@@ -158,7 +158,7 @@ p { line-height: 1.6; }
   .mission-panel, .design-canvas { min-height: 0; }
   .diagram, .design-canvas .diagram { min-height: 0; }
   .diagram > svg.topology-canvas { min-height: 180px; height: 0; }
-  .mission-panel-network[hidden] { display: block !important; }
+  .mission-panel-network[hidden] { display: flex !important; }
   .mission-panel-device, .mission-panel-findings { grid-column: 2; grid-row: 1; overflow-y: auto; }
   .mission-panel-device[hidden] { display: block !important; }
   .mission-screen[data-active-tab='findings'] .mission-panel-device { display: none !important; }
@@ -281,3 +281,89 @@ p { line-height: 1.6; }
 .terminal-input-row .terminal-input { width: 100%; min-height: 46px; padding: 12px; font-family: Consolas, monospace; background: #061827; border: 1px solid #43829b; color: #cef1ed; }
 .terminal-input-row .terminal-input:focus { outline: 2px solid #5cd4eb; outline-offset: 2px; }
 @media (min-width: 900px) { .mission-panel-network { display: flex; flex-direction: column; } .mission-panel-network > .diagram { flex: 1; height: 0; min-height: 180px; } }
+/* The drawing and its list share a bounded pane separated by a draggable divider. */
+.diagram { overflow: hidden; }
+.canvas-toolbar { flex: 0 0 auto; }
+.canvas-navigation-help { width: 100%; color: #89aabd; font-size: 10px; margin-top: 2px; }
+.diagram > svg.topology-canvas { flex: 1 1 0; height: 0; min-height: 240px; }
+.topology-index { flex: 0 0 auto; padding: 0 16px; border-top: 0; }
+.topology-index summary { box-sizing: border-box; min-height: 36px; padding: 9px 0; }
+.topology-index .diagram-list { box-sizing: border-box; max-height: none; margin: 0; padding: 8px 0; overflow-y: auto; align-content: flex-start; }
+.topology-splitter { flex: 0 0 14px; display: flex; align-items: center; justify-content: center; cursor: row-resize; touch-action: none; background: #102c41; border-block: 1px solid #2d526a; }
+.topology-splitter-grip { width: 48px; height: 3px; border-radius: 3px; background: #6194ad; }
+.topology-splitter:hover, .topology-splitter:focus-visible, .topology-resizing .topology-splitter { background: #194962; outline: none; }
+.topology-splitter:focus-visible .topology-splitter-grip { background: #9bf0ff; }
+.topology-resizing { user-select: none; cursor: row-resize; }
+.diagram.topology-expanded { position: fixed; inset: 12px; z-index: 40; width: auto; height: auto !important; min-height: 0 !important; background: #071c30; border: 1px solid #4b95b0; border-radius: 10px; box-shadow: 0 0 0 100vmax #020d1ddd; }
+@media (min-width: 900px) {
+  .mission-screen { overflow-y: auto; }
+  .mission-panels { flex: 1 0 390px; min-height: 390px; }
+  .mission-panel-network { display: flex !important; flex-direction: column; }
+  .mission-panel-network > .diagram { min-height: 320px; }
+}
+@media (max-width: 899px) {
+  .mission-panel-network > .diagram, .design-canvas .diagram { height: max(560px, 75dvh); min-height: 0; }
+  .topology-splitter { flex-basis: 20px; }
+}
+
+/* --- Career campaign ---------------------------------------------------- */
+.home-career {
+  display: grid; grid-template-columns: 1.4fr 1fr; gap: 30px; align-items: center;
+  padding: 30px 34px; margin: 20px 0 24px;
+  border: 1px solid #3c6f8f; border-radius: 16px;
+  background: linear-gradient(120deg, #0e2f4b, #0b2338);
+}
+.home-career h2 { font-size: 27px; font-weight: 300; line-height: 1.25; margin: 10px 0; }
+.home-career p { color: var(--field-muted); max-width: 460px; }
+.home-career .primary-button { margin-top: 6px; }
+.home-career-meta { font-size: 12px; color: #79b7d1; margin-top: 12px; }
+.home-career-ladder { display: flex; gap: 14px; justify-content: center; }
+.career-rank-pip {
+  display: grid; place-items: center; width: 58px; height: 58px; border-radius: 14px;
+  font-weight: 700; font-size: 15px; letter-spacing: .05em;
+  color: #6f8ba1; background: #0a1d2f; border: 1px solid #274257;
+}
+.career-rank-pip.is-active { color: #062130; background: linear-gradient(135deg, #6ee7f5, #34b6db); border-color: #6ee7f5; box-shadow: 0 0 18px #34b6db55; }
+.career-rank-pip.is-complete { color: #062130; background: linear-gradient(135deg, #8ff0c8, #4fd0a4); border-color: #8ff0c8; }
+
+.career-screen { min-height: 100vh; padding: 24px; background: var(--field-bg); max-width: 980px; margin: 0 auto; }
+.career-header { margin-bottom: 22px; }
+.career-back { background: transparent; border: 1px solid #345369; margin-bottom: 16px; }
+.career-header h1 { font-size: 30px; font-weight: 300; margin: 8px 0; }
+.career-lead { color: var(--field-muted); max-width: 620px; margin: 0 0 16px; }
+.career-meter { height: 8px; border-radius: 999px; background: #0a1d2f; border: 1px solid #274257; overflow: hidden; max-width: 620px; }
+.career-meter-fill { height: 100%; background: linear-gradient(90deg, #34b6db, #6ee7f5); border-radius: 999px; transition: width .3s; }
+.career-meter-label { font-size: 12px; color: #79b7d1; margin: 8px 0 0; }
+
+.career-rank { border: 1px solid #274257; border-radius: 14px; padding: 22px; margin-bottom: 18px; background: linear-gradient(135deg, #0b2338, #0a1c2e); }
+.career-rank.is-active, .career-rank.is-unlocked { border-color: #3c6f8f; }
+.career-rank.is-complete { border-color: #3a6f5c; }
+.career-rank.is-locked { opacity: .62; }
+.career-rank-head { display: flex; align-items: center; gap: 14px; }
+.career-rank-badge { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; font-weight: 700; font-size: 14px; color: #cdeffb; background: #0a1d2f; border: 1px solid #3c6f8f; flex: none; }
+.career-rank.is-complete .career-rank-badge { color: #062130; background: linear-gradient(135deg, #8ff0c8, #4fd0a4); border-color: #8ff0c8; }
+.career-rank-head h2 { font-size: 20px; font-weight: 500; margin: 0; }
+.career-rank-tagline { font-size: 12px; color: #79b7d1; margin: 2px 0 0; }
+.career-rank-status { margin-left: auto; font-size: 12px; font-weight: 600; color: #9fd0e6; padding: 4px 10px; border: 1px solid #274257; border-radius: 999px; flex: none; }
+.career-rank.is-complete .career-rank-status { color: #8ff0c8; border-color: #3a6f5c; }
+.career-rank-blurb { color: var(--field-muted); font-size: 13.5px; margin: 14px 0 16px; max-width: 720px; }
+
+.career-assignments { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.career-assignment { border: 1px solid #26415a; border-radius: 12px; padding: 16px; background: #0a2032; display: flex; flex-direction: column; }
+.career-assignment.is-active { border-color: #6ee7f5; box-shadow: 0 0 0 1px #6ee7f52e, 0 10px 30px #01050f66; background: linear-gradient(150deg, #0d2b43, #0a2032); }
+.career-assignment.is-locked { opacity: .6; }
+.career-assignment-head { display: flex; align-items: baseline; gap: 9px; }
+.career-assignment-marker { font-size: 13px; color: #6ee7f5; flex: none; }
+.career-assignment.is-done .career-assignment-marker { color: #8ff0c8; }
+.career-assignment-head h3 { font-size: 15px; font-weight: 600; margin: 0; }
+.career-assignment-story { color: var(--field-muted); font-size: 13px; margin: 8px 0 14px; flex: 1; }
+.career-assignment-foot { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; }
+.career-assignment-skill { font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em; color: #7fb3cd; padding: 3px 9px; border: 1px solid #274257; border-radius: 999px; }
+.career-assignment-locked { font-size: 12px; color: #6f8ba1; }
+.career-replay { background: transparent; border: 1px solid #3c6f8f; color: #cdeffb; }
+
+@media (max-width: 720px) {
+  .home-career { grid-template-columns: 1fr; }
+  .home-career-ladder { justify-content: flex-start; }
+  .career-assignments { grid-template-columns: 1fr; }
+}

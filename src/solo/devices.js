@@ -4,6 +4,7 @@
 
 import { canReach, resolveName, testService } from './forward.js';
 import { getHelp } from './cli.js';
+import { attachMentor, explainConcept, explainTest } from './mentor.js';
 const expandedConsoles = new Set();
 
 function findPort(network, portId) {
@@ -111,11 +112,18 @@ export function runMissionTest(mission, testKind, deviceId) {
 
 // --- Rendering ---
 
-function fieldRow(labelText, input) {
+// `conceptKey` (optional) attaches the beginner mentor tooltip explaining what
+// this field is in plain language (see mentor.js explainConcept).
+function fieldRow(labelText, input, conceptKey) {
   const row = document.createElement('label');
   row.className = 'form-row';
   const span = document.createElement('span');
   span.textContent = labelText;
+  if (conceptKey) {
+    span.classList.add('mentor-hoverable');
+    span.tabIndex = 0;
+    attachMentor(span, () => explainConcept(conceptKey));
+  }
   row.append(span, input);
   return row;
 }
@@ -136,9 +144,9 @@ export function renderClientForm(device, onApply) {
   const gatewayInput = textInput(device.gateway);
   const dnsInput = textInput(device.dns);
   form.append(
-    fieldRow('IP address (/24)', ipInput),
-    fieldRow('Gateway', gatewayInput),
-    fieldRow('DNS', dnsInput),
+    fieldRow('IP address (/24)', ipInput, 'subnet'),
+    fieldRow('Gateway', gatewayInput, 'gateway'),
+    fieldRow('DNS', dnsInput, 'dns'),
   );
 
   const applyButton = document.createElement('button');
@@ -183,10 +191,10 @@ export function renderPortForm(port, onApply) {
   let vlanInput;
   if (port.mode === 'access') {
     vlanInput = textInput(String(port.accessVlan));
-    form.appendChild(fieldRow('Access VLAN', vlanInput));
+    form.appendChild(fieldRow('Access VLAN', vlanInput, 'vlan'));
   } else if (port.mode === 'trunk') {
     vlanInput = textInput(port.allowedVlans.join(', '));
-    form.appendChild(fieldRow('Allowed VLANs', vlanInput));
+    form.appendChild(fieldRow('Allowed VLANs', vlanInput, 'vlan'));
   }
 
   const applyButton = document.createElement('button');
@@ -295,6 +303,9 @@ export function renderTests(deviceId, onRunTest) {
   container.className = 'device-tests';
   const heading = document.createElement('h3');
   heading.textContent = 'Tests';
+  heading.classList.add('mentor-hoverable');
+  heading.tabIndex = 0;
+  attachMentor(heading, () => explainConcept('tests'));
   container.appendChild(heading);
   const row = document.createElement('div');
   row.className = 'device-tests-row';
@@ -303,6 +314,8 @@ export function renderTests(deviceId, onRunTest) {
     button.type = 'button';
     button.textContent = test.label;
     button.addEventListener('click', () => onRunTest(test.id, deviceId));
+    // Beginner mentor tooltip: what this specific test proves, in plain terms.
+    attachMentor(button, () => explainTest(test.id));
     row.appendChild(button);
   }
   container.appendChild(row);
@@ -320,6 +333,9 @@ export function renderTerminal(terminal, { onSubmitCommand, onInsertBuilderComma
 
   const heading = document.createElement('h3');
   heading.textContent = 'Console';
+  heading.classList.add('mentor-hoverable');
+  heading.tabIndex = 0;
+  attachMentor(heading, () => explainConcept('console'));
   container.appendChild(heading);
   const expand = document.createElement('button'); expand.type = 'button'; expand.className = 'console-expand'; expand.textContent = 'Expand console'; expand.setAttribute('aria-expanded', 'false');
   const setExpanded = expanded => { container.classList.toggle('console-expanded', expanded); expand.textContent = expanded ? 'Restore console' : 'Expand console'; expand.setAttribute('aria-expanded', String(expanded)); if (expanded) expandedConsoles.add(terminal.deviceId); else expandedConsoles.delete(terminal.deviceId); };
@@ -381,8 +397,10 @@ export function renderTerminal(terminal, { onSubmitCommand, onInsertBuilderComma
   if (!showBuilder) return container;
 
   const builderHeading = document.createElement('p');
-  builderHeading.className = 'terminal-builder-heading';
+  builderHeading.className = 'terminal-builder-heading mentor-hoverable';
   builderHeading.textContent = 'Command builder';
+  builderHeading.tabIndex = 0;
+  attachMentor(builderHeading, () => explainConcept('commandBuilder'));
   container.appendChild(builderHeading);
   const builderList = document.createElement('div');
   builderList.className = 'terminal-builder-list';

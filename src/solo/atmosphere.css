@@ -1,0 +1,178 @@
+/* Original network mesh: vivid on entry, quiet around the working diagram. */
+:root {
+  --field-bg: #050d20;
+  --field-panel: #0b1c32;
+  --workspace-border: #25435b;
+  --field-cyan: #50d8f1;
+}
+.home-screen {
+  background:
+    linear-gradient(90deg, #050d20f0 6%, #050d2033 74%),
+    radial-gradient(1150px 660px at 88% 4%, #ff933355, transparent 62%),
+    radial-gradient(1250px 840px at 8% 98%, #8a3fd06e, transparent 60%),
+    radial-gradient(980px 600px at 64% 42%, #f0407f3e, transparent 62%),
+    url('./assets/network-mesh.svg') center top / max(1600px, 100vw) auto no-repeat,
+    #050d20;
+}
+.home-screen > h1 { color: #f0faff; text-shadow: 0 0 36px #38c6ed40; }
+.home-subtitle { color: #83d9ee; }
+.home-studio {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    linear-gradient(100deg, #09192ff2 22%, #07152622),
+    radial-gradient(820px 460px at 90% 8%, #b585ff56, transparent 60%),
+    radial-gradient(720px 500px at 66% 120%, #f0407f3c, transparent 62%),
+    url('./assets/network-mesh.svg') center 56% / cover,
+    #061127;
+  border-color: #3a5f83;
+  box-shadow: 0 16px 60px #01051155, inset 0 1px #92dcff18;
+}
+.home-studio-art {
+  padding: 24px 0;
+  background: linear-gradient(#6de8ff66, #6de8ff66) center / 1px 70% no-repeat, linear-gradient(90deg, #4ddafa44, #b0a2ff88) center / 65% 1px no-repeat;
+}
+.home-studio-art svg { filter: drop-shadow(0 0 18px #30b5e73d) drop-shadow(0 12px 10px #020816); }
+.home-recommended-row, .home-issue-library { background: linear-gradient(110deg, #10253ced, #0c1831e8); border-color: #33516b; }
+.home-career {
+  position: relative; isolation: isolate; overflow: hidden;
+  background:
+    linear-gradient(115deg, #0e2f4bf0 28%, #0b233833),
+    radial-gradient(760px 420px at 93% 16%, #ff933355, transparent 60%),
+    radial-gradient(720px 460px at 76% 126%, #f0407f44, transparent 62%),
+    radial-gradient(620px 420px at 60% 50%, #8a3fd033, transparent 64%),
+    url('./assets/network-mesh.svg') right 40% / cover,
+    #0b2338;
+  box-shadow: 0 16px 60px #01051155, inset 0 1px #92dcff18;
+}
+.home-career h2, .career-header h1 { color: #f0faff; text-shadow: 0 0 30px #38c6ed33; }
+.career-screen {
+  background-image:
+    radial-gradient(1150px 720px at 86% 2%, #ff933332, transparent 60%),
+    radial-gradient(1250px 840px at 5% 100%, #8a3fd052, transparent 60%),
+    radial-gradient(960px 580px at 60% 38%, #f0407f30, transparent 62%),
+    radial-gradient(ellipse at 50% -10%, #12233c, #06182a 62%);
+}
+.career-header {
+  padding: 26px; border: 1px solid #2f5675; border-radius: 16px;
+  background:
+    linear-gradient(100deg, #0a1f33f0 28%, #0a1f3344),
+    radial-gradient(720px 380px at 92% 14%, #ff933348, transparent 60%),
+    radial-gradient(680px 400px at 70% 130%, #8a3fd04c, transparent 62%),
+    url('./assets/network-mesh.svg') right center / 900px auto,
+    #0a1f33;
+}
+.mission-header, .design-header {
+  background:
+    linear-gradient(90deg, #081529f8 28%, #08152966),
+    radial-gradient(820px 340px at 94% 16%, #ff933338, transparent 60%),
+    radial-gradient(760px 360px at 72% 134%, #8a3fd044, transparent 62%),
+    url('./assets/network-mesh.svg') right 55% / 900px auto,
+    #081529;
+}
+.workspace-brand { color: #ecfaff; text-shadow: 0 0 22px #3fcaf933; }
+.workspace-brand span, .section-kicker { color: #85cfeb; }
+.canvas-toolbar { background: linear-gradient(100deg, #0b2035, #111e38); }
+.diagram > svg.topology-canvas {
+  background-color: #061326;
+  background-image:
+    radial-gradient(ellipse at 50% 48%, #061326 20%, #061326ee 62%, #06132688),
+    radial-gradient(660px 440px at 4% 5%, #8a3fd040, transparent 60%),
+    radial-gradient(680px 460px at 97% 97%, #f0407f2e, transparent 60%),
+    radial-gradient(600px 420px at 94% 6%, #ff933328, transparent 60%),
+    radial-gradient(560px 400px at 6% 94%, #33cbf622, transparent 60%),
+    url('./assets/network-mesh.svg');
+  background-size: cover;
+  background-position: center;
+}
+.topology-canvas .diagram-link { filter: drop-shadow(0 0 2px #31c9ee30); }
+.topology-canvas .diagram-device-selected .device-selection { filter: drop-shadow(0 0 5px #42d5f240); }
+.topology-splitter { background: linear-gradient(90deg, #102339, #18354c, #102339); }
+.topology-splitter-grip { box-shadow: 0 0 8px #63dafa44; }
+.issue-header {
+  padding: 26px;
+  border: 1px solid #2b4662;
+  border-radius: 14px;
+  background: linear-gradient(90deg, #0a192ff5 30%, #0a192f77), url('./assets/network-mesh.svg') right center / 950px auto, #0a192f;
+}
+.issue-card { background: linear-gradient(140deg, #0b2237, #0c1930); }
+/* --- Beginner mentor tooltip ------------------------------------------- */
+.mentor-tip {
+  position: fixed;
+  z-index: 1000;
+  max-width: 320px;
+  padding: 13px 15px 11px;
+  border: 1px solid #3aa9d6;
+  border-radius: 12px;
+  background: linear-gradient(150deg, #0a1f39f2, #081428f7);
+  box-shadow: 0 18px 44px #01050faa, 0 0 0 1px #0b1c3280, inset 0 1px #79dbff2e;
+  color: #dcf3ff;
+  font-size: 13px;
+  line-height: 1.5;
+  pointer-events: none;
+  backdrop-filter: blur(3px);
+}
+.mentor-tip-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.mentor-tip-title { font-weight: 700; font-size: 14px; color: #f2fbff; letter-spacing: .2px; }
+.mentor-tip-tag {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #061323;
+  background: linear-gradient(90deg, #6ee7f5, #b0a2ff);
+  font-weight: 700;
+}
+.mentor-tip-status {
+  font-size: 11.5px;
+  color: #8fd6ef;
+  margin-bottom: 6px;
+  font-family: var(--mono, ui-monospace, monospace);
+}
+.mentor-tip-body { margin: 0; color: #d3ecfb; }
+.mentor-tip-note {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid #ffffff14;
+  color: #9fe0f4;
+  font-size: 12.5px;
+}
+.mentor-tip-hint {
+  margin-top: 9px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: #4f7ea0;
+}
+
+/* Subtle cue that a row/label is hoverable for a plain-language explanation. */
+.mentor-hoverable { cursor: help; }
+.device-inspect dt.mentor-hoverable,
+h3.mentor-hoverable,
+p.mentor-hoverable { text-decoration: underline dotted #47bfe066; text-underline-offset: 3px; }
+.device-panel h2.mentor-hoverable { cursor: help; }
+.mentor-guide-off .mentor-hoverable { cursor: default; }
+.mentor-guide-off .mentor-hoverable { text-decoration: none; }
+
+.mentor-guide-toggle {
+  border: 1px solid #3aa9d6;
+  border-radius: 999px;
+  background: linear-gradient(100deg, #123653, #0e2740);
+  color: #cdefff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+}
+.mentor-guide-toggle[aria-pressed='true'] {
+  border-color: #6ee7f5;
+  box-shadow: 0 0 0 1px #6ee7f533, 0 0 14px #52d8f13a;
+}
+.mentor-guide-toggle[aria-pressed='false'] { opacity: .72; }
+
+@media (max-width: 599px) {
+  .home-studio { background-position: center, 65% center; }
+  .issue-header { padding: 20px; }
+  .mentor-tip { max-width: min(320px, calc(100vw - 24px)); }
+}

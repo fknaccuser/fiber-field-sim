@@ -1,4 +1,6 @@
 import { svgEl, equipmentGlyph, EQUIPMENT } from './equipment.js';
+import { fitTopologyBounds, resizeTopologyDrawer } from './topology-viewport.js';
+import { attachMentor, explainDevice, explainCable, createGuideToggle } from './mentor.js';
 
 export function positionsFor(network, compact = false) {
   const hasDistribution = network.devices.some(d => d.id === 'SW2');
@@ -22,9 +24,12 @@ export function renderTopology(network, options = {}) {
   const svg = svgEl('svg', { class: 'topology-canvas', role: 'group', 'aria-label': 'Network topology. Select equipment or a cable. Drag the background to pan.' });
   const world = svgEl('g'), positions = positionsFor(network, viewState.compact ?? false);
   const ports = new Map((network.ports ?? []).map(p => [p.id, p]));
+  const deviceNames = new Map(network.devices.map(d => [d.id, d.name]));
   const ends = link => [link.a ?? ports.get(link.aPortId)?.deviceId, link.b ?? ports.get(link.bPortId)?.deviceId];
+  const cableSpec = link => { const [a, b] = ends(link); return explainCable(link, { aName: deviceNames.get(a), bName: deviceNames.get(b) }); };
   let width = viewState.width ?? 900, height = viewState.height ?? 500;
   const view = viewState;
+  view.autoFit ??= true;
   const updateView = () => {
     world.setAttribute('transform', `translate(${view.x ?? 0} ${view.y ?? 0}) scale(${view.k ?? 1})`);
     zoom.textContent = `${Math.round((view.k ?? 1) * 100)}%`;
@@ -38,21 +43,40 @@ export function renderTopology(network, options = {}) {
     }
   };
   const fit = () => {
-    const ps = Object.values(positions);
-    const minX = Math.min(0, ...ps.map(p => p[0] - 85)), maxX = Math.max(250, ...ps.map(p => p[0] + 85));
-    const minY = Math.min(0, ...ps.map(p => p[1] - 90)), maxY = Math.max(220, ...ps.map(p => p[1] + 85));
-    view.k = Math.min(1.25, (width - 40) / (maxX - minX), (height - 40) / (maxY - minY));
-    view.x = (width - (maxX + minX) * view.k) / 2; view.y = (height - (maxY + minY) * view.k) / 2; updateView();
+    if (!svg.isConnected || !width || !height) return;
+    // Measure rendered equipment, names, coaching arrows, and site bounds.
+    // A few passes account for labels that retain a minimum screen font size.
+    view.autoFit = true;
+    view.k = 1;
+    for (let pass = 0; pass < 4; pass++) {
+      updateView();
+      const bounds = world.getBBox();
+      const next = fitTopologyBounds(bounds, width, height);
+      if (next) Object.assign(view, next);
+    }
+    updateView();
   };
   const scale = (factor, x = width / 2, y = height / 2) => {
-    const old = view.k ?? 1; view.k = Math.max(.2, Math.min(2.5, old * factor));
+    const old = view.k ?? 1; view.k = Math.max(.001, Math.min(2.5, old * factor));
+    view.autoFit = false;
     view.x = x - (x - (view.x ?? 0)) * view.k / old; view.y = y - (y - (view.y ?? 0)) * view.k / old; updateView();
   };
   button('−', () => scale(1 / 1.25), 'Zoom out');
   const zoom = document.createElement('span'); zoom.className = 'canvas-zoom'; toolbar.append(zoom);
   button('+', () => scale(1.25), 'Zoom in'); button('Fit', fit, 'Fit network');
-  const labels = button('Labels', () => { view.labels = view.labels === false; svg.classList.toggle('labels-hidden', !view.labels); labels.setAttribute('aria-pressed', String(view.labels)); });
+  const labels = button('Labels', () => { view.labels = view.labels === false; svg.classList.toggle('labels-hidden', !view.labels); labels.setAttribute('aria-pressed', String(view.labels)); if (view.autoFit) fit(); });
   labels.setAttribute('aria-pressed', String(view.labels !== false)); svg.classList.toggle('labels-hidden', view.labels === false);
+  const expand = button('Expand', () => setExpanded(!view.expanded), 'Expand topology');
+  function setExpanded(expanded, resetFit = true) {
+    view.expanded = expanded; if (resetFit) view.autoFit = true;
+    container.classList.toggle('topology-expanded', expanded);
+    expand.textContent = expanded ? 'Restore' : 'Expand'; expand.setAttribute('aria-label', expanded ? 'Restore topology' : 'Expand topology'); expand.setAttribute('aria-expanded', String(expanded));
+  }
+  setExpanded(view.expanded ?? false, false);
+  container.addEventListener('keydown', event => { if (event.key === 'Escape' && view.expanded) { event.preventDefault(); setExpanded(false); expand.focus(); } });
+  svg.setAttribute('aria-label', 'Network topology. Select equipment or a cable. Drag the background to pan. Ctrl or Command plus scroll to zoom.');
+  toolbar.append(createGuideToggle());
+  const navigationHelp = document.createElement('span'); navigationHelp.className = 'canvas-navigation-help'; navigationHelp.textContent = 'Drag to pan · Ctrl + scroll to zoom · hover a device to learn what it is'; toolbar.append(navigationHelp);
   container.append(toolbar, svg);
   for (const site of sites) {
     const group = svgEl('g', { class: 'topology-site' });
@@ -70,6 +94,7 @@ export function renderTopology(network, options = {}) {
     const hit = svgEl('path', { class: 'cable-hit', fill: 'none', tabindex: 0, role: 'button', 'aria-label': `Cable ${link.id}, ${link.connected === false ? 'disconnected' : 'connected'}` });
     const act = () => onSelectLink?.(link.id); hit.addEventListener('click', act);
     hit.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(); } });
+    attachMentor(hit, () => cableSpec(link));
     const label = svgEl('text', { class: 'cable-label', 'text-anchor': 'middle' }, link.label ?? (ports.get(link.aPortId)?.label ?? ''));
     g.append(line, hit, label); world.append(g); paths.push({ a, b, line, hit, label });
   }
@@ -98,6 +123,7 @@ export function renderTopology(network, options = {}) {
       pointer.append(svgEl('text', { x: 0, y: -112, 'text-anchor': 'middle', fill: '#b7f3ff', 'font-size': 20 }, 'Start here'));
       g.append(pointer);
     }
+    attachMentor(g, () => explainDevice(device));
     const act = () => { if (!suppressClick) onSelectDevice?.(device.id); };
     g.addEventListener('click', act);
     g.addEventListener('keydown', e => {
@@ -120,12 +146,16 @@ export function renderTopology(network, options = {}) {
     if (drag.id) {
       if (Math.hypot(dx, dy) > 5) drag.moved = true; if (!drag.moved) return;
       positions[drag.id] = [drag.position[0] + dx / view.k, drag.position[1] + dy / view.k]; drag.g.setAttribute('transform', `translate(${positions[drag.id].join(' ')})`); drawPaths();
-    } else { view.x = drag.position[0] + dx; view.y = drag.position[1] + dy; updateView(); }
+    } else { view.autoFit = false; view.x = drag.position[0] + dx; view.y = drag.position[1] + dy; updateView(); }
   });
   svg.addEventListener('pointerup', () => { const done = drag; drag = null; if (done?.id && done.moved) { suppressClick = true; onMoveDevice?.(done.id, positions[done.id]); } else if (done?.id) onSelectDevice?.(done.id); });
   svg.addEventListener('pointercancel', () => { if (drag?.id) { positions[drag.id] = drag.position; drag.g.setAttribute('transform', `translate(${drag.position.join(' ')})`); drawPaths(); } drag = null; });
-  svg.addEventListener('wheel', e => { e.preventDefault(); const [x, y] = pointer(e); scale(e.deltaY < 0 ? 1.1 : 1 / 1.1, x, y); }, { passive: false });
-  const listWrap = document.createElement('details'); listWrap.className = 'topology-index'; listWrap.open = !compactList;
+  svg.addEventListener('wheel', e => { if (!e.ctrlKey && !e.metaKey) return; e.preventDefault(); const [x, y] = pointer(e); scale(e.deltaY < 0 ? 1.1 : 1 / 1.1, x, y); }, { passive: false });
+  const splitter = document.createElement('div'); splitter.className = 'topology-splitter'; splitter.tabIndex = 0; splitter.setAttribute('role', 'separator'); splitter.setAttribute('aria-orientation', 'horizontal'); splitter.setAttribute('aria-label', 'Resize device and cable list'); splitter.title = 'Drag down for more topology space; drag up to open the list. Arrow keys also resize.';
+  const grip = document.createElement('span'); grip.className = 'topology-splitter-grip'; grip.setAttribute('aria-hidden', 'true'); splitter.append(grip);
+  const listWrap = document.createElement('details'); listWrap.className = 'topology-index';
+  view.drawerHeight ??= compactList ? 0 : 140;
+  listWrap.open = view.drawerHeight > 0;
   const summary = document.createElement('summary'); summary.textContent = 'Device & cable list'; listWrap.append(summary);
   const list = document.createElement('ul'); list.className = 'diagram-list';
   for (const device of network.devices) {
@@ -134,9 +164,41 @@ export function renderTopology(network, options = {}) {
   }
   for (const link of network.links) {
     const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button'; b.className = 'diagram-list-link'; b.textContent = `Cable ${link.id}: ${link.connected === false ? 'disconnected' : 'connected'}`;
-    b.addEventListener('click', () => onSelectLink?.(link.id)); li.append(b); list.append(li);
+    b.addEventListener('click', () => onSelectLink?.(link.id)); attachMentor(b, () => cableSpec(link)); li.append(b); list.append(li);
   }
-  listWrap.append(list); container.append(listWrap);
+  listWrap.append(list); container.append(splitter, listWrap);
+  const drawerAvailable = () => Math.max(0, container.getBoundingClientRect().height - toolbar.getBoundingClientRect().height - splitter.getBoundingClientRect().height - summary.getBoundingClientRect().height);
+  function applyDrawer(height) {
+    view.drawerHeight = resizeTopologyDrawer(height, 0, drawerAvailable());
+    if (view.drawerHeight < 8) view.drawerHeight = 0;
+    if (view.drawerHeight > 0) view.lastDrawerHeight = view.drawerHeight;
+    listWrap.open = view.drawerHeight > 0;
+    list.style.height = `${view.drawerHeight}px`;
+    splitter.setAttribute('aria-valuemin', '0'); splitter.setAttribute('aria-valuemax', String(Math.round(Math.max(0, drawerAvailable() - 240))));
+    splitter.setAttribute('aria-valuenow', String(Math.round(view.drawerHeight)));
+    splitter.setAttribute('aria-valuetext', view.drawerHeight ? `${Math.round(view.drawerHeight)} pixels of list space. Drag down for more topology.` : 'List collapsed. Maximum topology space.');
+  }
+  list.style.height = `${view.drawerHeight}px`;
+  listWrap.addEventListener('toggle', () => {
+    if (!container.isConnected) return;
+    // Native summary clicks expand/collapse without resetting this preference on selection.
+    if (listWrap.open !== (view.drawerHeight > 0)) applyDrawer(listWrap.open ? view.lastDrawerHeight ?? 140 : 0);
+  });
+  let resizing = null;
+  splitter.addEventListener('pointerdown', event => {
+    if (event.button !== 0) return;
+    event.preventDefault(); splitter.focus(); splitter.setPointerCapture(event.pointerId);
+    resizing = { y: event.clientY, height: view.drawerHeight }; container.classList.add('topology-resizing');
+  });
+  splitter.addEventListener('pointermove', event => { if (resizing) applyDrawer(resizeTopologyDrawer(resizing.height, event.clientY - resizing.y, drawerAvailable())); });
+  const stopResize = () => { resizing = null; container.classList.remove('topology-resizing'); };
+  splitter.addEventListener('pointerup', stopResize); splitter.addEventListener('pointercancel', stopResize); splitter.addEventListener('lostpointercapture', stopResize);
+  splitter.addEventListener('keydown', event => {
+    if (!['ArrowUp', 'ArrowDown', 'Home', 'End', 'Enter'].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? drawerAvailable() : event.key === 'Enter' ? view.drawerHeight ? 0 : view.lastDrawerHeight ?? 140 : view.drawerHeight + (event.key === 'ArrowUp' ? 32 : -32);
+    applyDrawer(next);
+  });
   const observer = new ResizeObserver(() => {
     if (!container.isConnected) { observer.disconnect(); return; }
     const rect = svg.getBoundingClientRect(); if (!rect.width || !rect.height) return;
@@ -149,7 +211,8 @@ export function renderTopology(network, options = {}) {
       for (const g of world.querySelectorAll('.diagram-device')) g.setAttribute('transform', `translate(${positions[g.getAttribute('data-device-id')].join(' ')})`);
       drawPaths(); first = true;
     }
-    if (first) fit(); else { view.x += (width - oldWidth) / 2; view.y += (height - oldHeight) / 2; updateView(); }
+    if (first || view.autoFit) fit(); else { view.x += (width - oldWidth) / 2; view.y += (height - oldHeight) / 2; updateView(); }
+    applyDrawer(view.drawerHeight);
   }); observer.observe(svg);
   return container;
 }
