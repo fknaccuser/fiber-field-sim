@@ -103,8 +103,8 @@ export function evaluateCompletion(attempt) {
     id: 'targetVerifiedAtCurrentRevision',
     passed: targetVerified,
     message: targetVerified
-      ? 'Target verified with "Open portal" at the current configuration.'
-      : 'Run "Open portal" on the target again — an earlier passing test does not count after further changes.',
+      ? 'Target portal verified at the current configuration.'
+      : 'Verify the target again with curl http://portal.northline.test in its console (or Open portal when available). Earlier tests expire after a change.',
   });
 
   const protectedVerified = hasVerifiedTestAtCurrentRevision(attempt, {
@@ -115,8 +115,8 @@ export function evaluateCompletion(attempt) {
     id: 'protectedVerifiedAtCurrentRevision',
     passed: protectedVerified,
     message: protectedVerified
-      ? 'Protected client verified with "Check protected client" at the current configuration.'
-      : 'Run "Check protected client" again — an earlier passing test does not count after further changes.',
+      ? 'Protected client portal verified at the current configuration.'
+      : 'Verify the protected workstation with curl http://portal.northline.test in its own console (or Check protected client when available).',
   });
 
   const hasSelectedFindings = attempt.selectedFindingIds.length >= 1;

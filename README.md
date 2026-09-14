@@ -1,5 +1,13 @@
 # Fiber Field Simulator
 
+The current `index.html` launches the vanilla JavaScript training workspace in
+`src/solo/main.js`. See [Network workspace](docs/network-workspace.md) for the
+redesigned interface, network design studio, progressive guidance, and validation.
+The React outside-plant implementation described below remains in the repository.
+The [learning path and issue database](docs/learning-and-issues.md) document guided
+arrows, console-only advanced labs, and the 200-issue catalog. A machine-readable
+export is available in [data/issues-v1.json](data/issues-v1.json).
+
 A training simulator for outside-plant fiber technicians. The trainee is dispatched to a
 fault they cannot see, and has to find it the way it is found in the field: read the print,
 pull the plant records, ask the OLT, measure light, shoot an OTDR, inspect a connector, and

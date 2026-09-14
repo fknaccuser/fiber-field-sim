@@ -25,7 +25,7 @@ test.describe('The Field Solo', () => {
     await expect(page.locator('.mission-screen')).toBeVisible();
 
     // Reconnect PC1's cable (P1: disconnected Ethernet cable).
-    await page.click('.diagram-list-link >> nth=0');
+    await page.click('.cable-hit >> nth=0');
     await expect(page.locator('.reconnect-heading')).toContainText('disconnected');
     await page.selectOption('.reconnect-panel select', 'PC1:eth0');
     await page.click('.reconnect-panel button:has-text("Next")');
@@ -35,12 +35,12 @@ test.describe('The Field Solo', () => {
 
     // Verify the target client (test results surface as Findings rows, not
     // inline under Tests — the completion checklist below is the real proof).
-    await page.click('.diagram-list-device >> nth=0');
+    await page.click('.diagram-device >> nth=0');
     await page.click('.device-tests button:has-text("Open portal")');
 
     // Verify the protected client.
     await page.click('.mission-tab:has-text("Network")');
-    await page.click('.diagram-list-device >> nth=1');
+    await page.click('.diagram-device >> nth=1');
     await page.click('.device-tests button:has-text("Check protected client")');
 
     // Select a genuine finding, write a note, submit. (noteChange deliberately
@@ -67,13 +67,14 @@ test.describe('The Field Solo', () => {
     // Fix the client's DNS to the actual portal server address for this seed's x=65.
     // Scoped to .device-configure: an unscoped getByLabel('DNS') also matches
     // the topology diagram's "DNS and portal (server)" device aria-label.
-    await page.click('.diagram-list-device >> nth=0');
+    await page.click('.diagram-device >> nth=0');
+    await page.click('#inspector-tab-configure');
     await page.locator('.device-configure').getByLabel('DNS').fill('10.65.30.53');
     await page.locator('.device-configure button:has-text("Apply")').click();
     await page.click('.device-tests button:has-text("Open portal")');
 
     await page.click('.mission-tab:has-text("Network")');
-    await page.click('.diagram-list-device >> nth=1');
+    await page.click('.diagram-device >> nth=1');
     await page.click('.device-tests button:has-text("Check protected client")');
 
     await page.click('.mission-tab:has-text("Findings")');
@@ -111,6 +112,7 @@ test.describe('The Field Solo', () => {
     // wait for each command's own echo before typing the next one, so a
     // render mid-flight can never eat a keystroke meant for its successor.
     async function runCliCommand(text) {
+      await page.click('#inspector-tab-console');
       const terminalInput = page.locator('.device-terminal .terminal-input');
       await terminalInput.fill(text);
       await terminalInput.press('Enter');
@@ -119,12 +121,13 @@ test.describe('The Field Solo', () => {
 
     // CLI -> GUI: change SW1:Gi0/1's access VLAN over the terminal, then read
     // it back from the Configure form.
-    await page.click('.diagram-list-device >> nth=2'); // SW1
+    await page.click('.diagram-device >> nth=2'); // SW1
     await expect(page.locator('.device-panel h2')).toContainText('switch');
     for (const command of ['enable', 'configure terminal', 'interface Gi0/1', 'switchport access vlan 20']) {
       await runCliCommand(command);
     }
     const gi01Vlan = page.locator('p.device-port-heading:text-is("Gi0/1") + form.device-form').getByLabel('Access VLAN');
+    await page.click('#inspector-tab-configure');
     await expect(gi01Vlan).toHaveValue('20');
 
     // GUI -> CLI: disable Gi0/2 from its Configure form, then read it back
@@ -185,7 +188,7 @@ test.describe('The Field Solo', () => {
       await page.click('.home-recommended-row button:has-text("Start")');
       await expect(page.locator('.mission-panel-network')).toBeVisible();
       await expect(page.locator('.mission-panel-device')).toBeHidden();
-      await page.click('.diagram-list-device >> nth=0');
+      await page.click('.diagram-device >> nth=0');
       await expect(page.locator('.mission-panel-device')).toBeVisible();
       await page.click('.mission-tab:has-text("Findings")');
       await expect(page.locator('.mission-panel-findings')).toBeVisible();
@@ -196,17 +199,21 @@ test.describe('The Field Solo', () => {
   test.describe('900px+ tablet split', () => {
     test.use({ viewport: { width: 1280, height: 900 } });
 
-    test('the tab control is hidden and all three panels are visible at once', async ({ page }) => {
+    test('the canvas stays visible while Device and Findings share one inspector', async ({ page }) => {
       await enableApp(page);
       await page.click('.home-recommended-row button:has-text("Start")');
       await expect(page.locator('.mission-screen')).toBeVisible();
-      await expect(page.locator('.mission-tabs')).toBeHidden();
+      await expect(page.locator('.mission-tabs')).toBeVisible();
       await expect(page.locator('.mission-panel-network')).toBeVisible();
-      await expect(page.locator('.mission-panel-findings')).toBeVisible();
+      await expect(page.locator('.mission-panel-findings')).toBeHidden();
       // Selecting a device makes the third panel meaningful without any tab click.
-      await page.click('.diagram-list-device >> nth=0');
+      await page.click('.diagram-device >> nth=0');
       await expect(page.locator('.mission-panel-device')).toBeVisible();
       await expect(page.locator('.mission-panel-device')).toContainText('Customer workstation');
+      await page.getByRole('tab', { name: 'Findings', exact: true }).click();
+      await expect(page.locator('.mission-panel-network')).toBeVisible();
+      await expect(page.locator('.mission-panel-device')).toBeHidden();
+      await expect(page.locator('.mission-panel-findings')).toBeVisible();
     });
   });
 });
@@ -223,7 +230,7 @@ test.describe('Determinism and storage across separate browser contexts', () => 
       await page.fill('.home-seed-form input', 'TF1-BR-2-I-detcheck1');
       await page.click('.home-seed-form button:has-text("Go")');
       await expect(page.locator('.mission-screen')).toBeVisible();
-      await page.click('.diagram-list-device >> nth=0');
+      await page.click('.diagram-device >> nth=0');
     }
 
     const ipA = await pageA.getByLabel('IP address (/24)').inputValue();
@@ -243,7 +250,7 @@ test.describe('Determinism and storage across separate browser contexts', () => 
     await enableApp(page);
     await page.click('.home-recommended-row button:has-text("Start")');
     await expect(page.locator('.mission-screen')).toBeVisible();
-    await page.click('.diagram-list-link >> nth=0');
+    await page.click('.cable-hit >> nth=0');
     await page.selectOption('.reconnect-panel select', 'PC1:eth0');
     await page.click('.reconnect-panel button:has-text("Next")');
     await page.selectOption('.reconnect-panel select', 'SW1:Gi0/1');
@@ -257,8 +264,8 @@ test.describe('Determinism and storage across separate browser contexts', () => 
     await expect(page.locator('.mission-screen')).toBeVisible();
     // The repaired cable's state survived the reload (read from IndexedDB,
     // not memory) — the link list no longer reads "disconnected".
-    await expect(page.locator('.diagram-list-link').first()).not.toContainText('disconnected');
-    await page.click('.diagram-list-device >> nth=0');
+    await expect(page.locator('.cable-hit').first()).toHaveAttribute('aria-label', 'Cable L1, connected');
+    await page.click('.diagram-device >> nth=0');
     await page.click('.device-tests button:has-text("Open portal")');
     await page.click('.mission-tab:has-text("Findings")');
     await expect(page.locator('.findings-list')).toContainText('passed');

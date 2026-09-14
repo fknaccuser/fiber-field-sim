@@ -1,0 +1,3761 @@
+{
+  "schema": "field-issues-1",
+  "total": 200,
+  "issues": [
+    {
+      "id": "ISS-01-01",
+      "title": "Disconnected workstation cable",
+      "category": "Physical & power",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "One desk cannot reach any network service.",
+      "evidence": "The workstation reports media disconnected; its patch lead is unseated.",
+      "repair": "Reconnect the assigned lead at both endpoints.",
+      "verification": "Confirm link and test the gateway and application.",
+      "recipeId": "P1",
+      "format": "Live lab + case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-02",
+      "title": "Administratively disabled access port",
+      "category": "Physical & power",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A connected workstation has no service.",
+      "evidence": "The assigned switch port reports administratively down; its cable is seated.",
+      "repair": "Enable the authorized access port.",
+      "verification": "Confirm operational link and application access.",
+      "recipeId": "P2",
+      "format": "Live lab + case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-03",
+      "title": "Failed patch lead",
+      "category": "Physical & power",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "Connectivity fails at one desk.",
+      "evidence": "The same PC and switch port work with a known-good lead; the original fails wiremap.",
+      "repair": "Replace and label the defective patch lead.",
+      "verification": "Retest wiremap and sustained traffic.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-04",
+      "title": "Unpowered access switch",
+      "category": "Physical & power",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "An entire small office loses wired access.",
+      "evidence": "The switch has no power LEDs and the rack outlet is dead.",
+      "repair": "Restore the approved power feed and verify the switch boots.",
+      "verification": "Check all uplinks and representative clients.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-05",
+      "title": "Disabled workstation adapter",
+      "category": "Physical & power",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "Only one PC is offline.",
+      "evidence": "The operating system shows its Ethernet adapter disabled; switch and cable work for another PC.",
+      "repair": "Enable the intended adapter.",
+      "verification": "Confirm link, addressing, and application access.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-06",
+      "title": "Wrong wall jack",
+      "category": "Physical & power",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A moved workstation has no link.",
+      "evidence": "The desk uses jack B17 while the active patch-panel circuit is B18.",
+      "repair": "Move to the documented jack or correct the patching record.",
+      "verification": "Trace both ends and verify service.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-07",
+      "title": "Patch-panel cross-connect error",
+      "category": "Physical & power",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A workstation reaches the wrong network after cabling work.",
+      "evidence": "Tone tracing maps its outlet to a different department port than the print.",
+      "repair": "Correct the cross-connect against the approved port map.",
+      "verification": "Verify VLAN, client subnet, and the neighboring circuit.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-08",
+      "title": "Copper split pair",
+      "category": "Physical & power",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A cable passes simple continuity but fails under load.",
+      "evidence": "Certification shows split pairs and excessive crosstalk.",
+      "repair": "Reterminate using the correct pair assignments.",
+      "verification": "Pass certification and a traffic test.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-09",
+      "title": "Excessive copper channel length",
+      "category": "Physical & power",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A distant desk has unstable Ethernet.",
+      "evidence": "The measured channel exceeds the installed cabling design limit and fails certification.",
+      "repair": "Shorten or redesign the channel using approved infrastructure.",
+      "verification": "Certify the completed channel.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-10",
+      "title": "Damaged RJ45 latch",
+      "category": "Physical & power",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A desk drops offline when its cable is touched.",
+      "evidence": "The plug does not latch; gentle movement opens the link.",
+      "repair": "Replace the patch cable.",
+      "verification": "Verify secure seating and stable link.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-11",
+      "title": "Incorrect forced link speed",
+      "category": "Physical & power",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A replacement device will not link.",
+      "evidence": "One side is forced to a speed the other does not support.",
+      "repair": "Align supported speed and negotiation settings.",
+      "verification": "Confirm negotiated speed and error-free traffic.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-12",
+      "title": "Duplex mismatch",
+      "category": "Physical & power",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Transfers are slow despite link-up status.",
+      "evidence": "One end is half duplex and the other full; late collisions increase.",
+      "repair": "Align negotiation and duplex on both ends.",
+      "verification": "Confirm matching duplex and no increasing collision counters.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-13",
+      "title": "PoE budget exhausted",
+      "category": "Physical & power",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "The newest access point does not power on.",
+      "evidence": "The switch log reports denied power and allocated power reaches the available budget.",
+      "repair": "Provide approved additional PoE capacity or redistribute loads.",
+      "verification": "Verify every required powered device remains online.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-14",
+      "title": "Insufficient PoE class",
+      "category": "Physical & power",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A camera starts but reboots when accessories activate.",
+      "evidence": "The device requires more power than the negotiated PoE allocation.",
+      "repair": "Use a compatible power source and supported negotiation.",
+      "verification": "Test the camera with its full load enabled.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-15",
+      "title": "Wrong power adapter",
+      "category": "Physical & power",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A small router repeatedly resets.",
+      "evidence": "The fitted supply rating does not meet the router specification; a correct supply is stable.",
+      "repair": "Install the specified supply.",
+      "verification": "Confirm stable operation under load.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-16",
+      "title": "UPS battery failure",
+      "category": "Physical & power",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Network equipment resets during a brief outage.",
+      "evidence": "The UPS logs failed battery self-tests and provides no ride-through.",
+      "repair": "Replace the battery or UPS under the maintenance procedure.",
+      "verification": "Run the approved UPS load and transfer test.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-17",
+      "title": "Thermal shutdown",
+      "category": "Physical & power",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A switch fails during the hottest part of the day.",
+      "evidence": "Temperature alarms precede shutdown; the intake is obstructed.",
+      "repair": "Restore cooling and clear the obstruction within maintenance procedures.",
+      "verification": "Monitor temperature and stability under load.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-18",
+      "title": "Intermittent NIC hardware fault",
+      "category": "Physical & power",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "One PC drops link on multiple known-good ports.",
+      "evidence": "Cable and port swaps do not move the fault; another NIC in the same PC is stable.",
+      "repair": "Replace the defective NIC after confirming driver health.",
+      "verification": "Run sustained traffic and monitor link events.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-19",
+      "title": "Electromagnetic interference on copper",
+      "category": "Physical & power",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Errors coincide with nearby industrial equipment starting.",
+      "evidence": "CRC bursts correlate with motor starts and disappear on a separated temporary route.",
+      "repair": "Reroute or replace the affected cabling per the site design.",
+      "verification": "Compare counters during repeated equipment cycles.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-01-20",
+      "title": "Unidirectional physical link",
+      "category": "Physical & power",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "A fiber uplink shows inconsistent reachability.",
+      "evidence": "The receive path works in one direction only; optical and interface tests isolate one strand.",
+      "repair": "Repair the failed directional path with the link safely isolated.",
+      "verification": "Verify both directions and restore redundancy.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-01",
+      "title": "Wrong access VLAN",
+      "category": "Ethernet & VLANs",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A workstation cannot reach its intended gateway.",
+      "evidence": "The access port belongs to VLAN 20 while the work order assigns this desk to VLAN 10.",
+      "repair": "Assign the approved access VLAN.",
+      "verification": "Verify the intended subnet and preserve the other department.",
+      "recipeId": "V1",
+      "format": "Live lab + case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-02",
+      "title": "Missing VLAN on trunk allow list",
+      "category": "Ethernet & VLANs",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "One department loses access across an uplink.",
+      "evidence": "The target VLAN is absent from the uplink allow list while other required VLANs are present.",
+      "repair": "Add the missing VLAN while retaining the existing required VLANs.",
+      "verification": "Test both affected and protected VLANs.",
+      "recipeId": "V2",
+      "format": "Live lab + case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-03",
+      "title": "VLAN absent from local switch",
+      "category": "Ethernet & VLANs",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A newly assigned access port is inactive.",
+      "evidence": "The port references a VLAN that is absent from the switch VLAN table.",
+      "repair": "Create the approved VLAN on the required switches.",
+      "verification": "Check port state and end-to-end connectivity.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-04",
+      "title": "Access port configured as trunk",
+      "category": "Ethernet & VLANs",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "An ordinary workstation is connected to an unintended trunk.",
+      "evidence": "The approved desk profile is access mode but the running configuration is trunk mode.",
+      "repair": "Apply the documented access-port profile.",
+      "verification": "Verify untagged client traffic lands in the assigned VLAN.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-05",
+      "title": "Trunk configured as access",
+      "category": "Ethernet & VLANs",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Only one VLAN crosses a new switch uplink.",
+      "evidence": "One uplink end is access mode; the peer is an 802.1Q trunk.",
+      "repair": "Align both ends with the approved trunk configuration.",
+      "verification": "Verify all required VLANs across the uplink.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-06",
+      "title": "Native VLAN mismatch",
+      "category": "Ethernet & VLANs",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Untagged traffic crosses into the wrong broadcast domain.",
+      "evidence": "The two trunk endpoints show different native VLAN IDs.",
+      "repair": "Align the approved native VLAN on both endpoints.",
+      "verification": "Verify tagged and untagged traffic and clear mismatch alerts.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-07",
+      "title": "Port security MAC violation",
+      "category": "Ethernet & VLANs",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A replaced workstation is blocked.",
+      "evidence": "The port security counter increases and the learned secure MAC belongs to the old workstation.",
+      "repair": "Update the authorized MAC binding under the port security policy.",
+      "verification": "Verify the new endpoint and confirm policy enforcement remains active.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-08",
+      "title": "Sticky MAC moved to another port",
+      "category": "Ethernet & VLANs",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A workstation works on its old desk but not its new desk.",
+      "evidence": "Its secure MAC remains bound to the original switch port.",
+      "repair": "Move the authorized binding as part of the approved desk change.",
+      "verification": "Confirm the new port works without allowing unrelated endpoints.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-09",
+      "title": "BPDU Guard triggered by desk switch",
+      "category": "Ethernet & VLANs",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A user-installed switch takes a desk port down.",
+      "evidence": "The port is err-disabled and logs BPDUs from the desk connection.",
+      "repair": "Remove the unauthorized bridge and recover the approved endpoint port.",
+      "verification": "Verify no further BPDUs or err-disable events.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-10",
+      "title": "Broadcast loop",
+      "category": "Ethernet & VLANs",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A VLAN becomes unusable after a patch change.",
+      "evidence": "Broadcast counters surge; MAC addresses flap between the new links.",
+      "repair": "Isolate the confirmed redundant loop and restore the approved topology.",
+      "verification": "Confirm stable MAC learning and normal broadcast levels.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-11",
+      "title": "Unexpected spanning-tree root",
+      "category": "Ethernet & VLANs",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Layer-2 paths change after adding a switch.",
+      "evidence": "The added switch has the winning bridge ID instead of the designated root.",
+      "repair": "Restore the planned root priorities under change control.",
+      "verification": "Verify root roles and blocked paths match the design.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-12",
+      "title": "Spanning-tree inconsistent port",
+      "category": "Ethernet & VLANs",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "A redundant uplink stops forwarding.",
+      "evidence": "Spanning-tree reports an inconsistency and peer configuration violates the expected topology.",
+      "repair": "Correct the specific inconsistency before recovering the port.",
+      "verification": "Verify stable spanning-tree state without creating a loop.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-13",
+      "title": "EtherChannel member mismatch",
+      "category": "Ethernet & VLANs",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "One bundle member is suspended.",
+      "evidence": "Its VLAN or channel settings differ from the other members.",
+      "repair": "Align the member with the approved bundle configuration.",
+      "verification": "Confirm all intended members bundle successfully.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-14",
+      "title": "LACP passive on both ends",
+      "category": "Ethernet & VLANs",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A negotiated link aggregation group never forms.",
+      "evidence": "Both peers are configured passive and no peer initiates negotiation.",
+      "repair": "Set at least one approved peer to active.",
+      "verification": "Verify LACP neighbors and bundled members.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-15",
+      "title": "Static channel against LACP peer",
+      "category": "Ethernet & VLANs",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "An aggregate fails after replacing one side.",
+      "evidence": "One peer uses static aggregation and the other expects LACP.",
+      "repair": "Align the aggregation protocol on both endpoints.",
+      "verification": "Verify member consistency and failover behavior.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-16",
+      "title": "Voice VLAN absent",
+      "category": "Ethernet & VLANs",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "The PC works through a phone but the phone cannot register.",
+      "evidence": "The desk port lacks the documented voice VLAN assignment.",
+      "repair": "Restore the approved voice VLAN configuration.",
+      "verification": "Verify phone addressing and call registration while the PC stays online.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-17",
+      "title": "LLDP disabled on phone port",
+      "category": "Ethernet & VLANs",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "A phone does not learn its expected network policy.",
+      "evidence": "The approved phone profile depends on LLDP-MED but the port advertises none.",
+      "repair": "Restore the supported discovery and network-policy configuration.",
+      "verification": "Verify the phone learns the expected voice policy.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-18",
+      "title": "Multicast snooping without querier",
+      "category": "Ethernet & VLANs",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "A multicast stream stops after membership entries expire.",
+      "evidence": "Snooping is enabled; no querier is active and memberships age out.",
+      "repair": "Restore the designated multicast querier.",
+      "verification": "Observe membership refresh and sustained group delivery.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-19",
+      "title": "Storm-control threshold too low",
+      "category": "Ethernet & VLANs",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Legitimate bursts cause intermittent loss.",
+      "evidence": "Storm-control drops rise during normal documented workload peaks.",
+      "repair": "Adjust thresholds from measured traffic and the approved policy.",
+      "verification": "Retest legitimate bursts and confirm storm protection remains effective.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-02-20",
+      "title": "MAC address flapping from duplicate VM MACs",
+      "category": "Ethernet & VLANs",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Traffic alternates between two virtual hosts.",
+      "evidence": "The same MAC moves between hypervisor ports; no physical loop is present.",
+      "repair": "Assign unique approved MAC addresses to the cloned VMs.",
+      "verification": "Confirm stable MAC learning and reachability to both VMs.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-01",
+      "title": "Client in wrong IPv4 subnet",
+      "category": "Addressing & DHCP",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "One workstation cannot reach its assigned gateway.",
+      "evidence": "The client address is outside the work order subnet while its assigned switch VLAN is correct.",
+      "repair": "Assign a unique usable address in the documented subnet.",
+      "verification": "Verify local and routed connectivity without changing departments.",
+      "recipeId": "I1",
+      "format": "Live lab + case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-02",
+      "title": "Incorrect default gateway",
+      "category": "Addressing & DHCP",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "Local communication works but remote services fail.",
+      "evidence": "The configured gateway has no owner on the client LAN.",
+      "repair": "Set the documented router address as the default gateway.",
+      "verification": "Test the gateway and a remote application.",
+      "recipeId": "I2",
+      "format": "Live lab + case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-03",
+      "title": "Missing default gateway",
+      "category": "Addressing & DHCP",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A static-addressed endpoint can reach only its own subnet.",
+      "evidence": "Its route table contains no default route and its gateway field is empty.",
+      "repair": "Configure the approved default gateway.",
+      "verification": "Verify traffic to a remote subnet.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-04",
+      "title": "Subnet mask too broad",
+      "category": "Addressing & DHCP",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "Some remote addresses are treated as local.",
+      "evidence": "The endpoint uses /16 where the design specifies /24 and sends ARP for remote hosts.",
+      "repair": "Set the documented mask.",
+      "verification": "Verify remote traffic is sent through the gateway.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-05",
+      "title": "Subnet mask too narrow",
+      "category": "Addressing & DHCP",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "Nearby hosts appear unreachable.",
+      "evidence": "The endpoint mask excludes hosts that should be on its local subnet.",
+      "repair": "Apply the documented prefix.",
+      "verification": "Verify local neighbors and routed destinations.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-06",
+      "title": "Duplicate static IPv4 address",
+      "category": "Addressing & DHCP",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Two devices have intermittent connectivity.",
+      "evidence": "ARP observations show two MAC addresses claiming the same assigned IP.",
+      "repair": "Allocate a unique documented address to the conflicting endpoint.",
+      "verification": "Confirm one owner per IP and stable connections.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-07",
+      "title": "DHCP pool exhausted",
+      "category": "Addressing & DHCP",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "New clients cannot obtain leases.",
+      "evidence": "The scope has zero free addresses and DISCOVER messages receive no lease offer.",
+      "repair": "Reclaim invalid allocations or expand the approved address plan.",
+      "verification": "Verify new leases without conflicts.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-08",
+      "title": "DHCP service stopped",
+      "category": "Addressing & DHCP",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Clients on several scopes cannot renew.",
+      "evidence": "The server is reachable but its DHCP service is stopped and no offers leave it.",
+      "repair": "Restore the service after checking the failure logs.",
+      "verification": "Verify the full lease exchange on affected scopes.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-09",
+      "title": "Missing DHCP relay",
+      "category": "Addressing & DHCP",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Clients on one routed VLAN receive no addresses.",
+      "evidence": "Broadcast discovery stays on that VLAN and its gateway has no relay configured.",
+      "repair": "Configure the authorized relay destination.",
+      "verification": "Verify discovery reaches the server and a lease returns.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-10",
+      "title": "Incorrect DHCP relay destination",
+      "category": "Addressing & DHCP",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "One branch cannot obtain leases after server migration.",
+      "evidence": "Its helper address still points to the retired DHCP server.",
+      "repair": "Update the relay to the authorized current server.",
+      "verification": "Verify a full lease exchange across the routed path.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-11",
+      "title": "Wrong DHCP gateway option",
+      "category": "Addressing & DHCP",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Many newly leased clients cannot leave their subnet.",
+      "evidence": "Their leases all contain a router option that disagrees with the subnet design.",
+      "repair": "Correct the scope router option and renew affected leases.",
+      "verification": "Verify new leases and off-subnet access.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-12",
+      "title": "Wrong DHCP DNS option",
+      "category": "Addressing & DHCP",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Clients reach IPs but cannot resolve internal names.",
+      "evidence": "The scope distributes an unintended resolver address.",
+      "repair": "Correct the scope DNS option.",
+      "verification": "Renew a test lease and resolve an internal service.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-13",
+      "title": "Rogue DHCP server",
+      "category": "Addressing & DHCP",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Some clients receive unexpected addresses and gateway values.",
+      "evidence": "Packet captures show competing offers from an unauthorized server.",
+      "repair": "Isolate the unauthorized server and apply the approved DHCP protection policy.",
+      "verification": "Verify only authorized offers remain and renew affected clients.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-14",
+      "title": "DHCP reservation uses wrong identifier",
+      "category": "Addressing & DHCP",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A device never receives its reserved address.",
+      "evidence": "The reservation key differs from the client identifier used in its requests.",
+      "repair": "Correct the reservation for the actual approved client identifier.",
+      "verification": "Renew the device and verify the intended allocation.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-15",
+      "title": "Static address inside dynamic pool",
+      "category": "Addressing & DHCP",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A conflict occurs when a new client joins.",
+      "evidence": "A manually configured printer address is also available in the dynamic scope.",
+      "repair": "Exclude or reserve the static allocation and clear the actual conflict.",
+      "verification": "Verify unique addresses through another lease cycle.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-16",
+      "title": "DHCP relay blocked by ACL",
+      "category": "Addressing & DHCP",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "The relay is configured but clients still receive no offers.",
+      "evidence": "ACL counters show DHCP relay traffic dropped between gateway and server.",
+      "repair": "Permit the required authorized relay traffic.",
+      "verification": "Capture a successful complete lease exchange.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-17",
+      "title": "IPv6 router advertisements blocked",
+      "category": "Addressing & DHCP",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "IPv6 hosts lack a default route.",
+      "evidence": "The approved router emits RAs but the access path filters them.",
+      "repair": "Correct the RA filtering policy for the authorized router.",
+      "verification": "Verify IPv6 prefix and default route installation.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-18",
+      "title": "IPv6 duplicate address detection failure",
+      "category": "Addressing & DHCP",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "A static IPv6 address remains unusable.",
+      "evidence": "The host reports duplicate address detection failure and a neighbor owns that address.",
+      "repair": "Assign the correct unique address and resolve the conflicting configuration.",
+      "verification": "Verify DAD succeeds and IPv6 communication works.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-19",
+      "title": "Incorrect IPv6 prefix length",
+      "category": "Addressing & DHCP",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Some IPv6 neighbors cannot communicate.",
+      "evidence": "A static host prefix differs from the approved on-link prefix.",
+      "repair": "Correct the host prefix length.",
+      "verification": "Verify on-link and routed IPv6 traffic.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-03-20",
+      "title": "APIPA after lease failure",
+      "category": "Addressing & DHCP",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A workstation has a 169.254 address and no business access.",
+      "evidence": "DHCP discovery receives no offer; the self-assigned address is not the business subnet.",
+      "repair": "Trace and restore the DHCP path before renewing the lease.",
+      "verification": "Confirm an authorized lease, gateway, DNS, and application access.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-01",
+      "title": "Incorrect client resolver",
+      "category": "DNS & naming",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A workstation can reach the server IP but names fail.",
+      "evidence": "Its configured resolver address does not belong to the intended DNS server.",
+      "repair": "Set the authorized DNS server address.",
+      "verification": "Resolve the service and open it by name.",
+      "recipeId": "D1",
+      "format": "Live lab + case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-02",
+      "title": "Incorrect portal A record",
+      "category": "DNS & naming",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "The portal name resolves but the service fails.",
+      "evidence": "The DNS answer points to a different address than the designated portal server.",
+      "repair": "Correct the authoritative A record.",
+      "verification": "Resolve again and verify the expected application endpoint.",
+      "recipeId": "D2",
+      "format": "Live lab + case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-03",
+      "title": "Missing authoritative record",
+      "category": "DNS & naming",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "One service name returns NXDOMAIN.",
+      "evidence": "The authoritative zone contains no record for the approved service name.",
+      "repair": "Create the approved record after verifying ownership and target.",
+      "verification": "Query the authority and recursive resolver for the intended answer.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-04",
+      "title": "Stale client DNS cache",
+      "category": "DNS & naming",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Only one PC resolves an old server address.",
+      "evidence": "The authority and other clients return the new address; this client retains an old cached answer.",
+      "repair": "Clear the affected cache after confirming the authoritative change.",
+      "verification": "Resolve again and connect to the current service.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-05",
+      "title": "Stale recursive cache",
+      "category": "DNS & naming",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "An entire resolver population receives an old answer.",
+      "evidence": "The authority is correct but the recursive server retains the prior record within its cache.",
+      "repair": "Follow the cache expiry or approved invalidation procedure.",
+      "verification": "Verify refreshed answers from the recursive server.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-06",
+      "title": "Incorrect DNS suffix search list",
+      "category": "DNS & naming",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "Short names fail while fully qualified names work.",
+      "evidence": "The client appends an unrelated suffix to the short name.",
+      "repair": "Apply the approved suffix search list or use the correct FQDN.",
+      "verification": "Test the intended short name and FQDN.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-07",
+      "title": "Split DNS answer missing internally",
+      "category": "DNS & naming",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A service works externally but not inside.",
+      "evidence": "Internal clients query a separate zone that lacks the intended record.",
+      "repair": "Publish the approved record in the internal view.",
+      "verification": "Verify internal and external answers serve their intended audiences.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-08",
+      "title": "Conditional forwarder points to retired server",
+      "category": "DNS & naming",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Names in one partner domain time out.",
+      "evidence": "The conditional forwarder targets a decommissioned resolver.",
+      "repair": "Update the forwarding destination and reachability policy.",
+      "verification": "Query several names in the forwarded namespace.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-09",
+      "title": "DNS TCP fallback blocked",
+      "category": "DNS & naming",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Small answers work but larger queries fail.",
+      "evidence": "UDP responses are truncated and the subsequent TCP/53 connection is blocked.",
+      "repair": "Permit authorized DNS TCP fallback.",
+      "verification": "Verify the complete large answer over TCP.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-10",
+      "title": "DNS UDP blocked",
+      "category": "DNS & naming",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Name lookups time out while server management works.",
+      "evidence": "The path policy drops UDP/53 requests to the approved resolver.",
+      "repair": "Correct the required resolver access policy.",
+      "verification": "Verify client queries and responses.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-11",
+      "title": "DNSSEC validation failure after rollover",
+      "category": "DNS & naming",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "A signed domain returns SERVFAIL on validating resolvers.",
+      "evidence": "The published trust chain does not match the current signing material.",
+      "repair": "Coordinate correction of the DS and DNSKEY chain with the domain owner.",
+      "verification": "Verify successful validation without disabling DNSSEC.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-12",
+      "title": "CNAME loop",
+      "category": "DNS & naming",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "An alias never resolves to an address.",
+      "evidence": "The alias chain returns to an earlier name.",
+      "repair": "Correct the alias chain to a valid terminal record.",
+      "verification": "Resolve the alias and inspect the full chain.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-13",
+      "title": "Dangling CNAME",
+      "category": "DNS & naming",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A friendly name no longer works after migration.",
+      "evidence": "Its canonical target no longer exists.",
+      "repair": "Point the alias to the approved current target.",
+      "verification": "Verify the alias resolves and the application accepts its hostname.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-14",
+      "title": "Wrong reverse DNS record",
+      "category": "DNS & naming",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Logs identify a server incorrectly.",
+      "evidence": "Forward lookup is correct but the address PTR points to a retired hostname.",
+      "repair": "Correct the approved reverse record.",
+      "verification": "Verify forward and reverse results are consistent with the design.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-15",
+      "title": "Duplicate host registration",
+      "category": "DNS & naming",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A hostname sometimes reaches the wrong machine.",
+      "evidence": "The DNS name has unintended addresses from two separate endpoint registrations.",
+      "repair": "Remove the unauthorized registration and fix the naming conflict.",
+      "verification": "Confirm the intended address set and endpoint identity.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-16",
+      "title": "Secondary zone transfer denied",
+      "category": "DNS & naming",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "One DNS server serves outdated records.",
+      "evidence": "Its SOA serial lags and transfer logs show an ACL rejection.",
+      "repair": "Permit transfers only between the authorized primary and secondary.",
+      "verification": "Verify serial convergence and consistent responses.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-17",
+      "title": "Expired secondary zone",
+      "category": "DNS & naming",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "A secondary stops serving a zone.",
+      "evidence": "Transfers have failed longer than the configured expiry interval.",
+      "repair": "Restore authorized transfer connectivity and refresh the zone.",
+      "verification": "Confirm current serial and authoritative answers.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-18",
+      "title": "Wrong delegated name server",
+      "category": "DNS & naming",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Only one subdomain cannot be resolved.",
+      "evidence": "The parent delegation points to a server not authoritative for that child.",
+      "repair": "Correct the delegation with the zone owner.",
+      "verification": "Trace resolution from the parent to the correct child authority.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-19",
+      "title": "Application bypasses enterprise DNS",
+      "category": "DNS & naming",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Browser results disagree with command-line DNS.",
+      "evidence": "The browser uses a separate resolver path while the OS uses enterprise DNS.",
+      "repair": "Apply the approved browser resolver policy.",
+      "verification": "Verify the application uses the intended namespace and policy.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-04-20",
+      "title": "Negative DNS cache after record creation",
+      "category": "DNS & naming",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "A newly created name still returns NXDOMAIN to some clients.",
+      "evidence": "The authority has the record but affected caches retain a previous negative answer.",
+      "repair": "Allow negative-cache expiry or use approved targeted invalidation.",
+      "verification": "Verify the new record from previously affected clients.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-01",
+      "title": "Missing static route",
+      "category": "Routing & WAN",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A remote subnet is unreachable.",
+      "evidence": "The router has no matching route and no usable default for that destination.",
+      "repair": "Install the approved route with the correct next hop.",
+      "verification": "Verify forward and return paths.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-02",
+      "title": "Incorrect static next hop",
+      "category": "Routing & WAN",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A configured route does not deliver traffic.",
+      "evidence": "The route points to an unreachable or incorrect adjacent router.",
+      "repair": "Correct the next hop from the routing plan.",
+      "verification": "Verify next-hop reachability and destination traffic.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-03",
+      "title": "Missing return route",
+      "category": "Routing & WAN",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "Requests reach a server but replies never return.",
+      "evidence": "The destination side lacks a route to the source subnet.",
+      "repair": "Restore the authorized return route.",
+      "verification": "Verify bidirectional traffic from the original source.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-04",
+      "title": "More-specific route overrides intended path",
+      "category": "Routing & WAN",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Only a subset of addresses takes the wrong exit.",
+      "evidence": "A longer matching prefix points to an unintended next hop.",
+      "repair": "Correct the erroneous more-specific route.",
+      "verification": "Verify the affected range and surrounding prefixes.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-05",
+      "title": "Unexpected preferred default route",
+      "category": "Routing & WAN",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Internet traffic uses a backup circuit.",
+      "evidence": "The backup default is preferred by the current route selection settings.",
+      "repair": "Restore the documented route preference and tracking.",
+      "verification": "Verify normal path and controlled failover.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-06",
+      "title": "OSPF area mismatch",
+      "category": "Routing & WAN",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Two adjacent routers never form an OSPF relationship.",
+      "evidence": "The shared interface area IDs differ.",
+      "repair": "Align the interface area according to the design.",
+      "verification": "Verify adjacency and exchanged routes.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-07",
+      "title": "OSPF hello timer mismatch",
+      "category": "Routing & WAN",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "An OSPF neighbor remains absent.",
+      "evidence": "Hello and dead intervals differ between directly connected peers.",
+      "repair": "Align the approved timers.",
+      "verification": "Verify stable adjacency beyond the dead interval.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-08",
+      "title": "OSPF authentication mismatch",
+      "category": "Routing & WAN",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "An OSPF link is up but routes are missing.",
+      "evidence": "Neighbor logs report authentication failure and configured credentials differ.",
+      "repair": "Align the authorized authentication settings.",
+      "verification": "Verify adjacency and route exchange without removing authentication.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-09",
+      "title": "OSPF passive interface on transit link",
+      "category": "Routing & WAN",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A router sends no OSPF hellos to its peer.",
+      "evidence": "The transit interface is marked passive.",
+      "repair": "Remove passive status only from the intended transit interface.",
+      "verification": "Verify neighbor formation and intended advertisements.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-10",
+      "title": "OSPF MTU mismatch",
+      "category": "Routing & WAN",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Neighbors stall during database exchange.",
+      "evidence": "Interface MTUs differ and database-description exchange does not complete.",
+      "repair": "Align link MTUs with the supported design.",
+      "verification": "Verify full adjacency and large-packet forwarding.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-11",
+      "title": "Duplicate OSPF router ID",
+      "category": "Routing & WAN",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Routing becomes unstable after cloning a router configuration.",
+      "evidence": "Two active routers advertise the same router ID.",
+      "repair": "Assign unique router IDs through a controlled routing change.",
+      "verification": "Verify stable adjacencies and consistent topology databases.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-12",
+      "title": "BGP remote AS mismatch",
+      "category": "Routing & WAN",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A new BGP session will not establish.",
+      "evidence": "Peer configuration specifies the wrong remote autonomous system.",
+      "repair": "Correct the peer AS assignment.",
+      "verification": "Verify session establishment and authorized route exchange.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-13",
+      "title": "BGP prefix filter rejects required route",
+      "category": "Routing & WAN",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A BGP peer is established but one prefix is absent.",
+      "evidence": "Policy evaluation rejects the required prefix at the configured filter.",
+      "repair": "Update the approved prefix policy with narrow scope.",
+      "verification": "Verify the desired prefix and continued rejection of unauthorized routes.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-14",
+      "title": "BGP next hop unreachable",
+      "category": "Routing & WAN",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A received BGP route is unusable.",
+      "evidence": "The BGP next-hop address has no resolving route.",
+      "repair": "Restore the intended next-hop reachability or approved next-hop handling.",
+      "verification": "Verify route installation and traffic forwarding.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-15",
+      "title": "Route redistribution feedback",
+      "category": "Routing & WAN",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Routes oscillate between routing domains.",
+      "evidence": "The same prefixes return through redistribution without the intended tags or filters.",
+      "repair": "Restore loop-prevention tags and redistribution policy.",
+      "verification": "Verify stable origin and path selection.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-16",
+      "title": "Policy routing overrides normal route",
+      "category": "Routing & WAN",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "One traffic class follows an unexpected WAN.",
+      "evidence": "A policy route matches that source or application before normal route lookup.",
+      "repair": "Correct the policy match or next hop under change control.",
+      "verification": "Test both matched and unmatched traffic classes.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-17",
+      "title": "Path MTU discovery black hole",
+      "category": "Routing & WAN",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Small packets work while larger sessions stall.",
+      "evidence": "Oversized packets fail and required packet-too-big feedback is filtered.",
+      "repair": "Restore necessary PMTUD feedback and validate the path MTU.",
+      "verification": "Test large transfers across the affected path.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-18",
+      "title": "WAN shaping rate exceeds carrier contract",
+      "category": "Routing & WAN",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Traffic drops during predictable upload bursts.",
+      "evidence": "Provider policing counters rise because local egress sends faster than the committed service.",
+      "repair": "Shape to the agreed service profile.",
+      "verification": "Verify throughput and drops under sustained load.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-19",
+      "title": "Carrier handoff VLAN mismatch",
+      "category": "Routing & WAN",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A new WAN circuit has link but no service.",
+      "evidence": "The carrier requires a handoff VLAN different from the configured tag.",
+      "repair": "Align the approved handoff tagging with the carrier.",
+      "verification": "Verify the demarcation and routed service.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-05-20",
+      "title": "Backup route tracking probes wrong target",
+      "category": "Routing & WAN",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "The backup path activates while the primary is usable.",
+      "evidence": "The tracking probe targets a host that no longer answers although the primary path works.",
+      "repair": "Use an approved representative and reachable tracking target.",
+      "verification": "Test primary failure and recovery behavior.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-01",
+      "title": "Incorrect Wi-Fi passphrase",
+      "category": "Wireless",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "One client cannot authenticate to a personal SSID.",
+      "evidence": "The client log shows key negotiation failure; other clients join using the approved key.",
+      "repair": "Correct the saved credential through the approved process.",
+      "verification": "Verify authentication and network access.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-02",
+      "title": "Weak signal at coverage edge",
+      "category": "Wireless",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A client disconnects in one room.",
+      "evidence": "A survey shows insufficient signal and poor signal-to-noise ratio at that location.",
+      "repair": "Improve the approved AP placement or coverage plan.",
+      "verification": "Survey and test at the affected location.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-03",
+      "title": "Co-channel airtime congestion",
+      "category": "Wireless",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Wi-Fi slows during busy periods.",
+      "evidence": "Neighboring cells share the channel and channel utilization is high despite clean wired uplinks.",
+      "repair": "Adjust the channel and capacity plan using survey evidence.",
+      "verification": "Measure busy-hour airtime and application performance.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-04",
+      "title": "Adjacent-channel interference",
+      "category": "Wireless",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Clients suffer retries near a neighboring radio.",
+      "evidence": "Overlapping channel use correlates with errors on the affected band.",
+      "repair": "Select a supported non-overlapping channel plan.",
+      "verification": "Measure retries and usable throughput.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-05",
+      "title": "Hidden-node contention",
+      "category": "Wireless",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Two clients individually work but degrade each other.",
+      "evidence": "Both reach the AP but cannot reliably hear one another and collide under simultaneous load.",
+      "repair": "Revise cell design or supported contention controls.",
+      "verification": "Test both clients concurrently.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-06",
+      "title": "Excessive channel width",
+      "category": "Wireless",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Wide channels perform worse in a dense office.",
+      "evidence": "The spectrum plan leaves too few reusable channels and interference spans the wide channel.",
+      "repair": "Use a narrower width supported by the capacity plan.",
+      "verification": "Compare aggregate throughput and airtime reuse.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-07",
+      "title": "Wrong SSID-to-VLAN mapping",
+      "category": "Wireless",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A wireless group receives the wrong network policy.",
+      "evidence": "The SSID maps to a different VLAN than its approved service profile.",
+      "repair": "Correct the SSID VLAN mapping.",
+      "verification": "Verify client addressing, isolation, and permitted services.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-08",
+      "title": "AP uplink missing client VLAN",
+      "category": "Wireless",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Clients associate but cannot obtain service on one SSID.",
+      "evidence": "The AP uplink trunk does not carry that SSID VLAN.",
+      "repair": "Restore the required VLAN on the uplink.",
+      "verification": "Verify DHCP and application access on every required SSID.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-09",
+      "title": "RADIUS server unreachable from controller",
+      "category": "Wireless",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Enterprise Wi-Fi authentication times out.",
+      "evidence": "The controller sends requests but receives no response from the configured authentication server.",
+      "repair": "Restore the authorized network path and service.",
+      "verification": "Verify authentication without changing the enterprise security mode.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-10",
+      "title": "Expired EAP server certificate",
+      "category": "Wireless",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Enterprise clients reject authentication after a date boundary.",
+      "evidence": "Client validation logs identify an expired server certificate.",
+      "repair": "Renew the correct certificate and chain through the approved process.",
+      "verification": "Verify strict certificate validation and successful authentication.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-11",
+      "title": "Incorrect EAP trust configuration",
+      "category": "Wireless",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Managed clients reject a newly deployed authentication server.",
+      "evidence": "The certificate chain or server name does not match the managed trust profile.",
+      "repair": "Correct the approved trust profile or server certificate.",
+      "verification": "Verify authentication with server validation still enforced.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-12",
+      "title": "Captive portal session expired",
+      "category": "Wireless",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A guest is associated but redirected instead of browsing.",
+      "evidence": "The access system shows an expired guest session.",
+      "repair": "Complete the approved guest reauthorization flow.",
+      "verification": "Verify authorized access and guest isolation.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-13",
+      "title": "Client isolation blocks intended peer service",
+      "category": "Wireless",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Wireless clients cannot use a local peer device.",
+      "evidence": "The SSID explicitly prevents client-to-client forwarding.",
+      "repair": "Provide an approved service path or policy exception rather than removing isolation globally.",
+      "verification": "Verify the intended service and continued guest separation.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-14",
+      "title": "DFS radar channel evacuation",
+      "category": "Wireless",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "An AP changes channel and clients briefly disconnect.",
+      "evidence": "Controller logs show a radar event followed by required channel evacuation.",
+      "repair": "Plan supported channels and coverage for the regulatory behavior.",
+      "verification": "Verify recovery and coverage during channel changes.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-15",
+      "title": "Transmit power imbalance",
+      "category": "Wireless",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A client sees strong AP signal but uploads fail.",
+      "evidence": "The AP reaches the client while the lower-power client cannot sustain the return path.",
+      "repair": "Balance cell size and AP power using two-way survey results.",
+      "verification": "Verify both uplink and downlink at the cell edge.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-16",
+      "title": "Sticky roaming client",
+      "category": "Wireless",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A mobile device stays connected to a distant AP.",
+      "evidence": "The client remains on the old BSSID while a closer cell offers better service.",
+      "repair": "Tune the supported roaming and cell design for that client population.",
+      "verification": "Walk-test handoffs with the affected client type.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-17",
+      "title": "Unsupported security mode on legacy client",
+      "category": "Wireless",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "An older device cannot join a new SSID.",
+      "evidence": "Its supported authentication capabilities do not include the required SSID mode.",
+      "repair": "Upgrade the client or use an approved isolated compatibility service.",
+      "verification": "Verify access without downgrading the main enterprise SSID.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-18",
+      "title": "AP regulatory domain mismatch",
+      "category": "Wireless",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "A replacement AP cannot use the planned channels.",
+      "evidence": "Its regulatory configuration or hardware domain differs from the deployment location.",
+      "repair": "Use correctly approved hardware and regulatory settings.",
+      "verification": "Verify legal channel operation and coverage.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-19",
+      "title": "Mesh backhaul degradation",
+      "category": "Wireless",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Clients have strong local signal but poor upstream service.",
+      "evidence": "The mesh backhaul has high retries and low capacity while the access radio is healthy.",
+      "repair": "Improve the backhaul path or provide an approved wired uplink.",
+      "verification": "Measure end-to-end performance across the backhaul.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-06-20",
+      "title": "Too many low-rate clients consuming airtime",
+      "category": "Wireless",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A busy WLAN has low throughput without wired congestion.",
+      "evidence": "Airtime analysis shows slow clients consuming a disproportionate share.",
+      "repair": "Improve coverage and the approved client/rate policy.",
+      "verification": "Verify service for supported clients and improved airtime use.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-01",
+      "title": "ACL denies required application port",
+      "category": "Security & access",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "Ping works but a specific application fails.",
+      "evidence": "The relevant deny counter increments for the application's destination port.",
+      "repair": "Add the narrowly scoped authorized permit in the correct order.",
+      "verification": "Test required access and an intentionally denied flow.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-02",
+      "title": "ACL applied in wrong direction",
+      "category": "Security & access",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A new rule has no intended effect.",
+      "evidence": "The ACL is attached to the opposite traffic direction from the planned enforcement point.",
+      "repair": "Apply the approved policy at the correct interface and direction.",
+      "verification": "Verify both permitted and blocked test traffic.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-03",
+      "title": "Broad deny placed before specific permit",
+      "category": "Security & access",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "An approved exception does not work.",
+      "evidence": "An earlier matching deny prevents evaluation of the later permit.",
+      "repair": "Correct rule ordering under the policy change process.",
+      "verification": "Verify the exception without opening unrelated access.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-04",
+      "title": "Host firewall blocks inbound service",
+      "category": "Security & access",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Remote clients fail while local service tests succeed.",
+      "evidence": "The service listens locally; host firewall logs drop the inbound connection.",
+      "repair": "Permit the authorized service and source scope.",
+      "verification": "Verify remote access and continued blocking of other traffic.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-05",
+      "title": "Stateful firewall sees asymmetric path",
+      "category": "Security & access",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Sessions fail despite individually allowed routes.",
+      "evidence": "One direction bypasses the firewall, so the return flow has no matching state.",
+      "repair": "Restore the intended symmetric inspection path.",
+      "verification": "Verify complete sessions and failover behavior.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-06",
+      "title": "NAT rule matches wrong source subnet",
+      "category": "Security & access",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "One internal subnet cannot use the external service.",
+      "evidence": "Translation counters match other subnets but not the affected source range.",
+      "repair": "Correct the approved NAT source match.",
+      "verification": "Verify translated sessions from affected and unaffected subnets.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-07",
+      "title": "NAT pool exhausted",
+      "category": "Security & access",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "New outbound sessions fail while existing ones continue.",
+      "evidence": "Available translations are exhausted at the configured pool limit.",
+      "repair": "Restore capacity or correct abnormal session consumption.",
+      "verification": "Verify new sessions under expected peak load.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-08",
+      "title": "Missing NAT exemption for VPN",
+      "category": "Security & access",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Internal traffic enters a VPN with the wrong source.",
+      "evidence": "The flow is translated before matching the intended protected subnet policy.",
+      "repair": "Restore the approved VPN NAT exemption.",
+      "verification": "Verify original source addressing across the tunnel.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-09",
+      "title": "VPN phase-one proposal mismatch",
+      "category": "Security & access",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "An IPsec tunnel never establishes its control association.",
+      "evidence": "Peer logs show no common IKE proposal.",
+      "repair": "Align approved IKE algorithms and parameters.",
+      "verification": "Verify negotiation without weakening the required policy.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-10",
+      "title": "VPN traffic-selector mismatch",
+      "category": "Security & access",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A tunnel is up but one subnet cannot pass.",
+      "evidence": "The peers disagree on the protected local and remote subnet selectors.",
+      "repair": "Align authorized traffic selectors.",
+      "verification": "Verify all approved subnet pairs and rejection outside them.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-11",
+      "title": "Expired VPN certificate",
+      "category": "Security & access",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A previously working tunnel cannot authenticate.",
+      "evidence": "Peer logs show certificate expiry rather than transport failure.",
+      "repair": "Renew the correct certificate and chain.",
+      "verification": "Verify authenticated tunnel establishment.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-12",
+      "title": "RADIUS shared-secret mismatch",
+      "category": "Security & access",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A network device reaches AAA but authentication fails.",
+      "evidence": "AAA logs report message authentication failure from that device.",
+      "repair": "Correct the authorized shared-secret configuration securely.",
+      "verification": "Verify authentication and accounting from the device.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-13",
+      "title": "802.1X authorization assigns wrong VLAN",
+      "category": "Security & access",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "An authenticated endpoint lands in the wrong department.",
+      "evidence": "The RADIUS accept response contains an unintended VLAN attribute.",
+      "repair": "Correct the role mapping in the approved access policy.",
+      "verification": "Verify authentication and the intended network assignment.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-14",
+      "title": "MAB registration missing",
+      "category": "Security & access",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A non-802.1X device remains in a restricted network.",
+      "evidence": "The fallback MAC authentication request finds no authorized inventory entry.",
+      "repair": "Register the approved device through the access process.",
+      "verification": "Verify the intended restricted or production role.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-15",
+      "title": "DHCP snooping trusted uplink missing",
+      "category": "Security & access",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "DHCP offers disappear at the access switch.",
+      "evidence": "Snooping drops server messages arriving on an untrusted authorized uplink.",
+      "repair": "Trust only the approved DHCP-server-facing path.",
+      "verification": "Verify valid leases and continued rogue-offer blocking.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-16",
+      "title": "Dynamic ARP inspection binding mismatch",
+      "category": "Security & access",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "A static-addressed host cannot reach its gateway.",
+      "evidence": "ARP inspection drops its valid ARP because no matching approved binding exists.",
+      "repair": "Add the authorized static binding or supported exception.",
+      "verification": "Verify host access and continued invalid-ARP rejection.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-17",
+      "title": "IP source guard blocks moved endpoint",
+      "category": "Security & access",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "A moved client has link but no IP traffic.",
+      "evidence": "Its current port does not match the validated source binding.",
+      "repair": "Refresh the legitimate binding through the approved access workflow.",
+      "verification": "Verify only the authorized source is accepted.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-18",
+      "title": "Management ACL excludes jump host",
+      "category": "Security & access",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Administrators cannot reach device management from the approved jump host.",
+      "evidence": "Management access logs deny the jump host source after a policy edit.",
+      "repair": "Restore the narrow approved management source allowance.",
+      "verification": "Verify jump-host access and denial from unauthorized sources.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-19",
+      "title": "SSH host-key change after authorized replacement",
+      "category": "Security & access",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "An SSH client warns that the server key changed.",
+      "evidence": "The device was replaced and the new key fingerprint is confirmed through the trusted inventory.",
+      "repair": "Update the saved key only after validating the replacement identity.",
+      "verification": "Reconnect and verify the expected fingerprint.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-07-20",
+      "title": "NTP skew breaks ticket authentication",
+      "category": "Security & access",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Domain services reject otherwise valid logins.",
+      "evidence": "Client and authentication server clocks exceed the accepted skew.",
+      "repair": "Restore the approved time synchronization path.",
+      "verification": "Verify clock alignment and successful authentication.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-01",
+      "title": "Application service stopped",
+      "category": "Applications & services",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "The server responds to ping but the application is unavailable.",
+      "evidence": "No process listens on the intended port and service logs show it stopped.",
+      "repair": "Restore the service after resolving its recorded failure.",
+      "verification": "Test the actual application from a client.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-02",
+      "title": "Application bound only to loopback",
+      "category": "Applications & services",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "The service works on the server but not remotely.",
+      "evidence": "The listening socket is bound to 127.0.0.1 rather than the intended interface.",
+      "repair": "Bind the approved service endpoint appropriately.",
+      "verification": "Verify remote access and intended exposure scope.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-03",
+      "title": "Incorrect application port",
+      "category": "Applications & services",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A client fails after a service configuration change.",
+      "evidence": "The client targets a different port from the documented listener.",
+      "repair": "Align the client endpoint with the approved service port.",
+      "verification": "Test a complete application transaction.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-04",
+      "title": "Expired HTTPS certificate",
+      "category": "Applications & services",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "Clients reject an HTTPS service.",
+      "evidence": "Certificate inspection shows the presented certificate is expired.",
+      "repair": "Renew and install the approved certificate and chain.",
+      "verification": "Verify normal certificate validation succeeds.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-05",
+      "title": "HTTPS hostname mismatch",
+      "category": "Applications & services",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A service is reachable but certificate validation fails.",
+      "evidence": "The requested hostname is absent from the certificate's valid names.",
+      "repair": "Use the correct hostname or deploy the appropriate certificate.",
+      "verification": "Verify hostname validation with no bypass.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-06",
+      "title": "Missing intermediate certificate",
+      "category": "Applications & services",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Some clients reject a certificate that others accept.",
+      "evidence": "The server omits an intermediate and affected clients cannot build the chain.",
+      "repair": "Install the correct complete server chain.",
+      "verification": "Validate from a client without a cached intermediate.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-07",
+      "title": "Wrong system proxy",
+      "category": "Applications & services",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Only proxy-aware applications fail.",
+      "evidence": "The client proxy configuration points to a retired or unreachable proxy.",
+      "repair": "Apply the approved proxy settings.",
+      "verification": "Test required destinations through the intended route.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-08",
+      "title": "Proxy bypass missing internal domain",
+      "category": "Applications & services",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Internal applications are mistakenly sent to an external proxy.",
+      "evidence": "The internal namespace is absent from the approved bypass list.",
+      "repair": "Correct the scoped bypass policy.",
+      "verification": "Verify internal direct access and external proxy enforcement.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-09",
+      "title": "Load-balancer health check uses wrong path",
+      "category": "Applications & services",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Healthy application servers are removed from rotation.",
+      "evidence": "The health probe requests a retired path that returns an error.",
+      "repair": "Set the approved health endpoint and expected response.",
+      "verification": "Verify backend health and client transactions.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-10",
+      "title": "Load balancer forwards to wrong backend port",
+      "category": "Applications & services",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "The virtual service answers but requests fail.",
+      "evidence": "The pool member configuration differs from the actual service listener.",
+      "repair": "Correct the approved backend port mapping.",
+      "verification": "Verify each backend and the virtual endpoint.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-11",
+      "title": "Application connection pool exhausted",
+      "category": "Applications & services",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Requests time out while network tests remain healthy.",
+      "evidence": "Application metrics show all pool slots occupied and requests waiting.",
+      "repair": "Resolve leaked or excessive connections and size the pool from evidence.",
+      "verification": "Verify normal request latency under representative load.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-12",
+      "title": "Server disk full blocks service writes",
+      "category": "Applications & services",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A reachable application cannot save transactions.",
+      "evidence": "Service logs show write failures and the required filesystem has no free space.",
+      "repair": "Recover capacity using the application's retention and recovery procedure.",
+      "verification": "Verify writes and monitor free space.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-13",
+      "title": "NTP server unreachable",
+      "category": "Applications & services",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A device clock drifts after a network change.",
+      "evidence": "Time queries to the configured server receive no response.",
+      "repair": "Restore access to an approved time source.",
+      "verification": "Verify synchronization status and offset.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-14",
+      "title": "SNMP version mismatch",
+      "category": "Applications & services",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Monitoring cannot poll a device.",
+      "evidence": "The poller and device use incompatible SNMP versions or security profiles.",
+      "repair": "Align the approved monitoring configuration.",
+      "verification": "Verify polling without downgrading the required security.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-15",
+      "title": "SNMP view excludes required OIDs",
+      "category": "Applications & services",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Some metrics are missing while basic polling succeeds.",
+      "evidence": "The configured view omits the required object subtree.",
+      "repair": "Extend the approved read view narrowly.",
+      "verification": "Verify required metrics and restricted access elsewhere.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-16",
+      "title": "Syslog destination incorrect",
+      "category": "Applications & services",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "Device events never arrive at the collector.",
+      "evidence": "The device sends logs to an old collector address.",
+      "repair": "Correct the authorized logging destination.",
+      "verification": "Generate a benign test event and verify receipt.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-17",
+      "title": "QoS classifies voice into bulk queue",
+      "category": "Applications & services",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Calls degrade only when uploads saturate the uplink.",
+      "evidence": "Voice packets enter the bulk class instead of the approved priority class.",
+      "repair": "Correct classification and trust boundaries per the QoS plan.",
+      "verification": "Test call quality during competing traffic.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-18",
+      "title": "SIP signaling works but RTP is blocked",
+      "category": "Applications & services",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Calls connect with no audio.",
+      "evidence": "Signaling succeeds while the authorized media-port range is dropped.",
+      "repair": "Correct the scoped media path policy.",
+      "verification": "Verify two-way audio and call teardown.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-19",
+      "title": "Multicast TTL too low for routed receivers",
+      "category": "Applications & services",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "A stream works locally but not beyond its first router.",
+      "evidence": "Packets arrive with insufficient TTL for the documented receiver path.",
+      "repair": "Set the approved stream TTL and validate multicast routing.",
+      "verification": "Verify delivery to intended remote receivers only.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-08-20",
+      "title": "Service dependency unavailable",
+      "category": "Applications & services",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "The web front end responds but transactions fail.",
+      "evidence": "Application logs identify an unreachable database dependency while front-end networking is healthy.",
+      "repair": "Restore the authorized dependency service or path.",
+      "verification": "Complete an end-to-end transaction, not just a front-end ping.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-01",
+      "title": "Wrong device changed",
+      "category": "Operations & resilience",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A repair has no effect on the reported endpoint.",
+      "evidence": "The edited hostname and serial do not match the work order inventory.",
+      "repair": "Stop changes, restore any unintended edit, and identify the correct asset.",
+      "verification": "Verify the intended repair and the accidentally touched device.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-02",
+      "title": "Unsaved running configuration lost on reboot",
+      "category": "Operations & resilience",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A previously fixed issue returns after restarting a device.",
+      "evidence": "Startup configuration lacks the approved changes present before reboot.",
+      "repair": "Persist the verified configuration using the platform's approved process.",
+      "verification": "Compare running and startup state and follow the reboot validation plan.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-03",
+      "title": "Outdated network diagram",
+      "category": "Operations & resilience",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "The documented path does not match field observations.",
+      "evidence": "Cable tracing and neighbor data identify a topology different from the print.",
+      "repair": "Validate the actual approved topology and update the record.",
+      "verification": "Have the corrected path independently checked.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-04",
+      "title": "Missing configuration backup",
+      "category": "Operations & resilience",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A failed device cannot be replaced confidently.",
+      "evidence": "The backup inventory lacks a current verified configuration.",
+      "repair": "Recover an approved source of truth and restore scheduled verified backups.",
+      "verification": "Perform a controlled restore validation.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-05",
+      "title": "Backup job silently failing",
+      "category": "Operations & resilience",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Recent configuration changes are absent from backups.",
+      "evidence": "The scheduler runs but authentication errors prevent retrieval.",
+      "repair": "Repair the authorized backup access and alerting.",
+      "verification": "Verify a new backup and its readable contents.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-06",
+      "title": "Monitoring threshold misconfigured",
+      "category": "Operations & resilience",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A capacity issue was never alerted.",
+      "evidence": "Measured utilization crossed the policy threshold but the monitor was configured above it.",
+      "repair": "Align thresholds and duration with the operating policy.",
+      "verification": "Replay a safe test condition and confirm the expected alert.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-07",
+      "title": "Alert routing points to inactive team",
+      "category": "Operations & resilience",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Critical alerts are generated but nobody responds.",
+      "evidence": "Delivery records show an obsolete escalation destination.",
+      "repair": "Update the approved ownership and escalation routing.",
+      "verification": "Send a benign test alert and confirm acknowledgment.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-08",
+      "title": "Maintenance suppression left enabled",
+      "category": "Operations & resilience",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Monitoring stays silent after maintenance.",
+      "evidence": "The affected objects remain suppressed beyond the approved window.",
+      "repair": "End stale suppression and correct its expiry controls.",
+      "verification": "Verify current health and restored alert evaluation.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-09",
+      "title": "Incorrect monitoring interface selection",
+      "category": "Operations & resilience",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Capacity reports disagree with the real uplink.",
+      "evidence": "The collector tracks an unused interface index after a hardware change.",
+      "repair": "Map monitoring to the intended stable interface identity.",
+      "verification": "Compare counters on the device and dashboard.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-10",
+      "title": "Counter reset mistaken for traffic drop",
+      "category": "Operations & resilience",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A graph shows a sudden impossible negative rate.",
+      "evidence": "The interface counter restarted at reboot and the poller treated it as continuous.",
+      "repair": "Correct counter-reset handling in the monitoring system.",
+      "verification": "Verify rate calculations across a controlled reset sample.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-11",
+      "title": "Redundant power feeds share one circuit",
+      "category": "Operations & resilience",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Both power supplies fail during one breaker outage.",
+      "evidence": "The A and B leads trace to the same electrical circuit.",
+      "repair": "Move to independently approved power feeds with facilities coordination.",
+      "verification": "Verify feed independence through the approved test plan.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-12",
+      "title": "Standby gateway priority incorrect",
+      "category": "Operations & resilience",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "The unexpected router owns the virtual gateway.",
+      "evidence": "Redundancy priority and preemption settings differ from the design.",
+      "repair": "Restore the approved active/standby preference.",
+      "verification": "Verify ownership and controlled failover.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-13",
+      "title": "Standby gateway tracking missing",
+      "category": "Operations & resilience",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Clients black-hole traffic after the active router loses its uplink.",
+      "evidence": "The router retains gateway ownership because uplink health is not tracked.",
+      "repair": "Configure the approved health tracking and priority adjustment.",
+      "verification": "Test upstream failure and recovery.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-14",
+      "title": "HA state synchronization broken",
+      "category": "Operations & resilience",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Sessions drop during firewall failover despite healthy links.",
+      "evidence": "The HA pair reports failed state synchronization.",
+      "repair": "Restore the dedicated authorized synchronization path and compatibility.",
+      "verification": "Verify synchronized state and controlled failover.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-15",
+      "title": "Configuration drift between HA peers",
+      "category": "Operations & resilience",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Failover changes application access unexpectedly.",
+      "evidence": "The peers have different approved policy revisions.",
+      "repair": "Reconcile configuration using the authoritative version.",
+      "verification": "Verify parity and behavior on both peers.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-16",
+      "title": "Firmware incompatibility in device stack",
+      "category": "Operations & resilience",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "A new stack member never becomes ready.",
+      "evidence": "The member software is incompatible with the stack's supported version set.",
+      "repair": "Install the approved compatible release using the maintenance plan.",
+      "verification": "Verify membership, ports, and redundancy.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-17",
+      "title": "Expired support entitlement blocks planned update",
+      "category": "Operations & resilience",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "A scheduled recovery cannot obtain the required image.",
+      "evidence": "The required entitlement is absent and the image source cannot be verified.",
+      "repair": "Resolve the entitlement or approved replacement path with the owner.",
+      "verification": "Verify lawful trusted image access before scheduling installation.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-18",
+      "title": "Change implemented outside approved scope",
+      "category": "Operations & resilience",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "An unrelated department fails during a targeted repair.",
+      "evidence": "The diff contains changes beyond the approved device and VLAN.",
+      "repair": "Roll back the unintended scope and reassess the planned fix.",
+      "verification": "Verify both target and protected services.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-19",
+      "title": "Rollback plan references stale configuration",
+      "category": "Operations & resilience",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A failed change cannot be safely reversed using the runbook.",
+      "evidence": "The listed rollback predates later approved changes.",
+      "repair": "Build a rollback from the verified pre-change baseline.",
+      "verification": "Validate that it restores required current services.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-09-20",
+      "title": "Incomplete handoff hides temporary workaround",
+      "category": "Operations & resilience",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "The next technician cannot explain an unusual configuration.",
+      "evidence": "A temporary route or bypass exists with no owner, expiry, or ticket note.",
+      "repair": "Document and review the workaround with the service owner.",
+      "verification": "Verify its impact and planned removal criteria.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-01",
+      "title": "Contaminated connector end face",
+      "category": "Fiber & optical",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "An optical circuit has excess loss after repatching.",
+      "evidence": "Inspection identifies contamination on the disconnected end face.",
+      "repair": "Inspect, clean with approved tools, and reinspect before reconnecting.",
+      "verification": "Measure loss and verify the end face meets acceptance criteria.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-02",
+      "title": "Unseated optical connector",
+      "category": "Fiber & optical",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A fiber connection drops after cabinet work.",
+      "evidence": "The connector is not fully latched in its intended adapter.",
+      "repair": "Seat the correct inspected connector securely.",
+      "verification": "Verify optical levels and stable service.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-03",
+      "title": "Transmit and receive fibers reversed",
+      "category": "Fiber & optical",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A duplex link has no communication after installation.",
+      "evidence": "Polarity tracing shows transmit connected to transmit rather than the peer receive.",
+      "repair": "Correct the documented duplex polarity.",
+      "verification": "Verify both optical receive paths and service.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-04",
+      "title": "Single-mode and multimode mismatch",
+      "category": "Fiber & optical",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A new optical link does not meet its loss budget.",
+      "evidence": "Installed fiber and optics do not match the approved media design.",
+      "repair": "Use a compatible fiber and transceiver combination.",
+      "verification": "Measure optical performance against the correct specifications.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-05",
+      "title": "Optical wavelength mismatch",
+      "category": "Fiber & optical",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Two endpoints have light but do not establish a usable link.",
+      "evidence": "The installed transceivers use incompatible wavelengths for the intended link.",
+      "repair": "Install the approved compatible optics.",
+      "verification": "Verify wavelength pairing and receive levels.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-06",
+      "title": "BiDi transceivers use same side of pair",
+      "category": "Fiber & optical",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A single-fiber bidirectional circuit will not link.",
+      "evidence": "Both modules transmit on the same wavelength instead of complementary wavelengths.",
+      "repair": "Install the correct complementary transceiver pair.",
+      "verification": "Verify transmit and receive wavelengths in both directions.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-07",
+      "title": "Receive power below sensitivity",
+      "category": "Fiber & optical",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "An optical receiver reports low light.",
+      "evidence": "Measured receive power is below the module's specified operating range.",
+      "repair": "Locate and correct excess path loss or redesign the approved budget.",
+      "verification": "Verify receive power with operating margin.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-08",
+      "title": "Receive power above overload limit",
+      "category": "Fiber & optical",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A short optical link has errors despite strong light.",
+      "evidence": "The receive level exceeds the receiver's specified maximum.",
+      "repair": "Apply the approved attenuation or compatible optics design.",
+      "verification": "Verify receive power lies within the supported range.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-09",
+      "title": "Macrobend loss",
+      "category": "Fiber & optical",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Optical loss increases after a tray is closed.",
+      "evidence": "A tight bend violates the cable bend specification; loss improves when corrected.",
+      "repair": "Restore the specified bend radius and routing.",
+      "verification": "Measure loss with the enclosure in its normal closed state.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-10",
+      "title": "Microbend from excessive tie pressure",
+      "category": "Fiber & optical",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "Loss appears after cable dressing.",
+      "evidence": "A tight restraint compresses the cable and the measured loss changes when relieved.",
+      "repair": "Use approved supports without excessive compression.",
+      "verification": "Verify stable optical measurements after redressing.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-11",
+      "title": "High-loss fusion splice",
+      "category": "Fiber & optical",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A span fails its acceptance budget after repair.",
+      "evidence": "Bidirectional testing localizes excessive loss at the new splice.",
+      "repair": "Reprepare and resplice using the qualified procedure.",
+      "verification": "Verify splice and end-to-end loss from both directions.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-12",
+      "title": "Broken fiber in closure",
+      "category": "Fiber & optical",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A previously working span is dark.",
+      "evidence": "An OTDR trace ends at the closure and continuity testing isolates the fiber.",
+      "repair": "Repair the break under the approved outage and splice plan.",
+      "verification": "Verify continuity, loss, and service restoration.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-13",
+      "title": "Wrong splitter port assignment",
+      "category": "Fiber & optical",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A customer is connected to the wrong optical distribution path.",
+      "evidence": "Plant records and tracing identify a different splitter port from the assigned circuit.",
+      "repair": "Correct the assignment and records.",
+      "verification": "Verify the intended customer path and neighboring service.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-14",
+      "title": "Splitter loss omitted from budget",
+      "category": "Fiber & optical",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "A planned PON path has insufficient optical margin.",
+      "evidence": "The calculation includes cable loss but omits the installed splitter stages.",
+      "repair": "Recalculate and redesign the path within the approved optical class.",
+      "verification": "Verify measured and calculated end-to-end margin.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-15",
+      "title": "UPC and APC connector mismatch",
+      "category": "Fiber & optical",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "A patched circuit has high reflection and excess loss.",
+      "evidence": "The mating connector polish types differ.",
+      "repair": "Use the correct matched connectors and adapters.",
+      "verification": "Inspect and test loss and reflectance.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-16",
+      "title": "Dirty OTDR launch connector",
+      "category": "Fiber & optical",
+      "grouping": "Common",
+      "difficulty": 2,
+      "symptom": "Many unrelated fibers show the same near-end anomaly.",
+      "evidence": "The common launch connection fails inspection.",
+      "repair": "Clean or replace the launch connection and reestablish the reference setup.",
+      "verification": "Retest known-good fiber and the affected circuit.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-17",
+      "title": "Missing OTDR launch fiber",
+      "category": "Fiber & optical",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "The first connection cannot be assessed.",
+      "evidence": "The test setup lacks sufficient launch fiber to move the connection beyond the instrument dead zone.",
+      "repair": "Use the appropriate launch and receive setup.",
+      "verification": "Verify both end connections can be evaluated.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-18",
+      "title": "OTDR ghost mistaken for real event",
+      "category": "Fiber & optical",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "A trace suggests an event beyond the actual fiber end.",
+      "evidence": "The apparent event repeats a strong reflection pattern and has no matching physical distance.",
+      "repair": "Confirm with alternate setup and bidirectional measurements before repairing.",
+      "verification": "Identify the real events without acting on the artifact.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-19",
+      "title": "One-direction splice gainer",
+      "category": "Fiber & optical",
+      "grouping": "Rare",
+      "difficulty": 3,
+      "symptom": "A splice appears to have negative loss.",
+      "evidence": "Opposite-direction measurements differ because of backscatter characteristics.",
+      "repair": "Use the approved bidirectional averaging method.",
+      "verification": "Report the combined splice loss rather than a single-direction gainer.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Establish scope",
+        "Capture a baseline",
+        "Understand the relevant network layer"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    },
+    {
+      "id": "ISS-10-20",
+      "title": "Incorrect power-meter reference",
+      "category": "Fiber & optical",
+      "grouping": "Foundational",
+      "difficulty": 1,
+      "symptom": "Measured insertion loss is implausible across multiple circuits.",
+      "evidence": "The reference setup differs from the approved test method or uses contaminated reference cords.",
+      "repair": "Reestablish the reference with verified cords and the specified method.",
+      "verification": "Validate a known-good link before retesting customer fibers.",
+      "recipeId": null,
+      "format": "Case study",
+      "prerequisites": [
+        "Read the work order",
+        "Identify the affected endpoint"
+      ],
+      "reviewStatus": "Authored curriculum; not a certification assessment"
+    }
+  ]
+}

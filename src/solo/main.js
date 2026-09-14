@@ -1,3 +1,4 @@
+import { createIssueLibrary } from './issue-library.js';
 import {
   createInitialState,
   submitOpeningCommand,
@@ -55,6 +56,7 @@ import { runMissionTest } from './devices.js';
 import { executeCommand } from './cli.js';
 import { recommendMission, recommendedTier } from './progress.js';
 import { recordStudyAnswer, recordCardReview } from './study.js';
+import { createBuilder } from './builder.js';
 
 const INIT_LINES = ['Initializing local session.', 'Preparing The Field.', 'Ready.'];
 const INIT_LINE_DELAY_MS = 200;
@@ -87,13 +89,18 @@ let importError = null;
 let offlineReady = false;
 let updateAvailable = false;
 let updateServiceWorkerFn = null;
+let builderScreen = null;
+let libraryScreen = null;
 
 function render() {
+  const focusedCommand = document.activeElement?.matches('.terminal-input') ? { name: document.activeElement.getAttribute('aria-label'), value: document.activeElement.value, start: document.activeElement.selectionStart, end: document.activeElement.selectionEnd } : null;
   const root = document.getElementById('root');
   root.textContent = '';
   if (updateAvailable) {
     root.appendChild(renderUpdateBanner({ onReload: reloadForUpdate }));
   }
+  if (builderScreen) { root.appendChild(builderScreen); return; }
+  if (libraryScreen) { root.appendChild(libraryScreen); return; }
   if (state.screen === 'opening') {
     root.appendChild(renderOpening());
   } else if (state.screen === 'initializing') {
@@ -103,6 +110,8 @@ function render() {
       renderHome(state, {
         onRetrySave: retrySave,
         onStartConfigure: startConfigure,
+        onOpenBuilder: () => { builderScreen = createBuilder({ onExit: () => { builderScreen = null; render(); } }); render(); },
+        onOpenIssues: () => { libraryScreen = createIssueLibrary({ onExit: () => { libraryScreen = null; render(); }, onLaunch: code => { libraryScreen = null; startCode(code); } }); render(); },
         onContinue: continueMission,
         onStartCode: startCode,
         onStartVariation: startSkillVariation,
@@ -188,6 +197,11 @@ function render() {
       }),
     );
   }
+  if (focusedCommand) {
+    const input = root.querySelector('.terminal-input');
+    if (input?.getAttribute('aria-label') === focusedCommand.name) { input.value = focusedCommand.value; input.focus(); input.setSelectionRange(focusedCommand.start, focusedCommand.end); }
+  }
+  const output = root.querySelector('.terminal-output'); if (output) output.scrollTop = output.scrollHeight;
 }
 
 // Retries whatever the last failure actually was: a mission autosave writes
@@ -621,6 +635,8 @@ function submitTerminalCommand(deviceId, deviceKind, text) {
   const { state: nextState, terminal } = executeCommand(state, session, text, session.builderOrigin);
   state = setTerminalSession(nextState, deviceId, terminal);
   render();
+  document.querySelector('.terminal-input')?.focus();
+  const output = document.querySelector('.terminal-output'); if (output) output.scrollTop = output.scrollHeight;
   persistMission();
 }
 

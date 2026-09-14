@@ -4,6 +4,7 @@
 
 import { canReach, resolveName, testService } from './forward.js';
 import { getHelp } from './cli.js';
+const expandedConsoles = new Set();
 
 function findPort(network, portId) {
   return network.ports.find((p) => p.id === portId);
@@ -313,30 +314,42 @@ export function renderTests(deviceId, onRunTest) {
 // rendered as one stacked panel rather than sub-tabs of a sub-tab — a
 // deliberate simplification for this release, not a missing feature (every
 // section is present and functional, just not tab-switched independently).
-export function renderTerminal(terminal, { onSubmitCommand, onInsertBuilderCommand } = {}) {
+export function renderTerminal(terminal, { onSubmitCommand, onInsertBuilderCommand, showBuilder = true } = {}) {
   const container = document.createElement('div');
   container.className = 'device-terminal';
 
   const heading = document.createElement('h3');
-  heading.textContent = 'Terminal';
+  heading.textContent = 'Console';
   container.appendChild(heading);
+  const expand = document.createElement('button'); expand.type = 'button'; expand.className = 'console-expand'; expand.textContent = 'Expand console'; expand.setAttribute('aria-expanded', 'false');
+  const setExpanded = expanded => { container.classList.toggle('console-expanded', expanded); expand.textContent = expanded ? 'Restore console' : 'Expand console'; expand.setAttribute('aria-expanded', String(expanded)); if (expanded) expandedConsoles.add(terminal.deviceId); else expandedConsoles.delete(terminal.deviceId); };
+  setExpanded(expandedConsoles.has(terminal.deviceId));
+  expand.addEventListener('click', () => setExpanded(!container.classList.contains('console-expanded')));
+  container.appendChild(expand);
 
   const output = document.createElement('pre');
   output.className = 'terminal-output';
   output.textContent = terminal.output.join('\n');
+  if (!terminal.output.length) output.textContent = `${terminal.deviceId}>\nConsole ready. Type ? for available commands.`;
   container.appendChild(output);
 
   const form = document.createElement('form');
   form.className = 'terminal-input-row';
   const label = document.createElement('label');
-  label.className = 'visually-hidden';
-  label.textContent = `Command for ${terminal.deviceId}`;
+  label.className = 'terminal-command-field';
+  const commandLabel = document.createElement('span'); commandLabel.className = 'visually-hidden'; commandLabel.textContent = `Command for ${terminal.deviceId}`; label.appendChild(commandLabel);
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'terminal-input';
   input.autocomplete = 'off';
   input.autocapitalize = 'off';
   input.spellcheck = false;
+  input.setAttribute('aria-label', `Command for ${terminal.deviceId}`);
+  let historyIndex = terminal.history.length;
+  input.addEventListener('keydown', event => {
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); historyIndex = Math.max(0, Math.min(terminal.history.length, historyIndex + (event.key === 'ArrowUp' ? -1 : 1))); input.value = terminal.history[historyIndex] ?? ''; }
+    if (event.key === 'Escape' && container.classList.contains('console-expanded')) expand.click();
+  });
   label.appendChild(input);
   form.appendChild(label);
   const submit = document.createElement('button');
@@ -346,8 +359,9 @@ export function renderTerminal(terminal, { onSubmitCommand, onInsertBuilderComma
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     if (input.value.trim() === '') return; // blank submission is ignored
-    onSubmitCommand?.(input.value);
+    const command = input.value;
     input.value = '';
+    onSubmitCommand?.(command);
   });
   container.appendChild(form);
 
@@ -364,6 +378,7 @@ export function renderTerminal(terminal, { onSubmitCommand, onInsertBuilderComma
   });
   helpRow.append(helpButton, helpList);
   container.appendChild(helpRow);
+  if (!showBuilder) return container;
 
   const builderHeading = document.createElement('p');
   builderHeading.className = 'terminal-builder-heading';

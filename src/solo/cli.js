@@ -3,7 +3,8 @@
 // Pure: no DOM, no fetch, no Date.now, does not mutate its input.
 
 import { applyAction } from './actions.js';
-import { canReach, resolveName } from './forward.js';
+import { canReach, resolveName, linkUsable } from './forward.js';
+import { extendedCommand, extendedHelp } from './cli-extended.js';
 
 const MAX_OUTPUT_LINES = 200;
 
@@ -177,19 +178,24 @@ function setTrunkVlans(ctx, vlanListText) {
 
 function runPing(ctx, ip) {
   const result = canReach(ctx.network, ctx.device.id, ip);
-  return { output: [result.ok ? `Reply from ${ip}: ok` : `Request timed out. (${result.code})`] };
+  return { output: [result.ok ? `Reply from ${ip}: ok` : `Request timed out. (${result.code})`], test: { testKind: 'ping', result, target: ip } };
 }
 
 function runNslookup(ctx, name) {
   const result = resolveName(ctx.network, ctx.device.id, name);
   return {
     output: result.ok ? [`Name: ${name}`, `Address: ${result.address}`] : [`*** Lookup failed (${result.code})`],
+    test: { testKind: 'resolvePortal', result, target: name },
   };
 }
 
 function ipconfig(ctx, all) {
   const device = ctx.device;
-  const lines = [`IPv4 Address. . . . . . . . . . . : ${device.ip ?? '(none)'}`, `Subnet Mask . . . . . . . . . . . : ${device.prefix ?? ''}`];
+  const mask = device.prefix === 0 ? 0 : (0xffffffff << (32 - device.prefix)) >>> 0;
+  const maskText = [24, 16, 8, 0].map(shift => (mask >>> shift) & 255).join('.');
+  const port = ctx.network.ports.find(p => p.deviceId === device.id);
+  const link = ctx.network.links.find(l => l.aPortId === port?.id || l.bPortId === port?.id);
+  const lines = [`Ethernet adapter ${port?.label ?? 'eth0'}:`, `Media state: ${link && linkUsable(ctx.network, link.id) ? 'connected' : 'disconnected'}`, `IPv4 Address. . . . . . . . . . . : ${device.ip ?? '(none)'}`, `Subnet Mask . . . . . . . . . . . : ${maskText}`];
   if (all) {
     lines.push(`Default Gateway . . . . . . . . . : ${device.gateway ?? '(none)'}`);
     lines.push(`DNS Servers . . . . . . . . . . . : ${device.dns ?? '(none)'}`);
@@ -200,7 +206,7 @@ function ipconfig(ctx, all) {
 function showInterfacesStatus(ctx) {
   return ctx.network.ports
     .filter((p) => p.deviceId === ctx.device.id)
-    .map((p) => `${p.label} ${p.adminUp ? 'up' : 'admin down'} ${p.mode}`);
+    .map((p) => { const link = ctx.network.links.find(l => l.aPortId === p.id || l.bPortId === p.id); return `${p.label} ${!p.adminUp ? 'admin down' : link && linkUsable(ctx.network, link.id) ? 'up' : 'notconnect'} ${p.mode}`; });
 }
 
 function showVlanBrief(ctx) {
@@ -270,7 +276,7 @@ export function executeCommand(state, terminal, commandText, origin = false) {
   const trimmed = commandText.trim();
   const historyEntry = trimmed;
 
-  function finish({ output = [], network: nextNetwork = network, mode, interfacePortId, action, ok = true, code, message }) {
+  function finish({ output = [], network: nextNetwork = network, mode, interfacePortId, action, actions, test, ok = true, code, message }) {
     const nextTerminal = {
       ...terminal,
       mode: mode ?? terminal.mode,
@@ -283,7 +289,19 @@ export function executeCommand(state, terminal, commandText, origin = false) {
     if (action && nextNetwork.revision !== network.revision) {
       nextMission = appendCliChangeEvent(mission, action, network, nextNetwork, device.id, origin);
     }
+    if (actions && nextNetwork.revision !== network.revision) {
+      let before = network;
+      for (const item of actions) {
+        const after = applyAction(before, item).state;
+        if (after.revision !== before.revision) nextMission = appendCliChangeEvent(nextMission, item, before, after, device.id, origin);
+        before = after;
+      }
+    }
     nextMission = { ...nextMission, network: nextNetwork };
+    if (test) {
+      const index = (nextMission.compactedEventCount ?? 0) + nextMission.events.length;
+      nextMission = { ...nextMission, events: [...nextMission.events, { id: String(index), index, kind: 'test', revision: nextNetwork.revision, deviceId: device.id, details: { ...test, command: trimmed }, assistance: Boolean(origin) }] };
+    }
     if (origin) {
       nextMission = appendAssistanceEvent(nextMission, device.id, 'builder-command');
     }
@@ -303,6 +321,8 @@ export function executeCommand(state, terminal, commandText, origin = false) {
   if (trimmed === '?') {
     return finish({ output: getHelp(terminal, '') });
   }
+  const extended = extendedCommand({ state, network, device, terminal }, trimmed);
+  if (extended) return finish(extended);
 
   const tokens = trimmed.split(/\s+/);
   const table = commandsFor(device.kind);
@@ -332,8 +352,9 @@ function appendCliChangeEvent(mission, action, before, after, deviceId, assisted
   const index = mission.compactedEventCount + mission.events.length;
   // Every CLI mutating command (shutdown/no shutdown/switchport ...) touches
   // exactly one port; a simpler extractor than app.js's generic one is fine.
-  const beforePort = before.ports.find((p) => p.id === action.portId) ?? null;
-  const afterPort = after.ports.find((p) => p.id === action.portId) ?? null;
+  const snapshot = net => action.portId ? net.ports.find(p => p.id === action.portId) : action.type === 'setDnsRecord' ? net.dnsRecords.find(r => r.serverId === action.serverId && r.name === action.name) : net.devices.find(d => d.id === action.deviceId);
+  const beforePort = snapshot(before) ?? null;
+  const afterPort = snapshot(after) ?? null;
   const event = {
     id: String(index),
     index,
@@ -372,7 +393,7 @@ export function getHelp(terminal, prefixText = '') {
   const candidates = table[terminal.mode] ?? [];
   const tokens = prefixText.trim() === '' ? [] : prefixText.trim().split(/\s+/);
   if (tokens.length === 0) {
-    return candidates.map((c) => [...c.keywords, ...(c.arg ? [placeholderFor(c.arg)] : [])].join(' '));
+    return [...candidates.map((c) => [...c.keywords, ...(c.arg ? [placeholderFor(c.arg)] : [])].join(' ')), ...extendedHelp(terminal.deviceKind)];
   }
   const lower = tokens.map((t) => t.toLowerCase());
   const matching = candidates.filter((c) =>

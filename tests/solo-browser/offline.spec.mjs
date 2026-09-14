@@ -51,7 +51,7 @@ test.describe('Offline installation and update behavior', () => {
     const title = await page.locator('.mission-title').textContent();
 
     // Configure/test: inspect a device and run a test, all offline.
-    await page.click('.diagram-list-device >> nth=0');
+    await page.click('.diagram-device >> nth=0');
     await page.click('.device-tests button:has-text("Ping gateway")');
     await page.click('.mission-tab:has-text("Findings")');
     await expect(page.locator('.findings-list')).not.toHaveCount(0);

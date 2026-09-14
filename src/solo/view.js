@@ -2,6 +2,12 @@
 // (app.js) stays DOM-free so it is testable under `node --test`.
 
 import { renderTopology } from './diagram.js';
+import { equipmentIcon } from './equipment.js';
+import { nextGuidance, trainingMode } from './guidance.js';
+
+const canvasViews = new Map();
+const inspectorViews = new Map();
+const coachingExpanded = new Map();
 import { terminalSessionFor, currentHintRecipeId, showCauseCount, showHarmlessDetail } from './app.js';
 import {
   renderClientForm,
@@ -143,6 +149,26 @@ export function renderHome(state, actions = {}) {
   const heading = document.createElement('h1');
   heading.textContent = 'The Field';
   container.appendChild(heading);
+  const subtitle = document.createElement('p');
+  subtitle.className = 'home-subtitle';
+  subtitle.textContent = 'Understand the connection.';
+  container.appendChild(subtitle);
+  const studio = document.createElement('section');
+  studio.className = 'home-studio';
+  const studioCopy = document.createElement('div');
+  const studioLabel = document.createElement('span'); studioLabel.className = 'section-kicker'; studioLabel.textContent = 'NETWORK STUDIO';
+  const studioTitle = document.createElement('h2'); studioTitle.textContent = 'Small lab. Entire campus. Your network.';
+  const studioText = document.createElement('p'); studioText.textContent = 'Build connected sites with a clear view of every device. Practice real troubleshooting in the guided labs below.';
+  const studioButton = document.createElement('button'); studioButton.type = 'button'; studioButton.className = 'primary-button'; studioButton.textContent = 'Design a network →';
+  studioButton.addEventListener('click', () => actions.onOpenBuilder?.());
+  studioCopy.append(studioLabel, studioTitle, studioText, studioButton);
+  const studioArt = document.createElement('div'); studioArt.className = 'home-studio-art'; studioArt.setAttribute('aria-hidden', 'true');
+  for (const kind of ['server', 'switch', 'router', 'client']) studioArt.append(equipmentIcon(kind));
+  studio.append(studioCopy, studioArt); container.append(studio);
+  const library = document.createElement('section'); library.className = 'home-issue-library';
+  const libraryCopy = document.createElement('div'); const libraryTitle = document.createElement('h2'); libraryTitle.textContent = 'Practice the problems you will meet in the field.';
+  const libraryText = document.createElement('p'); libraryText.textContent = '200 issues · foundational, common, and rare · live repair labs and evidence-based case studies.'; libraryCopy.append(libraryTitle, libraryText);
+  const libraryButton = document.createElement('button'); libraryButton.type = 'button'; libraryButton.textContent = 'Explore issue library'; libraryButton.addEventListener('click', () => actions.onOpenIssues?.()); library.append(libraryCopy, libraryButton); container.append(library);
 
   // S19.md: "Show Ready offline only after worker activation and successful
   // required-cache checks" — actions.offlineReady is set only once the
@@ -719,11 +745,28 @@ function renderDevicePanel(state, actions) {
   const heading = document.createElement('h2');
   heading.textContent = device.name;
   container.appendChild(heading);
-  container.appendChild(renderInspect(network, device));
+  const equipment = equipmentIcon(device.kind); equipment.classList.add('inspector-equipment'); container.prepend(equipment);
+  const viewKey = `${state.mission.id}:${device.id}`;
+  const mode = trainingMode(state.mission, state.profile);
+  container.dataset.trainingMode = mode;
+  const tabs = document.createElement('div'); tabs.className = 'inspector-tabs'; tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', 'Device tools');
+  const panes = {};
+  const choose = id => {
+    inspectorViews.set(viewKey, id);
+    container.dataset.inspector = id;
+    for (const [key, pane] of Object.entries(panes)) pane.hidden = key !== id;
+    for (const b of tabs.children) b.setAttribute('aria-selected', String(b.dataset.pane === id));
+  };
+  for (const [id, label] of [['inspect', 'Inspect'], ['configure', 'Configure'], ['console', 'Console']]) {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.dataset.pane = id; b.setAttribute('role', 'tab'); b.id = `inspector-tab-${id}`; b.setAttribute('aria-controls', `inspector-pane-${id}`); b.addEventListener('click', () => choose(id)); tabs.append(b);
+    const pane = document.createElement('div'); pane.id = `inspector-pane-${id}`; pane.setAttribute('role', 'tabpanel'); pane.setAttribute('aria-labelledby', b.id); panes[id] = pane;
+  }
+  container.append(tabs, ...Object.values(panes));
+  panes.inspect.appendChild(renderInspect(network, device));
 
   const configureHeading = document.createElement('h3');
   configureHeading.textContent = 'Configure';
-  container.appendChild(configureHeading);
+  panes.configure.appendChild(configureHeading);
   if (state.error) {
     const error = document.createElement('p');
     error.className = 'form-error';
@@ -731,19 +774,35 @@ function renderDevicePanel(state, actions) {
     error.textContent = state.error;
     container.appendChild(error);
   }
-  container.appendChild(renderConfigure(network, device, (formActions) => actions.onApplyDeviceForm?.(formActions)));
+  panes.configure.appendChild(renderConfigure(network, device, (formActions) => actions.onApplyDeviceForm?.(formActions)));
+  if (mode === 'console') {
+    tabs.querySelector('[data-pane="inspect"]').hidden = true;
+    tabs.querySelector('[data-pane="configure"]').hidden = true;
+  }
 
-  if (device.kind === 'client') {
+  if (device.kind === 'client' && mode !== 'console') {
     container.appendChild(renderTests(device.id, (testKind, deviceId) => actions.onRunTest?.(testKind, deviceId)));
+    const latestTest = state.mission.events.findLast(event => event.kind === 'test' && event.deviceId === device.id);
+    if (latestTest) {
+      const feedback = document.createElement('p'); feedback.className = 'test-feedback'; feedback.setAttribute('role', 'status');
+      feedback.textContent = describeEvent(state.mission, latestTest); container.append(feedback);
+    }
   }
 
   const terminal = terminalSessionFor(state, device.id, device.kind);
-  container.appendChild(
+  panes.console.appendChild(
     renderTerminal(terminal, {
       onSubmitCommand: (text) => actions.onSubmitCommand?.(device.id, device.kind, text),
       onInsertBuilderCommand: () => actions.onInsertBuilderCommand?.(device.id, device.kind),
+      showBuilder: mode !== 'console',
     }),
   );
+  choose(mode === 'console' ? 'console' : inspectorViews.get(viewKey) ?? (mode === 'coached' ? 'console' : 'inspect'));
+  if (mode === 'coached') {
+    const bridge = document.createElement('p'); bridge.className = 'console-bridge';
+    bridge.textContent = device.kind === 'client' ? 'Try the console: ipconfig /all, ping <IP>, nslookup <name>, then curl http://<name>. The test buttons remain available while you practice.' : 'Practice in the console. Type ? to discover commands for this device and mode.';
+    panes.console.prepend(bridge);
+  }
 
   return container;
 }
@@ -849,7 +908,7 @@ function describeEvent(mission, event) {
   const device = mission.network.devices.find((d) => d.id === event.deviceId);
   const deviceName = device?.name ?? event.deviceId ?? 'network';
   if (event.kind === 'test') {
-    const label = TEST_LABELS[event.details.testKind] ?? event.details.testKind;
+    const label = event.details.command ?? TEST_LABELS[event.details.testKind] ?? event.details.testKind;
     const outcome = event.details.result.ok ? 'passed' : `failed (${event.details.result.code})`;
     return `${label} from ${deviceName}: ${outcome}`;
   }
@@ -1050,9 +1109,14 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   const mission = state.mission;
   const container = document.createElement('div');
   container.className = 'mission-screen';
+  container.dataset.activeTab = activeTab;
+  const mode = trainingMode(mission, state.profile);
+  container.dataset.trainingMode = mode;
 
   const header = document.createElement('div');
   header.className = 'mission-header';
+  const brand = document.createElement('div'); brand.className = 'workspace-brand'; brand.textContent = 'FIELD';
+  const brandSub = document.createElement('span'); brandSub.textContent = 'PRACTICE LAB'; brand.append(brandSub); header.append(brand);
   const title = document.createElement('span');
   title.className = 'mission-title';
   title.textContent =
@@ -1125,7 +1189,20 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   if (state.pendingMissionRequest) {
     container.appendChild(renderPendingMissionPrompt(state, actions));
   }
-  container.appendChild(renderBrief(state, actions));
+  const workOrder = document.createElement('details'); workOrder.className = 'work-order';
+  const summary = document.createElement('summary'); summary.textContent = mission.mode === 'repair' ? 'Work order · Restore customer connectivity' : 'Lab brief · Configure and verify the network';
+  workOrder.append(summary, renderBrief(state, actions)); container.append(workOrder);
+  const level = mode === 'console' ? 'independent' : mode, next = nextGuidance(mission);
+  const guide = document.createElement('section'); guide.className = 'workspace-guide'; guide.setAttribute('aria-label', 'Learning guidance');
+  const guideLabel = document.createElement('span'); guideLabel.className = 'guide-stage'; guideLabel.textContent = level === 'guided' ? `GUIDED · ${next.step}/4` : level === 'coached' ? 'COACHED' : 'INDEPENDENT';
+  const guideCopy = document.createElement('div');
+  const guideTitle = document.createElement('strong'); guideTitle.textContent = level === 'independent' ? 'Your workspace. Your investigation.' : next.title;
+  const guideDetail = document.createElement('p'); guideDetail.textContent = mode === 'console' ? 'Use the device consoles to inspect, configure, and verify. Test the portal with curl from both workstations, then cite evidence in Findings. Physical cable repairs remain on the canvas. Type ? for supported commands.' : next.detail;
+  guideDetail.hidden = !(coachingExpanded.get(mission.id) ?? level === 'guided');
+  const help = document.createElement('button'); help.type = 'button'; help.textContent = guideDetail.hidden ? 'Show guidance' : 'Hide guidance'; help.setAttribute('aria-expanded', String(!guideDetail.hidden));
+  container.classList.toggle('coach-hidden', guideDetail.hidden);
+  help.addEventListener('click', () => { guideDetail.hidden = !guideDetail.hidden; container.classList.toggle('coach-hidden', guideDetail.hidden); coachingExpanded.set(mission.id, !guideDetail.hidden); help.textContent = guideDetail.hidden ? 'Show guidance' : 'Hide guidance'; help.setAttribute('aria-expanded', String(!guideDetail.hidden)); });
+  guideCopy.append(guideTitle, guideDetail); guide.append(guideLabel, guideCopy, help); container.append(guide);
 
   const tabList = document.createElement('div');
   tabList.className = 'mission-tabs';
@@ -1148,16 +1225,29 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   const networkPanel = document.createElement('div');
   networkPanel.className = 'mission-panel mission-panel-network';
   networkPanel.hidden = activeTab !== 'network';
+  if (!canvasViews.has(mission.id)) canvasViews.set(mission.id, {});
+  const targetPortIds = mission.network.ports.filter(p => p.deviceId === mission.targetClientId).map(p => p.id);
+  const guideCable = mode === 'guided' && next.step === 3 ? mission.network.links.find(l => !l.connected && (targetPortIds.includes(l.aPortId) || targetPortIds.includes(l.bPortId))) : null;
   networkPanel.appendChild(
     renderTopology(mission.network, {
       selectedDeviceId: state.selectedDeviceId,
       onSelectDevice: actions.onSelectDevice,
       onSelectLink: actions.onSelectLink,
       reconnectLinkId: state.reconnect?.linkId ?? null,
+      viewState: canvasViews.get(mission.id),
+      compactList: true,
+      guideDeviceId: mode === 'guided' && next.step === 1 ? mission.targetClientId : null,
+      guideLinkId: guideCable?.id,
     }),
   );
   if (state.reconnect) {
     networkPanel.appendChild(renderReconnectPanel(state, actions));
+  }
+  if (guideCable) {
+    const tip = document.createElement('aside'); tip.className = 'action-coach cable-coach';
+    tip.textContent = state.reconnect ? '↓ Choose the workstation endpoint and its assigned access-switch port, then Connect. The work order identifies the assigned VLAN.' : '↙ The dashed cable is disconnected. Select it to inspect both endpoints and reconnect the workstation.';
+    if (!state.reconnect) { const inspect = document.createElement('button'); inspect.type = 'button'; inspect.textContent = 'Inspect highlighted cable'; inspect.addEventListener('click', () => actions.onSelectLink?.(guideCable.id)); tip.append(inspect); }
+    networkPanel.prepend(tip);
   }
   panels.appendChild(networkPanel);
 
@@ -1180,6 +1270,16 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   panels.appendChild(findingsPanel);
 
   container.appendChild(panels);
+  if (mode === 'guided') {
+    const target = next.step === 2 ? devicePanel.querySelector('.device-tests button')
+      : next.step === 3 && !guideCable ? devicePanel.querySelector('#inspector-tab-configure')
+      : next.step === 4 ? [...tabList.children].find(b => b.textContent === 'Findings') : null;
+    if (target) {
+      const hint = next.step === 2 ? '↓ Run a baseline test. A failure is useful evidence.' : next.step === 3 ? '↓ Compare settings with the work order before changing them.' : '↓ Verify both PCs, then select evidence and write your repair note.';
+      const tip = document.createElement('p'); tip.className = 'action-coach'; tip.id = 'action-coach-tip'; tip.textContent = hint;
+      target.parentElement.insertBefore(tip, target); target.classList.add('coach-target'); target.setAttribute('aria-describedby', tip.id);
+    }
+  }
 
   if (state.recentDevices.length > 0) {
     const recent = document.createElement('div');
