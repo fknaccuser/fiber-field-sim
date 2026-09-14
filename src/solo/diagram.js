@@ -2,6 +2,9 @@ import { svgEl, equipmentGlyph, EQUIPMENT } from './equipment.js';
 import { fitTopologyBounds, resizeTopologyDrawer } from './topology-viewport.js';
 import { attachMentor, explainDevice, explainCable, createGuideToggle } from './mentor.js';
 
+// Per-kind node glow colour so each device reads as a luminous point in the web.
+const NODE_COLOR = { client: '#3dd6f5', switch: '#6ee7f5', router: '#ffb257', server: '#b585ff', firewall: '#ff6fa5', accessPoint: '#7bf0c8', cloud: '#9edbed', fiber: '#ffb257', site: '#9edbed' };
+
 export function positionsFor(network, compact = false) {
   const hasDistribution = network.devices.some(d => d.id === 'SW2');
   const fixed = compact
@@ -87,10 +90,17 @@ export function renderTopology(network, options = {}) {
     group.append(label); world.append(group);
   }
   const paths = [];
+  // Glowing multi-hue web: each connected cable takes an accent colour so the
+  // topology reads like the reference network art rather than a flat diagram.
+  const LINK_COLORS = ['#3dd6f5', '#b585ff', '#ff6fa5', '#ffb257', '#7bf0c8', '#6ee7f5'];
+  let linkIndex = 0;
   for (const link of network.links) {
     const [a, b] = ends(link); if (!positions[a] || !positions[b]) continue;
     const g = svgEl('g', { class: `topology-cable${link.connected === false ? ' is-disconnected' : ''}${link.id === reconnectLinkId ? ' is-selected' : ''}${link.id === options.guideLinkId ? ' cable-coach-target' : ''}${selectedDeviceId && a !== selectedDeviceId && b !== selectedDeviceId ? ' is-muted' : ''}` });
+    const linkColor = link.connected === false ? '#ff9d5c' : LINK_COLORS[linkIndex++ % LINK_COLORS.length];
     const line = svgEl('path', { class: `diagram-link${link.connected === false ? ' diagram-link-down' : ''}`, fill: 'none' });
+    line.style.setProperty('--link-color', linkColor);
+    line.style.setProperty('--link-glow', linkColor);
     const hit = svgEl('path', { class: 'cable-hit', fill: 'none', tabindex: 0, role: 'button', 'aria-label': `Cable ${link.id}, ${link.connected === false ? 'disconnected' : 'connected'}` });
     const act = () => onSelectLink?.(link.id); hit.addEventListener('click', act);
     hit.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(); } });
@@ -106,13 +116,17 @@ export function renderTopology(network, options = {}) {
     }
   }
   drawPaths();
-  let drag = null, suppressClick = false;
+  let drag = null, suppressClick = false, nodeIndex = 0;
   const pointer = e => { const box = svg.getBoundingClientRect(); return [e.clientX - box.left, e.clientY - box.top]; };
   for (const device of network.devices) {
     const [x, y] = positions[device.id];
     const g = svgEl('g', { class: `diagram-device${device.id === selectedDeviceId ? ' diagram-device-selected' : ''}`, 'data-kind': device.kind, 'data-device-id': device.id, transform: `translate(${x} ${y})`, tabindex: 0, role: 'button', 'aria-label': `${device.name} (${device.kind})`, 'aria-pressed': device.id === selectedDeviceId });
+    const nodeColor = NODE_COLOR[device.kind] ?? '#3dd6f5';
+    g.style.setProperty('--node-color', nodeColor);
     g.append(svgEl('title', {}, device.name));
-    g.append(svgEl('rect', { class: 'device-selection', x: -48, y: -45, width: 96, height: 90, rx: 14 }), equipmentGlyph(device.kind));
+    const halo = svgEl('circle', { class: 'device-halo', cx: 0, cy: 0, r: 34 });
+    halo.style.animationDelay = `${(nodeIndex++ % 6) * 0.55}s`;
+    g.append(halo, svgEl('rect', { class: 'device-selection', x: -48, y: -45, width: 96, height: 90, rx: 14 }), equipmentGlyph(device.kind));
     if (device.kind !== 'site') g.append(svgEl('text', { class: 'node-type', x: 0, y: 61, 'text-anchor': 'middle' }, device.kind === 'client' ? 'PC' : EQUIPMENT[device.kind] ?? device.kind));
     g.append(svgEl('text', { class: 'node-label diagram-device-label', x: 0, y: 61, 'text-anchor': 'middle' }, device.name));
     g.append(svgEl('text', { class: 'node-detail', x: 0, y: 80, 'text-anchor': 'middle' }, device.subtitle ?? `${device.id} · ${EQUIPMENT[device.kind] ?? 'Site'}`));

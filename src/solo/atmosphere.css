@@ -86,8 +86,45 @@
   background-size: cover;
   background-position: center;
 }
-.topology-canvas .diagram-link { filter: drop-shadow(0 0 2px #31c9ee30); }
-.topology-canvas .diagram-device-selected .device-selection { filter: drop-shadow(0 0 5px #42d5f240); }
+/* Glowing spider-web topology: luminous coloured cables + node halos. */
+.topology-canvas .diagram-link {
+  stroke: var(--link-color, #4aa8cf);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 3px var(--link-glow, #3dd6f5)) drop-shadow(0 0 8px var(--link-glow, #3dd6f5));
+  opacity: .95;
+}
+.topology-cable.is-muted { opacity: .3; }
+.topology-cable.is-disconnected .diagram-link {
+  stroke: #ff9d5c;
+  stroke-dasharray: 8 6;
+  filter: drop-shadow(0 0 4px #ff9d5c88);
+  opacity: .9;
+}
+.topology-cable.is-selected .diagram-link {
+  stroke: #eafcff;
+  stroke-width: 3.6;
+  filter: drop-shadow(0 0 4px var(--link-glow, #6ee7f5)) drop-shadow(0 0 12px var(--link-glow, #6ee7f5));
+}
+.topology-canvas .device-halo {
+  fill: var(--node-color, #3dd6f5);
+  opacity: .42;
+  filter: blur(13px);
+  animation: node-pulse 4.6s ease-in-out infinite;
+}
+.topology-canvas .diagram-device:hover .device-halo,
+.topology-canvas .diagram-device:focus-visible .device-halo { opacity: .75; animation: none; }
+.topology-canvas .diagram-device-selected .device-halo { opacity: .82; animation: none; }
+.topology-canvas .diagram-device .equipment-glyph { filter: drop-shadow(0 0 4px var(--node-color, #3dd6f5)) drop-shadow(0 0 1px var(--node-color, #3dd6f5)); }
+.topology-canvas .diagram-device:hover .device-selection,
+.topology-canvas .diagram-device-selected .device-selection {
+  stroke: var(--node-color, #42d5f2);
+  filter: drop-shadow(0 0 7px var(--node-color, #42d5f2));
+}
+.topology-canvas .node-type { fill: var(--node-color, #9edbed); }
+.topology-canvas .power-on { filter: drop-shadow(0 0 3px #83cfb7); }
+@keyframes node-pulse { 0%, 100% { opacity: .34; } 50% { opacity: .6; } }
+@media (prefers-reduced-motion: reduce) { .topology-canvas .device-halo { animation: none; } }
 .topology-splitter { background: linear-gradient(90deg, #102339, #18354c, #102339); }
 .topology-splitter-grip { box-shadow: 0 0 8px #63dafa44; }
 .issue-header {
