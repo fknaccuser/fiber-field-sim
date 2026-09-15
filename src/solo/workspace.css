@@ -367,3 +367,49 @@ p { line-height: 1.6; }
   .home-career-ladder { justify-content: flex-start; }
   .career-assignments { grid-template-columns: 1fr; }
 }
+
+/* --- Field device shell: one surface, map at home, sheets over it -------- */
+.mission-screen.field-device { display: flex; flex-direction: column; height: 100dvh; min-height: 0; overflow: hidden; }
+.field-device .mission-header { min-height: 54px; padding: 9px 16px; gap: 10px; }
+.field-device .mission-header button { min-height: 34px; font-size: 12px; }
+.field-device .fd-stage { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.field-device .fd-map { flex: 1; min-height: 0; display: flex; flex-direction: column; background: transparent; }
+.field-device .fd-map > .diagram { flex: 1; height: auto !important; min-height: 0 !important; }
+
+/* Slim coaching ribbon docked above the map (pushes the map, never covers it) */
+.fd-guide { flex: none; display: flex; align-items: center; gap: 12px; margin: 8px 8px 0; padding: 8px 13px; border-radius: 12px; background: linear-gradient(100deg, #0c2740f2, #0a1e33f2); border: 1px solid #2c5570; }
+.fd-guide .guide-stage { font-size: 10px; letter-spacing: .1em; color: #71dbef; white-space: nowrap; }
+.fd-guide-copy { flex: 1; min-width: 0; }
+.fd-guide-copy strong { font-size: 13px; font-weight: 600; }
+.fd-guide-copy p { margin: 3px 0 0; font-size: 12px; color: #adc3d6; }
+.fd-guide-toggle { flex: none; min-height: 30px; font-size: 11px; padding: 5px 13px; border-radius: 999px; white-space: nowrap; }
+
+/* Sheets slide over the map */
+.fd-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; flex-direction: column; max-height: 84%; background: linear-gradient(180deg, #0c2138f2, #0a1a2df8); border-top: 1px solid #35618a; border-radius: 20px 20px 0 0; box-shadow: 0 -22px 64px #01050faa, inset 0 1px #79dbff26; }
+.fd-sheet[hidden] { display: none; }
+.fd-sheet-bar { position: relative; display: flex; align-items: center; gap: 10px; padding: 12px 14px 8px; flex: none; border-bottom: 1px solid #1c3b53; }
+.fd-grab { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 40px; height: 4px; border-radius: 999px; background: #ffffff2b; }
+.fd-sheet-title { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; margin: 2px 0 0; color: #eaf6ff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fd-sheet-close { flex: none; min-height: 34px; padding: 6px 13px; border-radius: 999px; background: #123653; border: 1px solid #3a6f8f; color: #cdeffb; font-weight: 600; font-size: 12px; }
+.fd-sheet-close:hover { background: #17466a; }
+.fd-sheet-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 18px 20px; }
+.fd-sheet-body .device-panel, .fd-sheet-body > div { border: 0; padding: 0; background: transparent; }
+
+/* Bottom dock: the device's controls */
+.fd-dock { flex: none; display: flex; gap: 6px; padding: 7px 10px calc(8px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(180deg, #0a1c30, #07131f); border-top: 1px solid #23405a; }
+.fd-dock-btn { flex: 1; min-height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; background: transparent; border: 1px solid transparent; border-radius: 13px; color: #8fb0c7; position: relative; padding: 4px; }
+.fd-dock-btn:hover { background: #0e243a; border-color: #274863; }
+.fd-dock-glyph { font-size: 17px; line-height: 1; }
+.fd-dock-label { font-size: 10.5px; font-weight: 600; max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fd-dock-btn.is-active { color: #eafcff; background: linear-gradient(180deg, #123350, #0e2740); border-color: #3f7398; box-shadow: 0 0 16px #34b6db33; }
+.fd-dock-device.is-active { border-color: #6ee7f5; box-shadow: 0 0 16px #6ee7f533; }
+.fd-dock-badge { position: absolute; top: 5px; right: 16px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #ff6fa5; color: #180a12; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+.fd-dock-btn.coach-target { border-color: #6ee7f5; animation: node-pulse 1.6s ease-in-out infinite; }
+
+/* Reconnect helper floats over the map like a sheet, not a stacked box */
+.field-device .fd-map .reconnect-panel { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 18; margin: 0; }
+
+@media (min-width: 760px) {
+  .mission-screen.field-device { max-width: 1180px; margin: 0 auto; box-shadow: 0 0 0 1px #24455f, 0 30px 90px #01040c88; }
+  .fd-sheet { max-height: 78%; border-radius: 22px 22px 0 0; }
+}

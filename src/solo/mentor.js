@@ -255,10 +255,18 @@ const CONCEPTS_EXTRA = {
       'Your evidence log. Every device you inspect and every test you run is recorded here. Before you submit a repair, tick the findings that prove what was wrong and that you fixed it, then write a short note.',
   },
   tests: {
-    title: 'Tests',
-    tag: 'Verify',
+    title: 'Tests — read the symptom',
+    tag: 'Method',
     plain:
-      'Quick checks you run from a workstation. Each button performs one test and records the pass/fail result in Findings — this is how you prove a symptom before touching anything, and confirm the fix afterward.',
+      'Each button runs one check from a workstation and records pass/fail in Findings. Read the results as symptoms: WHICH test fails tells you WHERE the fault is — a local link, routing between networks, or DNS — so you fix the right layer instead of guessing.',
+    note:
+      'Work bottom-up: gateway → server IP → resolve name → open portal. The first test that fails points at the cause.',
+  },
+  diagnosis: {
+    title: 'Symptom → cause → fix',
+    tag: 'How to think',
+    plain:
+      'Troubleshooting runs from the symptom to the cause. “Can’t reach anything” is a common symptom of a local fault — a cable unplugged, a shut port, a wrong IP/subnet, or the access port on the wrong VLAN. “Works by IP but not by name” points at DNS. “This desk works, the next doesn’t” points at the VLAN on that port. Change one thing, test again.',
   },
 };
 Object.assign(CONCEPTS, CONCEPTS_EXTRA);
@@ -293,31 +301,41 @@ const TESTS = {
     title: 'Test: Ping gateway',
     tag: 'Reachability',
     plain:
-      'Sends a tiny "are you there?" message to this workstation’s gateway — the router that leads out of its network. A reply means the local path (cable, port, VLAN, IP) is good up to the router. No reply means the problem is local.',
+      'Sends a tiny "are you there?" message to this workstation’s gateway — the router that leads out of its network. A reply means the local path (cable, port, VLAN, IP) is good up to the router.',
+    note:
+      'A FAILURE here is a classic local-fault symptom. Look out for: the cable unplugged, a port administratively shut, a wrong IP or subnet on the PC, or the switch access port set to the wrong VLAN. Fix the physical and local layer first.',
   },
   pingServer: {
     title: 'Test: Ping server IP',
     tag: 'Reachability',
     plain:
       'Pings the portal server by its raw IP address. Success proves the network path all the way to the server works — separately from whether the server’s NAME resolves.',
+    note:
+      'If the gateway pings but THIS fails, the break is between networks. Look out for: a wrong router segment / gateway address, or the PC sitting in the wrong subnet or VLAN so its traffic never reaches the server’s network.',
   },
   resolvePortal: {
     title: 'Test: Resolve portal',
     tag: 'DNS',
     plain:
       'Asks DNS to turn the portal’s name into an IP address. This checks name resolution only — it does not prove the page will actually load.',
+    note:
+      'If you can ping the server’s IP but THIS fails, it’s a DNS symptom. Look out for: the PC’s DNS resolver set to a wrong or unreachable address, or the DNS server missing the portal’s record. The network is fine — the name lookup isn’t.',
   },
   openPortal: {
     title: 'Test: Open portal',
     tag: 'End-to-end',
     plain:
       'Opens the portal by name — the real check a user cares about. It only passes when addressing, VLAN, routing AND DNS are all correct at once.',
+    note:
+      'This is the symptom the customer actually reports, and a failure can come from ANY layer. Work bottom-up — gateway, then server IP, then resolve the name — and the first test that fails names the cause.',
   },
   checkProtected: {
     title: 'Test: Check protected client',
     tag: 'Security + service',
     plain:
       'Runs the portal check from the locked-down workstation, confirming your fix restored service for the authorized PC without tripping its port security.',
+    note:
+      'A FAILURE after your fix means: port security tripped (an unknown device was plugged in), or your change broke this PC’s own addressing or VLAN. It proves security held AND service works.',
   },
 };
 
@@ -449,6 +467,15 @@ export function attachMentor(element, specFn) {
   element.addEventListener('pointerdown', hideTip);
   element.addEventListener('focus', () => {
     if (!enabled) return;
+    // Only show on *keyboard* focus. A click/tap also focuses the element, and
+    // showing on that would leave the tip stuck open after selecting a device.
+    let keyboard = false;
+    try {
+      keyboard = element.matches(':focus-visible');
+    } catch {
+      keyboard = false;
+    }
+    if (!keyboard) return;
     const spec = specFn();
     if (!spec) return;
     fillTip(spec);
@@ -456,6 +483,19 @@ export function attachMentor(element, specFn) {
     place(r.left + r.width / 2, r.bottom);
   });
   element.addEventListener('blur', hideTip);
+  // Activating (Enter/Space), Escape, or tabbing away also dismisses it.
+  element.addEventListener('keydown', (e) => {
+    if (['Enter', ' ', 'Spacebar', 'Escape', 'Tab'].includes(e.key)) hideTip();
+  });
+}
+
+// A press or tap anywhere, a scroll, or Escape dismisses any open tooltip —
+// the safety net that guarantees it never stays stuck (e.g. after a tap, or
+// once the view re-renders and the hovered element is gone).
+if (typeof document !== 'undefined') {
+  document.addEventListener('pointerdown', () => { if (visible) hideTip(); }, true);
+  document.addEventListener('scroll', () => { if (visible) hideTip(); }, true);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && visible) hideTip(); }, true);
 }
 
 // Small pill button that toggles the beginner tooltips, for a toolbar.

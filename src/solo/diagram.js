@@ -128,7 +128,7 @@ export function renderTopology(network, options = {}) {
     halo.style.animationDelay = `${(nodeIndex++ % 6) * 0.55}s`;
     g.append(halo, svgEl('rect', { class: 'device-selection', x: -48, y: -45, width: 96, height: 90, rx: 14 }), equipmentGlyph(device.kind));
     if (device.kind !== 'site') g.append(svgEl('text', { class: 'node-type', x: 0, y: 61, 'text-anchor': 'middle' }, device.kind === 'client' ? 'PC' : EQUIPMENT[device.kind] ?? device.kind));
-    g.append(svgEl('text', { class: 'node-label diagram-device-label', x: 0, y: 61, 'text-anchor': 'middle' }, device.name));
+    g.append(svgEl('text', { class: 'node-label diagram-device-label', x: 0, y: 61, 'text-anchor': 'middle' }, String(device.name ?? '').replace(/^[^:]+:\s*/, '')));
     g.append(svgEl('text', { class: 'node-detail', x: 0, y: 80, 'text-anchor': 'middle' }, device.subtitle ?? `${device.id} · ${EQUIPMENT[device.kind] ?? 'Site'}`));
     if (device.powered !== undefined) g.append(svgEl('circle', { cx: 35, cy: -31, r: 4, class: device.powered ? 'power-on' : 'power-off' }));
     if (options.guideDeviceId === device.id) {

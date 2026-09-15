@@ -213,3 +213,98 @@ p.mentor-hoverable { text-decoration: underline dotted #47bfe066; text-underline
   .issue-header { padding: 20px; }
   .mentor-tip { max-width: min(320px, calc(100vw - 24px)); }
 }
+
+/* ===================== Neon cyber theme ===================== */
+:root {
+  --neon-cyan: #37e0ff;
+  --neon-purple: #b06bff;
+  --neon-magenta: #ff4fa3;
+  --neon-orange: #ff9433;
+  --neon-gold: #ffcf5a;
+}
+
+/* Darker, purpler grounds so neon actually pops */
+.mission-screen.field-device { background: radial-gradient(1200px 820px at 82% -12%, #1d1142, #06040f 62%); }
+.home-screen { background:
+    linear-gradient(90deg, #08061af0 6%, #0a0720 74%),
+    radial-gradient(1150px 660px at 88% 4%, #ff943340, transparent 62%),
+    radial-gradient(1250px 840px at 8% 98%, #8a3fd070, transparent 60%),
+    radial-gradient(980px 600px at 60% 42%, #f0407f48, transparent 62%),
+    url('./assets/network-mesh.svg') center top / max(1600px, 100vw) auto no-repeat,
+    #06040f; }
+.career-screen { background-image:
+    radial-gradient(1150px 720px at 86% 2%, #ff943338, transparent 60%),
+    radial-gradient(1250px 840px at 5% 100%, #8a3fd066, transparent 60%),
+    radial-gradient(960px 580px at 60% 40%, #f0407f36, transparent 62%),
+    radial-gradient(ellipse at 50% -10%, #160e30, #07050f 62%); }
+
+/* Every button: neon outline on dark glass */
+button {
+  background: linear-gradient(180deg, #191233, #120d26);
+  border: 1px solid #463877;
+  color: #eae6ff;
+}
+button:hover { border-color: var(--neon-purple); box-shadow: 0 0 12px #b06bff55; background: linear-gradient(180deg, #241a48, #181031); }
+
+/* Primary actions: glowing purple→magenta sign */
+.primary-button, .findings-submit {
+  background: linear-gradient(120deg, #b06bff, #ff4fa3);
+  border-color: #ff77bb;
+  color: #180323;
+  font-weight: 700;
+  box-shadow: 0 0 22px #b06bff5e;
+}
+.primary-button:hover, .findings-submit:hover { box-shadow: 0 0 30px #ff4fa380; background: linear-gradient(120deg, #c07dff, #ff64b0); color: #180323; }
+
+/* Kickers / brand in neon */
+.section-kicker { color: var(--neon-purple); text-shadow: 0 0 12px #b06bff44; }
+.workspace-brand { color: #ffe7c9; text-shadow: 0 0 20px #ff943366; }
+.workspace-brand span { color: var(--neon-orange); }
+.home-subtitle { color: #d8b6ff; }
+
+/* Field-device chrome */
+.field-device .mission-header {
+  background: linear-gradient(100deg, #170c30f2 30%, #0c0722aa), url('./assets/network-mesh.svg') right 40% / cover, #0d0722;
+  border-bottom: 1px solid #3a2a63;
+}
+.fd-guide { background: linear-gradient(100deg, #1a0f36ee, #120a2aee); border: 1px solid #45308f; box-shadow: 0 0 26px #7a3bbf2e; }
+.fd-guide .guide-stage { color: var(--neon-orange); text-shadow: 0 0 10px #ff943355; }
+.fd-guide-copy strong { color: #f4ecff; }
+.fd-guide-copy p { color: #c3b6e6; }
+
+.fd-sheet {
+  background: linear-gradient(180deg, #150c2ef6, #0c0720f9);
+  border-top: 1px solid var(--neon-purple);
+  box-shadow: 0 -22px 64px #05010faa, 0 0 44px #7a3bbf3a, inset 0 1px #b06bff33;
+}
+.fd-sheet-title { color: #f5ecff; }
+.fd-sheet-close {
+  background: linear-gradient(120deg, #b06bff, #ff4fa3);
+  border-color: #ff77bb; color: #180323; box-shadow: 0 0 16px #b06bff5e;
+}
+.fd-sheet-close:hover { box-shadow: 0 0 24px #ff4fa380; }
+
+/* Dock: active tab glows neon */
+.fd-dock { background: linear-gradient(180deg, #0e0824, #070412); border-top: 1px solid #2f2456; }
+.fd-dock-btn { color: #a99bd0; }
+.fd-dock-btn:hover { background: #16103a; border-color: #45308f; }
+.fd-dock-btn.is-active {
+  color: #fdefff;
+  background: linear-gradient(180deg, #2b1556, #190d3a);
+  border-color: var(--neon-purple);
+  box-shadow: 0 0 20px #b06bff66, inset 0 0 14px #b06bff22;
+}
+.fd-dock-device.is-active { border-color: var(--neon-cyan); box-shadow: 0 0 20px #37e0ff66, inset 0 0 14px #37e0ff22; }
+.fd-dock-badge { background: var(--neon-orange); color: #200c00; box-shadow: 0 0 10px #ff943399; }
+
+/* Device inspector sub-tabs, mission tabs, guided-help toggle: neon accents */
+.inspector-tabs [aria-selected='true'], .mission-tab[aria-selected='true'] {
+  color: var(--neon-cyan); border-bottom-color: var(--neon-cyan); text-shadow: 0 0 10px #37e0ff44;
+}
+.mentor-guide-toggle[aria-pressed='true'] {
+  border-color: var(--neon-cyan);
+  color: #eafcff;
+  box-shadow: 0 0 14px #37e0ff44;
+}
+.career-rank-pip.is-active, .career-rank-badge { border-color: var(--neon-purple); }
+.home-career .primary-button { box-shadow: 0 0 22px #ff943355, 0 0 30px #b06bff44; }

@@ -880,7 +880,7 @@ function renderDevicePanel(state, actions) {
   }
 
   const heading = document.createElement('h2');
-  heading.textContent = device.name;
+  heading.textContent = String(device.name ?? '').replace(/^[^:]+:\s*/, '');
   heading.classList.add('mentor-hoverable');
   heading.tabIndex = 0;
   attachMentor(heading, () => explainDevice(device));
@@ -1143,12 +1143,6 @@ function renderFindings(state, actions) {
   return container;
 }
 
-const MISSION_TABS = [
-  { id: 'network', label: 'Network' },
-  { id: 'device', label: 'Device' },
-  { id: 'findings', label: 'Findings' },
-];
-
 function xFromNetwork(network) {
   // The generated /24's second octet is never mutated by any recipe; the
   // server's own address is always intact, so it's a reliable source.
@@ -1336,42 +1330,28 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   if (state.pendingMissionRequest) {
     container.appendChild(renderPendingMissionPrompt(state, actions));
   }
-  const workOrder = document.createElement('details'); workOrder.className = 'work-order';
-  const summary = document.createElement('summary'); summary.textContent = mission.mode === 'repair' ? 'Work order · Restore customer connectivity' : 'Lab brief · Configure and verify the network';
-  workOrder.append(summary, renderBrief(state, actions)); container.append(workOrder);
+  container.classList.add('field-device');
   const level = mode === 'console' ? 'independent' : mode, next = nextGuidance(mission);
-  const guide = document.createElement('section'); guide.className = 'workspace-guide'; guide.setAttribute('aria-label', 'Learning guidance');
+
+  // One device surface: the topology map is the home; device, findings and the
+  // work order open as sheets over it, so the learner never flips to a page.
+  const stage = document.createElement('div'); stage.className = 'fd-stage';
+
+  // Slim, collapsible coaching ribbon across the top of the map.
+  const guide = document.createElement('section'); guide.className = 'fd-guide'; guide.setAttribute('aria-label', 'Learning guidance');
   const guideLabel = document.createElement('span'); guideLabel.className = 'guide-stage'; guideLabel.textContent = level === 'guided' ? `GUIDED · ${next.step}/4` : level === 'coached' ? 'COACHED' : 'INDEPENDENT';
-  const guideCopy = document.createElement('div');
+  const guideCopy = document.createElement('div'); guideCopy.className = 'fd-guide-copy';
   const guideTitle = document.createElement('strong'); guideTitle.textContent = level === 'independent' ? 'Your workspace. Your investigation.' : next.title;
   const guideDetail = document.createElement('p'); guideDetail.textContent = mode === 'console' ? 'Use the device consoles to inspect, configure, and verify. Test the portal with curl from both workstations, then cite evidence in Findings. Physical cable repairs remain on the canvas. Type ? for supported commands.' : next.detail;
   guideDetail.hidden = !(coachingExpanded.get(mission.id) ?? level === 'guided');
-  const help = document.createElement('button'); help.type = 'button'; help.textContent = guideDetail.hidden ? 'Show guidance' : 'Hide guidance'; help.setAttribute('aria-expanded', String(!guideDetail.hidden));
+  const help = document.createElement('button'); help.type = 'button'; help.className = 'fd-guide-toggle'; help.textContent = guideDetail.hidden ? 'Show' : 'Hide'; help.setAttribute('aria-expanded', String(!guideDetail.hidden)); help.setAttribute('aria-label', guideDetail.hidden ? 'Show guidance' : 'Hide guidance');
   container.classList.toggle('coach-hidden', guideDetail.hidden);
-  help.addEventListener('click', () => { guideDetail.hidden = !guideDetail.hidden; container.classList.toggle('coach-hidden', guideDetail.hidden); coachingExpanded.set(mission.id, !guideDetail.hidden); help.textContent = guideDetail.hidden ? 'Show guidance' : 'Hide guidance'; help.setAttribute('aria-expanded', String(!guideDetail.hidden)); });
-  guideCopy.append(guideTitle, guideDetail); guide.append(guideLabel, guideCopy, help); container.append(guide);
+  help.addEventListener('click', () => { guideDetail.hidden = !guideDetail.hidden; container.classList.toggle('coach-hidden', guideDetail.hidden); coachingExpanded.set(mission.id, !guideDetail.hidden); help.textContent = guideDetail.hidden ? 'Show' : 'Hide'; help.setAttribute('aria-expanded', String(!guideDetail.hidden)); });
+  guideCopy.append(guideTitle, guideDetail); guide.append(guideLabel, guideCopy, help); stage.append(guide);
 
-  const tabList = document.createElement('div');
-  tabList.className = 'mission-tabs';
-  tabList.setAttribute('role', 'tablist');
-  for (const tab of MISSION_TABS) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = tab.id === activeTab ? 'mission-tab mission-tab-active' : 'mission-tab';
-    button.textContent = tab.label;
-    button.setAttribute('role', 'tab');
-    button.setAttribute('aria-selected', tab.id === activeTab ? 'true' : 'false');
-    button.addEventListener('click', () => actions.onTabChange?.(tab.id));
-    tabList.appendChild(button);
-  }
-  container.appendChild(tabList);
-
-  const panels = document.createElement('div');
-  panels.className = 'mission-panels';
-
+  // The map — always present, the home surface.
   const networkPanel = document.createElement('div');
-  networkPanel.className = 'mission-panel mission-panel-network';
-  networkPanel.hidden = activeTab !== 'network';
+  networkPanel.className = 'mission-panel mission-panel-network fd-map';
   if (!canvasViews.has(mission.id)) canvasViews.set(mission.id, {});
   const targetPortIds = mission.network.ports.filter(p => p.deviceId === mission.targetClientId).map(p => p.id);
   const guideCable = mode === 'guided' && next.step === 3 ? mission.network.links.find(l => !l.connected && (targetPortIds.includes(l.aPortId) || targetPortIds.includes(l.bPortId))) : null;
@@ -1396,55 +1376,65 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
     if (!state.reconnect) { const inspect = document.createElement('button'); inspect.type = 'button'; inspect.textContent = 'Inspect highlighted cable'; inspect.addEventListener('click', () => actions.onSelectLink?.(guideCable.id)); tip.append(inspect); }
     networkPanel.prepend(tip);
   }
-  panels.appendChild(networkPanel);
+  stage.appendChild(networkPanel);
 
-  const devicePanel = document.createElement('div');
-  devicePanel.className = 'mission-panel mission-panel-device';
-  devicePanel.hidden = activeTab !== 'device';
-  devicePanel.appendChild(renderDevicePanel(state, actions));
-  panels.appendChild(devicePanel);
+  // A sheet slides up over the map instead of switching to a separate page.
+  const makeSheet = (kind, titleText, contentNode, onClose, closeLabel = '▾ Map') => {
+    const el = document.createElement('section'); el.className = `fd-sheet fd-sheet-${kind}`;
+    const bar = document.createElement('div'); bar.className = 'fd-sheet-bar';
+    const grab = document.createElement('span'); grab.className = 'fd-grab'; grab.setAttribute('aria-hidden', 'true');
+    const h = document.createElement('h2'); h.className = 'fd-sheet-title'; h.textContent = titleText;
+    const close = document.createElement('button'); close.type = 'button'; close.className = 'fd-sheet-close'; close.textContent = closeLabel; close.setAttribute('aria-label', 'Back to the network map'); close.addEventListener('click', onClose);
+    bar.append(grab, h, close);
+    const body = document.createElement('div'); body.className = 'fd-sheet-body'; body.appendChild(contentNode);
+    el.append(bar, body); return el;
+  };
+  const selectedDevice = mission.network.devices.find(d => d.id === state.selectedDeviceId);
+  const shortName = name => String(name ?? '').replace(/^[^:]+:\s*/, '');
+  const deviceSheetContent = renderDevicePanel(state, actions);
+  const deviceSheet = makeSheet('device', selectedDevice ? shortName(selectedDevice.name) : 'Device', deviceSheetContent, () => actions.onTabChange?.('network'));
+  deviceSheet.hidden = activeTab !== 'device';
+  stage.appendChild(deviceSheet);
 
-  const findingsPanel = document.createElement('div');
-  findingsPanel.className = 'mission-panel mission-panel-findings';
-  findingsPanel.hidden = activeTab !== 'findings';
-  findingsPanel.appendChild(
-    renderFindings(state, {
-      ...actions,
-      completionChecks:
-        mission.mode === 'repair' ? evaluateCompletion(mission).checks : evaluateConfigureChecklist(mission).checks,
-    }),
-  );
-  panels.appendChild(findingsPanel);
+  const findingsSheet = makeSheet('findings', mission.mode === 'repair' ? 'Findings & submit' : 'Checklist & submit',
+    renderFindings(state, { ...actions, completionChecks: mission.mode === 'repair' ? evaluateCompletion(mission).checks : evaluateConfigureChecklist(mission).checks }),
+    () => actions.onTabChange?.('network'));
+  findingsSheet.hidden = activeTab !== 'findings';
+  stage.appendChild(findingsSheet);
 
-  container.appendChild(panels);
+  const briefSheet = makeSheet('brief', mission.mode === 'repair' ? 'Work order' : 'Lab brief', renderBrief(state, actions), () => { briefSheet.hidden = true; }, '▾ Close');
+  briefSheet.hidden = true;
+  stage.appendChild(briefSheet);
+
+  container.appendChild(stage);
+
+  // Bottom dock — the device's controls; the map is always one tap away.
+  const dock = document.createElement('nav'); dock.className = 'fd-dock'; dock.setAttribute('aria-label', 'Workspace controls');
+  const dockButton = (glyph, label, isActive, onClick, extraClass = '') => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = ('fd-dock-btn ' + extraClass).trim();
+    b.setAttribute('aria-pressed', String(isActive)); if (isActive) b.classList.add('is-active');
+    const g = document.createElement('span'); g.className = 'fd-dock-glyph'; g.setAttribute('aria-hidden', 'true'); g.textContent = glyph;
+    const t = document.createElement('span'); t.className = 'fd-dock-label'; t.textContent = label;
+    b.append(g, t); b.addEventListener('click', onClick); dock.appendChild(b); return b;
+  };
+  dockButton('◹', 'Map', activeTab === 'network', () => actions.onTabChange?.('network'));
+  if (selectedDevice) dockButton('▤', shortName(selectedDevice.name), activeTab === 'device', () => actions.onTabChange?.('device'), 'fd-dock-device');
+  const findingsCount = mission.events.filter(e => e.kind === 'inspection' || e.kind === 'test').length;
+  const findingsBtn = dockButton('✔', 'Findings', activeTab === 'findings', () => actions.onTabChange?.('findings'));
+  if (findingsCount) { const badge = document.createElement('span'); badge.className = 'fd-dock-badge'; badge.textContent = String(findingsCount); findingsBtn.appendChild(badge); }
+  dockButton('❐', 'Brief', false, () => { briefSheet.hidden = false; });
+  container.appendChild(dock);
   if (mode === 'guided') {
-    const target = next.step === 2 ? devicePanel.querySelector('.device-tests button')
-      : next.step === 3 && !guideCable ? devicePanel.querySelector('#inspector-tab-configure')
-      : next.step === 4 ? [...tabList.children].find(b => b.textContent === 'Findings') : null;
-    if (target) {
-      const hint = next.step === 2 ? '↓ Run a baseline test. A failure is useful evidence.' : next.step === 3 ? '↓ Compare settings with the work order before changing them.' : '↓ Verify both PCs, then select evidence and write your repair note.';
-      const tip = document.createElement('p'); tip.className = 'action-coach'; tip.id = 'action-coach-tip'; tip.textContent = hint;
-      target.parentElement.insertBefore(tip, target); target.classList.add('coach-target'); target.setAttribute('aria-describedby', tip.id);
+    if (next.step === 2 || (next.step === 3 && !guideCable)) {
+      const target = next.step === 2 ? deviceSheetContent.querySelector('.device-tests button') : deviceSheetContent.querySelector('#inspector-tab-configure');
+      if (target) {
+        const hint = next.step === 2 ? '↓ Run a baseline test. A failure is useful evidence.' : '↓ Compare settings with the work order before changing them.';
+        const tip = document.createElement('p'); tip.className = 'action-coach'; tip.id = 'action-coach-tip'; tip.textContent = hint;
+        target.parentElement.insertBefore(tip, target); target.classList.add('coach-target'); target.setAttribute('aria-describedby', tip.id);
+      }
+    } else if (next.step === 4) {
+      findingsBtn.classList.add('coach-target');
     }
-  }
-
-  if (state.recentDevices.length > 0) {
-    const recent = document.createElement('div');
-    recent.className = 'mission-recent-devices';
-    const label = document.createElement('span');
-    label.textContent = 'Recent: ';
-    recent.appendChild(label);
-    for (const deviceId of state.recentDevices) {
-      const device = mission.network.devices.find((d) => d.id === deviceId);
-      if (!device) continue;
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'mission-recent-device';
-      button.textContent = device.name;
-      button.addEventListener('click', () => actions.onSelectDevice?.(deviceId));
-      recent.appendChild(button);
-    }
-    container.appendChild(recent);
   }
 
   return container;

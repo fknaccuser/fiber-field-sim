@@ -84,3 +84,14 @@ test('each verification test button has its own plain-language meaning', () => {
   assert.match(explainTest('openPortal').plain, /end-to-end|user cares|all/i);
   assert.equal(explainTest('unknown'), null);
 });
+
+test('tests teach symptom -> cause: each failure note names concrete things to check', () => {
+  assert.match(explainTest('pingGateway').note, /cable|VLAN|IP|port/i);
+  assert.match(explainTest('resolvePortal').note, /DNS/);
+  assert.match(explainTest('pingServer').note, /subnet|VLAN|gateway|network/i);
+  // The method concept frames the whole approach.
+  const d = explainConcept('diagnosis');
+  assert.match(d.plain, /symptom/i);
+  assert.match(d.plain, /DNS/);
+  assert.match(d.plain, /VLAN/);
+});
