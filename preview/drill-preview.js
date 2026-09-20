@@ -1,7 +1,7 @@
 // Preview-only entry. The generator, the answer checking, and the session
 // scoring are the repo's own drills/subnet.js. Only the screen is written here.
 
-import { TIERS, tierById, generate, isCorrect, emptySession, record, averageSeconds } from '../src/solo/drills/subnet.js';
+import { TIERS, tierById, generate, isCorrect, emptySession, record, averageSeconds, shouldShowWork } from '../src/solo/drills/subnet.js';
 
 const BEST_KEY = 'fieldsim:subnet:best';
 const readBest = () => { try { return Number(localStorage.getItem(BEST_KEY) || 0); } catch { return 0; } };
@@ -76,7 +76,10 @@ function render() {
 
   if (!question) {
     const intro = el('section', 'card');
-    intro.append(el('p', 'intro', 'Type the answer and press Enter. Running out of time costs the streak and nothing else. Every miss shows the rule that gets there.'));
+    intro.append(el('p', 'intro', 'Type the answer and press Enter. Running out of time costs the streak and nothing else.'));
+    intro.append(el('p', 'intro', tierById(session.tierId).teach
+      ? 'Warm shows the full arithmetic after every question, right or wrong, so the method gets built before the clock matters.'
+      : 'Field and Exam show the worked arithmetic only when you miss.'));
     intro.append(el('p', 'best', allTime ? `Best streak ${allTime}` : 'No streak yet'));
     const go = el('button', 'go', 'Start drilling');
     go.type = 'button';
@@ -112,7 +115,13 @@ function render() {
     fb.setAttribute('role', 'status');
     fb.append(el('p', 'verdict', last.correct ? `Correct · ${last.seconds.toFixed(1)}s` : (last.timedOut ? 'Out of time' : 'Not quite')));
     if (!last.correct) fb.append(el('p', 'answer', question.answer));
-    fb.append(el('p', 'rule', question.rule));
+    if (shouldShowWork(session.tierId, last.correct)) {
+      const work = el('ol', 'work');
+      for (const line of question.work) work.append(el('li', null, line));
+      fb.append(work);
+    } else {
+      fb.append(el('p', 'rule', question.rule));
+    }
     const go = el('button', 'go', 'Next');
     go.type = 'button';
     go.addEventListener('click', next);

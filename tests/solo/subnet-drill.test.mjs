@@ -112,3 +112,60 @@ test('a streak survives correct answers and dies on a miss or a timeout', () => 
   assert.equal(timedOut.correct, 0);
   assert.equal(averageSeconds(timedOut), null);
 });
+
+// ---- worked arithmetic ----
+import { maskBinary, cuttingOctet, shouldShowWork } from '../../src/solo/drills/subnet.js';
+
+test('the binary mask matches the dotted mask', () => {
+  for (let cidr = 8; cidr <= 30; cidr += 1) {
+    const bits = maskBinary(cidr);
+    assert.equal((bits.match(/1/g) || []).length, cidr, `/${cidr} one-bit count`);
+    assert.equal(bits.replace(/\./g, '').length, 32, `/${cidr} length`);
+    assert.match(bits, /^[01]{8}(\.[01]{8}){3}$/, `/${cidr} is not four binary octets`);
+    // Ones must all precede zeros: a valid mask has no holes.
+    assert.match(bits.replace(/\./g, ''), /^1*0*$/, `/${cidr} has a hole in the mask`);
+  }
+});
+
+test('the cutting octet is where the mask actually lands', () => {
+  assert.equal(cuttingOctet(20), 3);
+  assert.equal(cuttingOctet(26), 4);
+  assert.equal(cuttingOctet(24), 3, 'an aligned mask cuts the octet it ends on');
+  assert.equal(cuttingOctet(8), 1);
+});
+
+test('every worked line is real and no number leaves the octet', () => {
+  const seen = new Set();
+  for (const tier of TIERS) {
+    const rnd = seeded(4242);
+    for (let n = 0; n < 500; n += 1) {
+      const q = generate(tier.id, rnd);
+      seen.add(q.kind);
+      assert.ok(Array.isArray(q.work) && q.work.length >= 2, `${q.kind} has no worked math`);
+      for (const line of q.work) {
+        assert.ok(typeof line === 'string' && line.length > 8, `${q.kind} has an empty line`);
+        assert.ok(!line.includes('undefined') && !line.includes('NaN'), `${q.kind}: ${line}`);
+      }
+      // Subnet boundaries are listed inside a single octet, so nothing above 255.
+      const starts = q.work.find(l => l.startsWith('Subnets in that octet start at'));
+      if (starts) {
+        const values = starts.match(/\d+/g).map(Number);
+        assert.ok(values.every(v => v <= 255), `boundary out of range: ${starts}`);
+      }
+      // The final line of a worked answer states the answer itself.
+      if (['network', 'broadcast', 'first', 'last'].includes(q.kind)) {
+        assert.ok(q.work[q.work.length - 1].includes(q.answer), `${q.kind} never states ${q.answer}`);
+      }
+    }
+  }
+  assert.equal(seen.size, 9, 'not every kind was exercised');
+});
+
+test('warm always teaches, faster tiers teach only after a miss', () => {
+  assert.equal(shouldShowWork('warm', true), true);
+  assert.equal(shouldShowWork('warm', false), true);
+  assert.equal(shouldShowWork('field', true), false);
+  assert.equal(shouldShowWork('field', false), true);
+  assert.equal(shouldShowWork('exam', true), false);
+  assert.equal(shouldShowWork('exam', false), true);
+});
