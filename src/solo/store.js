@@ -122,6 +122,10 @@ function validateProfileShape(profile) {
   if (typeof profile.textScale !== 'number') {
     return { ok: false, error: 'Backup profile is missing textScale.' };
   }
+  const override = profile.guidanceOverride ?? null;
+  if (override !== null && !['guided', 'coached', 'independent'].includes(override)) {
+    return { ok: false, error: 'Backup profile guidanceOverride is not valid.' };
+  }
   for (const field of ['completedRuns', 'studyAnswers', 'cardReviews', 'recentFingerprints']) {
     if (!Array.isArray(profile[field])) {
       return { ok: false, error: `Backup profile's ${field} must be a list.` };

@@ -271,6 +271,9 @@ button:hover { border-color: var(--neon-purple); box-shadow: 0 0 12px #b06bff55;
 .fd-guide .guide-stage { color: var(--neon-orange); text-shadow: 0 0 10px #ff943355; }
 .fd-guide-copy strong { color: #f4ecff; }
 .fd-guide-copy p { color: #c3b6e6; }
+.fd-guide-blank-prompt { color: #c3b6e6; }
+.fd-guide-blank-input { background: #140c2b; border-color: #45308f; color: #f4ecff; }
+.fd-guide-blank[data-result='correct'] .fd-guide-blank-input { border-color: #5fae87; }
 
 .fd-sheet {
   background: linear-gradient(180deg, #150c2ef6, #0c0720f9);

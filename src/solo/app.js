@@ -8,6 +8,7 @@ import { createTerminalSession } from './cli.js';
 import { generateCase, nextCase, fingerprintForCode } from './generate.js';
 import { inSubnet } from './ip.js';
 import { evaluateCompletion, evaluateConfigureChecklist, summarizeRun } from './grade.js';
+import { GUIDANCE_LEVELS } from './guidance.js';
 
 export const RECOMMENDED_CODE = 'TF1-HM-1-P-START';
 
@@ -84,6 +85,7 @@ export function createInitialProfile() {
     counters: { runs: 0, assisted: 0, independent: 0 },
     evidence: { P: {}, I: {}, V: {}, D: {} },
     countedAttemptIds: [],
+    guidanceOverride: null,
   };
 }
 
@@ -138,6 +140,13 @@ export async function persistProfile(state, store) {
   } catch (error) {
     return { ...state, saveStatus: isQuotaExceeded(error) ? 'quota' : 'error', error: 'Save failed' };
   }
+}
+
+// The trainee's own choice of guidance level, in either direction. Passing
+// null clears it and returns them to the level their completed work earned.
+export function setGuidanceOverride(state, level) {
+  const next = GUIDANCE_LEVELS.includes(level) ? level : null;
+  return applyProfileUpdate(state, { guidanceOverride: next });
 }
 
 export async function updateAndPersistProfile(state, store, updates) {

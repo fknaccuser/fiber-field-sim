@@ -3,7 +3,8 @@
 
 import { renderTopology } from './diagram.js';
 import { equipmentIcon } from './equipment.js';
-import { nextGuidance, trainingMode } from './guidance.js';
+import { nextGuidance, trainingMode, showMeAvailable, guidanceOverride } from './guidance.js';
+import { walkthroughPosition, checkBlank } from './walkthrough.js';
 import { attachMentor, explainDevice, explainPort, explainConcept } from './mentor.js';
 import { careerProgress } from './career.js';
 
@@ -1332,6 +1333,11 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   }
   container.classList.add('field-device');
   const level = mode === 'console' ? 'independent' : mode, next = nextGuidance(mission);
+  // In guided mode the walkthrough names the actual devices in this case;
+  // nextGuidance stays as the fallback for anything it has no steps for.
+  const walk = mode === 'guided' ? walkthroughPosition(mission) : null;
+  const beat = walk?.step ?? null;
+  const override = guidanceOverride(state.profile);
 
   // One device surface: the topology map is the home; device, findings and the
   // work order open as sheets over it, so the learner never flips to a page.
@@ -1339,15 +1345,57 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
 
   // Slim, collapsible coaching ribbon across the top of the map.
   const guide = document.createElement('section'); guide.className = 'fd-guide'; guide.setAttribute('aria-label', 'Learning guidance');
-  const guideLabel = document.createElement('span'); guideLabel.className = 'guide-stage'; guideLabel.textContent = level === 'guided' ? `GUIDED · ${next.step}/4` : level === 'coached' ? 'COACHED' : 'INDEPENDENT';
+  const guideLabel = document.createElement('span'); guideLabel.className = 'guide-stage'; guideLabel.textContent = level === 'guided' ? `GUIDED · ${walk ? walk.index + 1 : next.step}/4` : level === 'coached' ? 'COACHED' : 'INDEPENDENT';
   const guideCopy = document.createElement('div'); guideCopy.className = 'fd-guide-copy';
-  const guideTitle = document.createElement('strong'); guideTitle.textContent = level === 'independent' ? 'Your workspace. Your investigation.' : next.title;
-  const guideDetail = document.createElement('p'); guideDetail.textContent = mode === 'console' ? 'Use the device consoles to inspect, configure, and verify. Test the portal with curl from both workstations, then cite evidence in Findings. Physical cable repairs remain on the canvas. Type ? for supported commands.' : next.detail;
+  const guideTitle = document.createElement('strong'); guideTitle.textContent = level === 'independent' ? 'Your workspace. Your investigation.' : (beat?.title ?? next.title);
+  const guideDetail = document.createElement('p'); guideDetail.textContent = mode === 'console' ? 'Use the device consoles to inspect, configure, and verify. Test the portal with curl from both workstations, then cite evidence in Findings. Physical cable repairs remain on the canvas. Type ? for supported commands.' : (beat?.detail ?? next.detail);
   guideDetail.hidden = !(coachingExpanded.get(mission.id) ?? level === 'guided');
   const help = document.createElement('button'); help.type = 'button'; help.className = 'fd-guide-toggle'; help.textContent = guideDetail.hidden ? 'Show' : 'Hide'; help.setAttribute('aria-expanded', String(!guideDetail.hidden)); help.setAttribute('aria-label', guideDetail.hidden ? 'Show guidance' : 'Hide guidance');
   container.classList.toggle('coach-hidden', guideDetail.hidden);
   help.addEventListener('click', () => { guideDetail.hidden = !guideDetail.hidden; container.classList.toggle('coach-hidden', guideDetail.hidden); coachingExpanded.set(mission.id, !guideDetail.hidden); help.textContent = guideDetail.hidden ? 'Show' : 'Hide'; help.setAttribute('aria-expanded', String(!guideDetail.hidden)); });
-  guideCopy.append(guideTitle, guideDetail); guide.append(guideLabel, guideCopy, help); stage.append(guide);
+  guideCopy.append(guideTitle, guideDetail);
+
+  // The walkthrough's last step stops demonstrating and asks for the fix.
+  if (beat?.blank && !guideDetail.hidden) {
+    const blank = document.createElement('div'); blank.className = 'fd-guide-blank';
+    const prompt = document.createElement('label'); prompt.className = 'fd-guide-blank-prompt'; prompt.textContent = beat.blank.prompt;
+    const input = document.createElement('input'); input.type = 'text'; input.className = 'fd-guide-blank-input'; input.setAttribute('aria-label', beat.blank.prompt);
+    const check = document.createElement('button'); check.type = 'button'; check.className = 'fd-guide-blank-check'; check.textContent = 'Check';
+    const feedback = document.createElement('p'); feedback.className = 'fd-guide-blank-feedback'; feedback.setAttribute('role', 'status');
+    const verify = () => {
+      const result = checkBlank(mission, input.value);
+      blank.dataset.result = result.ok ? 'correct' : 'incorrect';
+      feedback.textContent = result.ok
+        ? 'That is the change. Make it on the device, then test again to prove it.'
+        : result.reason;
+    };
+    check.addEventListener('click', verify);
+    input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); verify(); } });
+    prompt.appendChild(input); blank.append(prompt, check, feedback); guideCopy.appendChild(blank);
+  }
+
+  // Both directions stay reachable: drop the rails early, or put them back.
+  const controls = document.createElement('div'); controls.className = 'fd-guide-controls';
+  if (mode !== 'console') {
+    const tryIt = document.createElement('button');
+    tryIt.type = 'button'; tryIt.className = 'fd-guide-try'; tryIt.textContent = 'Let me try';
+    tryIt.addEventListener('click', () => actions.onSetGuidance?.('independent'));
+    controls.appendChild(tryIt);
+  }
+  if (showMeAvailable(mission, state.profile)) {
+    const showMe = document.createElement('button');
+    showMe.type = 'button'; showMe.className = 'fd-guide-showme'; showMe.textContent = 'Show me';
+    showMe.addEventListener('click', () => actions.onRequestHint?.());
+    controls.appendChild(showMe);
+  }
+  const restore = document.createElement('button');
+  restore.type = 'button'; restore.className = 'fd-guide-restore';
+  restore.textContent = override ? 'Use my earned level' : 'Turn help back on';
+  restore.addEventListener('click', () => actions.onSetGuidance?.(override ? null : 'guided'));
+  if (override || mode === 'console') controls.appendChild(restore);
+  if (controls.childElementCount) guideCopy.appendChild(controls);
+
+  guide.append(guideLabel, guideCopy, help); stage.append(guide);
 
   // The map — always present, the home surface.
   const networkPanel = document.createElement('div');

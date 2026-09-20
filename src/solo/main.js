@@ -27,6 +27,8 @@ import {
   replayMission,
   startNewVariation,
   requestHint,
+  setGuidanceOverride,
+  persistProfile,
   pauseMissionTimer,
   resumeMissionTimer,
   toggleFinding,
@@ -193,6 +195,7 @@ function render() {
           onConfirmReplace: confirmReplace,
           onCancelReplace: cancelReplace,
           onRequestHint: requestHintAction,
+          onSetGuidance: setGuidanceAction,
           onToggleFinding: toggleFindingAction,
           onNoteChange: noteChange,
           onSubmit: submitCompletion,
@@ -627,6 +630,13 @@ function runTest(testKind, deviceId) {
   state = recordTestEvent(state, testKind, loggedDeviceId, result);
   render();
   persistMission();
+}
+
+async function setGuidanceAction(level) {
+  state = setGuidanceOverride(state, level);
+  render();
+  state = await persistProfile(state, store);
+  render();
 }
 
 function requestHintAction() {
