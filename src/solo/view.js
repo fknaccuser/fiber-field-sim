@@ -177,7 +177,7 @@ export function renderHome(state, actions = {}) {
   const careerLadder = document.createElement('div'); careerLadder.className = 'home-career-ladder'; careerLadder.setAttribute('aria-hidden', 'true');
   for (const rank of career.ranks) {
     const pip = document.createElement('span');
-    pip.className = `career-rank-pip${rank.complete ? ' is-complete' : rank.unlocked ? ' is-active' : ''}`;
+    pip.className = `career-rank-pip${rank.complete ? ' is-complete' : rank.started ? ' is-active' : ''}`;
     pip.textContent = rank.badge;
     pip.title = rank.title;
     careerLadder.append(pip);
@@ -343,10 +343,11 @@ export function renderHome(state, actions = {}) {
   return container;
 }
 
-// The guided career campaign screen (career.js). A themed rank ladder plus the
-// active rank's assignment cards; completed ranks stay open to revisit, locked
-// ones show what's ahead. Each Start hands off to the same mission engine the
-// rest of the app uses.
+// The guided career campaign screen (career.js). A themed rank ladder with
+// every assignment open: completed ones can be replayed, one is marked as the
+// recommended next, and the rest are labelled with the tier they sit at so a
+// trainee choosing a hard one knows what they picked. Each Start hands off to
+// the same mission engine the rest of the app uses.
 export function renderCareer(state, actions = {}) {
   const container = document.createElement('div');
   container.className = 'career-screen';
@@ -383,7 +384,7 @@ export function renderCareer(state, actions = {}) {
 
   for (const rank of progress.ranks) {
     const section = document.createElement('section');
-    section.className = `career-rank${rank.complete ? ' is-complete' : rank.unlocked ? ' is-unlocked' : ' is-locked'}`;
+    section.className = `career-rank${rank.complete ? ' is-complete' : rank.started ? ' is-unlocked' : ' is-ahead'}`;
     const rankHead = document.createElement('div'); rankHead.className = 'career-rank-head';
     const badge = document.createElement('span'); badge.className = 'career-rank-badge'; badge.textContent = rank.badge;
     const rankTitles = document.createElement('div');
@@ -391,7 +392,7 @@ export function renderCareer(state, actions = {}) {
     const rankTag = document.createElement('p'); rankTag.className = 'career-rank-tagline'; rankTag.textContent = rank.tagline;
     rankTitles.append(rankTitle, rankTag);
     const rankStatus = document.createElement('span'); rankStatus.className = 'career-rank-status';
-    rankStatus.textContent = rank.complete ? 'Complete' : rank.unlocked ? `${rank.doneCount}/${rank.items.length}` : 'Locked';
+    rankStatus.textContent = rank.complete ? 'Complete' : rank.started ? `${rank.doneCount}/${rank.items.length}` : 'Open';
     rankHead.append(badge, rankTitles, rankStatus);
     section.appendChild(rankHead);
 
@@ -414,7 +415,7 @@ function renderAssignmentCard(assignment, actions) {
   card.className = `career-assignment is-${assignment.status}`;
   const head = document.createElement('div'); head.className = 'career-assignment-head';
   const marker = document.createElement('span'); marker.className = 'career-assignment-marker';
-  marker.textContent = assignment.status === 'done' ? '✓' : assignment.status === 'active' ? '▶' : '🔒';
+  marker.textContent = assignment.status === 'done' ? '✓' : assignment.status === 'active' ? '▶' : '↗';
   const title = document.createElement('h3'); title.textContent = assignment.title;
   head.append(marker, title);
   card.appendChild(head);
@@ -426,17 +427,20 @@ function renderAssignmentCard(assignment, actions) {
   const skill = document.createElement('span'); skill.className = 'career-assignment-skill'; skill.textContent = assignment.skill;
   foot.appendChild(skill);
 
-  if (assignment.status !== 'locked') {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = assignment.status === 'active' ? 'primary-button' : 'career-replay';
-    button.textContent = assignment.status === 'done' ? 'Replay' : 'Start assignment';
-    button.addEventListener('click', () => actions.onStartAssignment?.(assignment.id));
-    foot.appendChild(button);
-  } else {
-    const locked = document.createElement('span'); locked.className = 'career-assignment-locked'; locked.textContent = 'Finish the previous ticket to unlock';
-    foot.appendChild(locked);
+  if (assignment.status === 'ahead') {
+    const ahead = document.createElement('span');
+    ahead.className = 'career-assignment-ahead';
+    ahead.textContent = `Ahead of you · tier ${assignment.tier}`;
+    foot.appendChild(ahead);
   }
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = assignment.status === 'active' ? 'primary-button' : 'career-replay';
+  button.textContent = assignment.status === 'done' ? 'Replay'
+    : assignment.status === 'active' ? 'Start assignment'
+    : 'Take it anyway';
+  button.addEventListener('click', () => actions.onStartAssignment?.(assignment.id));
+  foot.appendChild(button);
   card.appendChild(foot);
   return card;
 }

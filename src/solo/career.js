@@ -140,8 +140,9 @@ function assignmentComplete(profile, assignment) {
 }
 
 // Derives the full campaign state from the profile: every assignment tagged
-// done | active | locked (strictly sequential — the next ticket unlocks when
-// the previous is complete), plus per-rank rollups and overall totals.
+// done | active | ahead, plus per-rank rollups and overall totals. 'active'
+// is the recommended next ticket rather than the only available one; 'ahead'
+// is harder than where the trainee currently stands and is still enterable.
 export function careerProgress(profile) {
   const flat = RANKS.flatMap((rank) => rank.assignments.map((a) => ({ ...a, rankId: rank.id })));
   const doneFlags = flat.map((a) => assignmentComplete(profile, a));
@@ -149,7 +150,11 @@ export function careerProgress(profile) {
   const allComplete = activeIndex === -1;
   if (allComplete) activeIndex = flat.length;
 
-  const statusFor = (i) => (doneFlags[i] ? 'done' : i === activeIndex ? 'active' : 'locked');
+  // Nothing is locked. An assignment past the trainee's current position is
+  // marked 'ahead' so the difficulty is honest, and it stays enterable: a
+  // trainee who bounces off a hard one has still learned where they stand,
+  // and can come back to the recommended ticket whenever they want.
+  const statusFor = (i) => (doneFlags[i] ? 'done' : i === activeIndex ? 'active' : 'ahead');
   const tagged = flat.map((a, i) => ({ ...a, status: statusFor(i) }));
 
   const ranks = RANKS.map((rank) => {
@@ -158,7 +163,8 @@ export function careerProgress(profile) {
       ...rank,
       items,
       complete: items.every((a) => a.status === 'done'),
-      unlocked: items.some((a) => a.status !== 'locked'),
+      unlocked: true,
+      started: items.some((a) => a.status !== 'ahead'),
       doneCount: items.filter((a) => a.status === 'done').length,
     };
   });
