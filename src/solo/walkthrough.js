@@ -50,11 +50,11 @@ function vlanList(value) {
 // steps are shared, because the arc is the same regardless of the fault:
 // see the symptom, prove it, find the break, fix the break.
 const FAULTS = {
-  P1: (m) => ({
+  P1: () => ({
     look: { title: 'Follow the cable', detail: `Select ${CLIENT} and read its link. The canvas draws a connected cable differently from a loose one, and this one is loose at the access port.` },
     blank: { prompt: 'The cable belongs in which switch port?', answer: 'Gi0/1', check: equals('Gi0/1'), hint: 'Read the port label on the switch end of the workstation link.' },
   }),
-  P2: (m) => ({
+  P2: () => ({
     look: { title: 'Read the port, not the cable', detail: 'The cable is seated at both ends. Open the switch and read the state of the access port the workstation lands on: it is administratively down, which a healthy cable cannot overcome.' },
     blank: { prompt: 'Type the state the port must be set to.', answer: 'up', check: (v) => ['up', 'enabled', 'no shutdown'].includes(String(v ?? '').trim().toLowerCase()), hint: 'The opposite of shutdown.' },
   }),

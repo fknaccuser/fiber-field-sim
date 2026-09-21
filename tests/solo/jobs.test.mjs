@@ -3,9 +3,6 @@ import assert from 'node:assert/strict';
 import { createHealthyLayout } from '../../src/solo/layouts.js';
 import { JOBS, JOB_LAYOUT, jobById, prepareJob, gradeJob } from '../../src/solo/jobs.js';
 
-const find = (n, id) => n.devices.find(d => d.id === id);
-const findPort = (n, id) => n.ports.find(p => p.id === id);
-
 test('every job prepares a network that fails its own checks', () => {
   for (const job of JOBS) {
     const prepared = prepareJob(job.id);

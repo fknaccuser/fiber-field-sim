@@ -8,9 +8,8 @@ import {
 import { CCNA_BANK } from '../src/solo/study/questions.js';
 import { review, dueCards, summarise, checkTyped, nextDue } from '../src/solo/study/recall.js';
 import { RECALL_DECK } from '../src/solo/study/recall-deck.js';
-import { CONCEPTS, conceptById } from '../src/solo/study/concepts.js';
+import { conceptById } from '../src/solo/study/concepts.js';
 import { masteryOf, collectionSummary, studyAfterTicket } from '../src/solo/study/mastery.js';
-import { HINTS } from '../src/solo/content.js';
 
 // The Field is not running inside this preview, so tickets are simulated.
 // Everything downstream of that, the collection and the study plan, is the

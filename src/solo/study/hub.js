@@ -13,7 +13,7 @@ import { DOMAINS, filter, sampleExam, coverage, presentation, isCorrect, expecte
 import { CCNA_BANK } from './questions.js';
 import { review, dueCards, summarise, checkTyped, nextDue } from './recall.js';
 import { RECALL_DECK } from './recall-deck.js';
-import { CONCEPTS, conceptById } from './concepts.js';
+import { conceptById } from './concepts.js';
 import { masteryOf, collectionSummary, studyAfterTicket } from './mastery.js';
 import { TIERS, tierById, generate, isCorrect as drillCorrect, emptySession, record, averageSeconds, shouldShowWork } from '../drills/subnet.js';
 import { parameters } from '../seed.js';
