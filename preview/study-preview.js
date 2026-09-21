@@ -6,6 +6,19 @@ import {
   isCorrect, expectedSelections, quotas,
 } from '../src/solo/study/bank.js';
 import { CCNA_BANK } from '../src/solo/study/questions.js';
+import { review, dueCards, summarise, checkTyped, nextDue } from '../src/solo/study/recall.js';
+import { RECALL_DECK } from '../src/solo/study/recall-deck.js';
+
+// Schedules persist per deck in the preview so the spacing is visible across
+// visits. Storage can be unavailable, in which case it simply resets.
+const load_ = (key) => { try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch { return {}; } };
+const save_ = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage off */ } };
+const CARDS_KEY = 'fieldsim:cards';
+const TYPE_KEY = 'fieldsim:typeit';
+const recall = { cards: load_(CARDS_KEY), typeit: load_(TYPE_KEY) };
+const CARD_IDS = CCNA_BANK.filter(q => q.format === 'single').map(q => q.id);
+const TYPE_IDS = RECALL_DECK.map(c => c.id);
+
 
 const root = document.getElementById('root');
 const state = {
@@ -116,6 +129,15 @@ function renderHome() {
   actions.append(quiz);
   actions.append(button('go ghost', 'Mock exam, 50 weighted', startExam));
   root.append(actions);
+
+  const now = Date.now();
+  const cardDue = dueCards(CARD_IDS, recall.cards, now).length;
+  const typeDue = dueCards(TYPE_IDS, recall.typeit, now).length;
+  root.append(el('p', 'label spaced', 'Spaced recall'));
+  const spaced = el('div', 'actions');
+  spaced.append(button('go ghost', `Flashcards · ${cardDue} due`, () => startRecall('cards')));
+  spaced.append(button('go ghost', `Type-it · ${typeDue} due`, () => startRecall('typeit')));
+  root.append(spaced);
 
   const q = quotas(50);
   root.append(el('p', 'foot', `A mock draws ${q.map(x => `${x.domain} ${x.want}`).join(', ')}.`));
@@ -240,9 +262,118 @@ function renderDone() {
   root.append(button('go', 'Back to study', () => { state.screen = 'home'; render(); }));
 }
 
+function startRecall(kind) {
+  const ids = kind === 'cards' ? CARD_IDS : TYPE_IDS;
+  state.recallKind = kind;
+  state.recallQueue = dueCards(ids, recall[kind], Date.now()).slice(0, 20);
+  state.recallAt = 0;
+  state.recallRight = 0;
+  state.flipped = false;
+  state.typed = null;
+  state.screen = 'recall';
+  render();
+}
+
+function recallCurrent() {
+  const id = state.recallQueue[state.recallAt];
+  return state.recallKind === 'cards' ? CCNA_BANK.find(q => q.id === id) : RECALL_DECK.find(c => c.id === id);
+}
+
+function mark(correct) {
+  const id = state.recallQueue[state.recallAt];
+  const kind = state.recallKind;
+  recall[kind] = { ...recall[kind], [id]: review(recall[kind][id], correct, Date.now()) };
+  save_(kind === 'cards' ? CARDS_KEY : TYPE_KEY, recall[kind]);
+  if (correct) state.recallRight += 1;
+  state.recallAt += 1;
+  state.flipped = false;
+  state.typed = null;
+  render();
+}
+
+function renderRecall() {
+  const kind = state.recallKind;
+  const ids = kind === 'cards' ? CARD_IDS : TYPE_IDS;
+  if (state.recallAt >= state.recallQueue.length) {
+    const s = summarise(ids, recall[kind]);
+    const upcoming = nextDue(ids, recall[kind], Date.now());
+    root.append(el('h1', null, state.recallQueue.length ? `${state.recallRight} of ${state.recallQueue.length}` : 'Nothing due'));
+    root.append(el('p', 'sub', state.recallQueue.length
+      ? 'Right answers move up a box and come back later. Misses come back this session.'
+      : 'Everything is scheduled for later. That is the system working rather than a gap.'));
+    const boxes = el('div', 'boxes');
+    for (const [box, count] of Object.entries(s.boxes)) {
+      const b = el('div', 'box');
+      b.append(el('b', null, String(count)));
+      b.append(el('span', null, `box ${box}`));
+      boxes.append(b);
+    }
+    const fresh = el('div', 'box');
+    fresh.append(el('b', null, String(s.fresh)));
+    fresh.append(el('span', null, 'unseen'));
+    boxes.append(fresh);
+    root.append(boxes);
+    if (upcoming) root.append(el('p', 'foot', `Next review ${new Date(upcoming).toLocaleString()}.`));
+    root.append(button('go', 'Back to study', () => { state.screen = 'home'; render(); }));
+    return;
+  }
+
+  const item = recallCurrent();
+  root.append(el('p', 'crumbs', `${kind === 'cards' ? 'Flashcards' : 'Type-it'} · ${state.recallAt + 1} of ${state.recallQueue.length} · box ${recall[kind][item.id]?.box ?? 'new'}`));
+  const card = el('section', 'card');
+
+  if (kind === 'cards') {
+    if (item.scenario) card.append(el('p', 'scenario', item.scenario));
+    card.append(el('p', 'prompt', item.prompt));
+    if (!state.flipped) {
+      card.append(el('p', 'hint', 'Answer it in your head first, then flip.'));
+      card.append(button('go', 'Flip', () => { state.flipped = true; render(); }));
+    } else {
+      const back = el('div', 'back');
+      back.append(el('p', 'answer', item.choices.find(c => c.correct).text));
+      back.append(el('p', 'explain', item.explain));
+      card.append(back);
+      const row = el('div', 'grade');
+      row.append(button('go miss', 'Missed it', () => mark(false)));
+      row.append(button('go', 'Knew it', () => mark(true)));
+      card.append(row);
+    }
+  } else {
+    card.append(el('p', 'kind', item.kind === 'command' ? 'IOS command' : 'Fact'));
+    card.append(el('p', 'prompt', item.prompt));
+    if (!state.typed) {
+      const input = el('input', 'type-input');
+      input.type = 'text';
+      input.autocomplete = 'off';
+      input.autocapitalize = 'off';
+      input.spellcheck = false;
+      input.setAttribute('aria-label', item.prompt);
+      const go = () => { state.typed = { value: input.value, ...checkTyped(item, input.value) }; if (!state.typed.empty) render(); };
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+      card.append(input);
+      card.append(button('go', 'Check', go));
+      setTimeout(() => input.focus(), 0);
+    } else {
+      const fb = el('div', `fb ${state.typed.correct ? 'ok' : 'no'}`);
+      fb.setAttribute('role', 'status');
+      fb.append(el('p', 'verdict', state.typed.correct ? 'Correct' : 'Not quite'));
+      if (!state.typed.correct) {
+        fb.append(el('p', 'mine', `You typed: ${state.typed.value}`));
+        fb.append(el('p', 'answer mono', item.answer));
+      }
+      fb.append(el('p', 'explain', item.note));
+      card.append(fb);
+      card.append(button('go', 'Next', () => mark(state.typed.correct)));
+    }
+  }
+  root.append(card);
+  root.append(button('quit', 'Back to study', () => { state.screen = 'home'; render(); }));
+}
+
 function render() {
   root.innerHTML = '';
   if (state.screen === 'home') renderHome();
+  else if (state.screen === 'recall') renderRecall();
   else if (state.screen === 'done') renderDone();
   else renderQuestion();
   window.scrollTo(0, 0);
