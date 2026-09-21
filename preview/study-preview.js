@@ -8,6 +8,21 @@ import {
 import { CCNA_BANK } from '../src/solo/study/questions.js';
 import { review, dueCards, summarise, checkTyped, nextDue } from '../src/solo/study/recall.js';
 import { RECALL_DECK } from '../src/solo/study/recall-deck.js';
+import { CONCEPTS, conceptById } from '../src/solo/study/concepts.js';
+import { masteryOf, collectionSummary, studyAfterTicket } from '../src/solo/study/mastery.js';
+import { HINTS } from '../src/solo/content.js';
+
+// The Field is not running inside this preview, so tickets are simulated.
+// Everything downstream of that, the collection and the study plan, is the
+// real mastery.js deciding from the same run records the app keeps.
+const RUNS_KEY = 'fieldsim:runs';
+const QUIZ_KEY = 'fieldsim:quizresults';
+const FAULTS = [
+  ['P1', 'Loose cable at the access port'], ['P2', 'Port administratively down'],
+  ['I1', 'Workstation on the wrong subnet'], ['I2', 'Wrong default gateway'],
+  ['V1', 'Access port in the wrong VLAN'], ['V2', 'Trunk not carrying the VLAN'],
+  ['D1', 'Wrong DNS resolver'], ['D2', 'Wrong DNS record'],
+];
 
 // Schedules persist per deck in the preview so the spacing is visible across
 // visits. Storage can be unavailable, in which case it simply resets.
@@ -17,6 +32,19 @@ const CARDS_KEY = 'fieldsim:cards';
 const TYPE_KEY = 'fieldsim:typeit';
 const recall = { cards: load_(CARDS_KEY), typeit: load_(TYPE_KEY) };
 const CARD_IDS = CCNA_BANK.filter(q => q.format === 'single').map(q => q.id);
+let completedRuns = (() => { try { return JSON.parse(localStorage.getItem(RUNS_KEY) || '[]'); } catch { return []; } })();
+const quizResults = load_(QUIZ_KEY);
+
+function practiceRecord() {
+  // Flashcards review bank questions, so they count toward question practice
+  // alongside quiz answers. Type-it reviews deck cards.
+  const questions = { ...quizResults };
+  for (const [id, card] of Object.entries(recall.cards)) {
+    questions[id] = { right: (questions[id]?.right ?? 0) + (card.right ?? 0), seen: (questions[id]?.seen ?? 0) + (card.seen ?? 0) };
+  }
+  return { questions, cards: recall.typeit };
+}
+const currentMastery = () => masteryOf({ completedRuns, practice: practiceRecord() });
 const TYPE_IDS = RECALL_DECK.map(c => c.id);
 
 
@@ -83,6 +111,9 @@ function submit() {
   const answer = q.format === 'single' ? state.pick[0] : state.pick;
   const correct = isCorrect(q, answer);
   if (correct) state.right += 1;
+  const prior = quizResults[q.id] ?? { right: 0, seen: 0 };
+  quizResults[q.id] = { right: prior.right + (correct ? 1 : 0), seen: prior.seen + 1 };
+  save_(QUIZ_KEY, quizResults);
   state.graded = { correct, answer };
   render();
 }
@@ -95,6 +126,16 @@ function advance() {
 
 function renderHome() {
   root.append(el('h1', null, 'Study'));
+  const sum = collectionSummary(currentMastery());
+  const coll = button('collection-bar', '', () => { state.screen = 'collection'; render(); });
+  coll.append(el('span', 'cb-title', 'Collection'));
+  coll.append(el('span', 'cb-meta', `${sum.earned} earned · ${sum.practiced} practiced · ${sum.unseen} unseen`));
+  const track = el('span', 'cb-track');
+  const earned = el('span', 'cb-earned'); earned.style.width = `${(100 * sum.earned) / sum.total}%`;
+  const practiced = el('span', 'cb-practiced'); practiced.style.width = `${(100 * sum.practiced) / sum.total}%`;
+  track.append(earned, practiced);
+  coll.append(track);
+  root.append(coll);
   root.append(el('p', 'sub', `${CCNA_BANK.length} CCNA questions. Mock exams are drawn to Cisco's domain weights.`));
 
   const bp = el('div', 'seg');
@@ -262,6 +303,110 @@ function renderDone() {
   root.append(button('go', 'Back to study', () => { state.screen = 'home'; render(); }));
 }
 
+function startPlanQuiz(questionIds) {
+  const wanted = new Set(questionIds);
+  state.deck = CCNA_BANK.filter(q => wanted.has(q.id) && q.format !== 'match' && q.format !== 'order');
+  state.exam = false;
+  begin();
+}
+
+function renderCollection() {
+  const rows = currentMastery();
+  const sum = collectionSummary(rows);
+  root.append(el('h1', null, 'Collection'));
+  root.append(el('p', 'sub', 'Drilling gets a concept to practiced. Only fixing it in the Field without help earns it. You cannot flashcard your way to earned.'));
+
+  const legend = el('div', 'legend');
+  for (const [cls, label, n] of [['earned', 'Earned', sum.earned], ['practiced', 'Practiced', sum.practiced], ['unseen', 'Unseen', sum.unseen]]) {
+    const item = el('span', `lg lg-${cls}`);
+    item.append(el('b', null, String(n)));
+    item.append(el('span', null, label));
+    legend.append(item);
+  }
+  root.append(legend);
+
+  const list = el('div', 'concepts');
+  for (const row of rows) {
+    const concept = conceptById(row.id);
+    const card = el('div', `concept st-${row.state}`);
+    const head = el('div', 'concept-head');
+    head.append(el('span', 'concept-name', row.label));
+    head.append(el('span', `badge b-${row.state}`, row.state));
+    card.append(head);
+    const bits = [`Faults ${concept.recipes.join(', ')}`];
+    if (row.earnedBy) bits.push(`earned by ${row.earnedBy}`);
+    else if (row.assistedInField) bits.push('fixed with help');
+    if (row.drilled) bits.push(`${row.drilled} of ${row.material} items drilled`);
+    else bits.push(`${row.material} items to study`);
+    card.append(el('p', 'concept-meta', bits.join(' · ')));
+    list.append(card);
+  }
+  root.append(list);
+
+  root.append(button('go', 'Finish a ticket', () => { state.screen = 'ticket'; state.ticketPlan = null; render(); }));
+  root.append(button('quit', 'Back to study', () => { state.screen = 'home'; render(); }));
+}
+
+function renderTicket() {
+  root.append(el('h1', null, 'Finish a ticket'));
+  root.append(el('p', 'sub', 'The Field runs in the full app. Here you tell it how a ticket went and watch what it does with that.'));
+
+  if (!state.ticketPlan) {
+    root.append(el('p', 'label', 'Which fault was it?'));
+    const faults = el('div', 'faults');
+    for (const [id, label] of FAULTS) {
+      const b = button(`fault${state.ticketFault === id ? ' on' : ''}`, '', () => { state.ticketFault = id; render(); });
+      b.append(el('span', 'fault-id', id));
+      b.append(el('span', null, label));
+      faults.append(b);
+    }
+    root.append(faults);
+
+    root.append(el('p', 'label', 'How did it go?'));
+    const outcomes = el('div', 'actions');
+    const finish = (assisted, solved) => {
+      if (!state.ticketFault) return;
+      const recipes = [state.ticketFault];
+      if (solved) {
+        completedRuns = [...completedRuns, { mode: 'repair', recipes, assisted }];
+        try { localStorage.setItem(RUNS_KEY, JSON.stringify(completedRuns)); } catch { /* storage off */ }
+      }
+      state.ticketPlan = { recipes, assisted, solved, ...studyAfterTicket({ recipes, assisted, solved }) };
+      render();
+    };
+    for (const [label, assisted, solved] of [['Fixed it, no help', false, true], ['Fixed it with hints', true, true], ['Could not fix it', false, false]]) {
+      const b = button('go ghost', label, () => finish(assisted, solved));
+      if (!state.ticketFault) b.disabled = true;
+      outcomes.append(b);
+    }
+    root.append(outcomes);
+    root.append(button('quit', 'Back to collection', () => { state.screen = 'collection'; render(); }));
+    return;
+  }
+
+  const plan = state.ticketPlan;
+  const concepts = plan.concepts.map(id => conceptById(id).label).join(', ');
+  const card = el('section', 'card');
+  if (!plan.needed) {
+    card.append(el('p', 'verdict ok-text', 'Earned'));
+    card.append(el('p', 'explain', `You fixed it without help, so ${concepts} is earned. Nothing to study from this one.`));
+  } else {
+    card.append(el('p', 'verdict warn-text', plan.solved ? 'Fixed with help' : 'Not fixed'));
+    card.append(el('p', 'explain', plan.solved
+      ? `That counts as practice on ${concepts}. Fix it again without hints to earn it. Here is what teaches it:`
+      : `Nothing lost. Here is exactly what teaches ${concepts}, then come back and take the ticket again:`));
+    const kit = el('ul', 'kit');
+    kit.append(el('li', null, `${plan.questions.length} questions`));
+    kit.append(el('li', null, `${plan.cards.length} commands and facts to type`));
+    if (plan.drill) kit.append(el('li', null, `The subnet drill, ${plan.drill} tier`));
+    card.append(kit);
+    card.append(button('go', `Study the ${plan.questions.length} questions now`, () => startPlanQuiz(plan.questions)));
+  }
+  root.append(card);
+  root.append(button('go ghost', 'Another ticket', () => { state.ticketPlan = null; state.ticketFault = null; render(); }));
+  root.append(button('quit', 'See the collection', () => { state.screen = 'collection'; render(); }));
+}
+
 function startRecall(kind) {
   const ids = kind === 'cards' ? CARD_IDS : TYPE_IDS;
   state.recallKind = kind;
@@ -374,6 +519,8 @@ function render() {
   root.innerHTML = '';
   if (state.screen === 'home') renderHome();
   else if (state.screen === 'recall') renderRecall();
+  else if (state.screen === 'collection') renderCollection();
+  else if (state.screen === 'ticket') renderTicket();
   else if (state.screen === 'done') renderDone();
   else renderQuestion();
   window.scrollTo(0, 0);

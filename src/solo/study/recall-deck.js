@@ -135,4 +135,18 @@ export const RECALL_DECK = [
   { id: 'port-ntp', domain: 'IPS', kind: 'fact', prompt: 'Port number for NTP.', answer: '123', accept: ['udp 123'], note: 'Lower stratum numbers sit closer to the reference clock.' },
   { id: 'port-dhcp', domain: 'IPS', kind: 'fact', prompt: 'Port number a DHCP server listens on.', answer: '67', accept: ['udp 67'], note: 'Clients listen on 68. The request is a broadcast, which is why a router needs ip helper-address to pass it to another subnet.' },
   { id: 'port-tftp', domain: 'IPS', kind: 'fact', prompt: 'Port number for TFTP.', answer: '69', accept: ['udp 69'], note: 'No authentication at all, which is why it is used for images on trusted networks only.' },
+
+  // ---------- name resolution ----------
+  { id: 'cmd-nslookup', domain: 'IPS', kind: 'command', prompt: 'On Windows, query DNS for portal.example.com.',
+    answer: 'nslookup portal.example.com', accept: [],
+    note: 'Prints the answer and the server that gave it. A timeout means the resolver is unreachable; a wrong answer means the record is wrong.' },
+  { id: 'cmd-ipconfig-all', domain: 'IPS', kind: 'command', prompt: 'On Windows, show the DNS servers a host is using.',
+    answer: 'ipconfig /all', accept: ['ipconfig/all'],
+    note: 'Plain ipconfig omits the DNS servers, which is why the resolver setting gets missed.' },
+  { id: 'cmd-name-server', domain: 'IPS', kind: 'command', prompt: 'On a Cisco device, use 10.1.1.53 as the DNS server.',
+    answer: 'ip name-server 10.1.1.53', accept: [],
+    note: 'Lookups also need ip domain-lookup enabled, which is on by default and often turned off to stop typos hanging the console.' },
+  { id: 'cmd-domain-lookup', domain: 'IPS', kind: 'command', prompt: 'On a Cisco device, turn DNS lookups back on.',
+    answer: 'ip domain-lookup', accept: ['ip domain lookup'],
+    note: 'With it on, a mistyped command is treated as a hostname and the console hangs trying to resolve it, which is why many labs disable it.' },
 ];
