@@ -425,3 +425,122 @@ p { line-height: 1.6; }
   .mission-screen.field-device { max-width: 1180px; margin: 0 auto; box-shadow: 0 0 0 1px #24455f, 0 30px 90px #01040c88; }
   .fd-sheet { max-height: 78%; border-radius: 22px 22px 0 0; }
 }
+
+/* ---------- CCNA exam prep ----------
+   Scoped under .exam-prep and built on the app's own --field-* colours, so
+   the hub matches the rest of the app and nothing here leaks outside it. */
+.study-exam-prep { display: block; width: 100%; text-align: left; margin: 14px 0 18px; padding: 14px 16px; background: var(--field-panel); border: 1px solid #2c5570; border-left: 3px solid var(--field-cyan); border-radius: 12px; color: var(--field-text); font: inherit; cursor: pointer; }
+.study-exam-prep:hover { border-color: var(--field-cyan); }
+.study-exam-prep:focus-visible { outline: 2px solid var(--field-cyan); outline-offset: 2px; }
+.study-exam-prep-title { display: block; font-size: 16px; font-weight: 650; }
+.study-exam-prep-sub { display: block; margin-top: 3px; font-size: 12.5px; color: var(--field-muted); }
+
+.exam-prep { --ep-line: #23384c; --ep-deep: #0a1521; --ep-raised: #182a3e; max-width: 660px; margin: 0 auto; padding: 22px 16px 60px; color: var(--field-text); }
+.exam-prep h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -.01em; }
+.exam-prep .ep-header { margin-bottom: 18px; }
+.exam-prep .ep-sub { margin: 0; color: var(--field-muted); font-size: 14px; }
+.exam-prep .ep-label { margin: 18px 0 7px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--field-muted); }
+.exam-prep .ep-foot { margin: 14px 0 0; font-size: 11.5px; color: var(--field-muted); }
+.exam-prep .ep-warn { margin: 12px 0; font-size: 13px; color: var(--field-warning); }
+.exam-prep .ep-crumbs { margin: 0 0 10px; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--field-muted); }
+.exam-prep button:focus-visible, .exam-prep select:focus-visible, .exam-prep input:focus-visible { outline: 2px solid var(--field-cyan); outline-offset: 2px; }
+
+.exam-prep .ep-collection { display: block; width: 100%; text-align: left; background: var(--field-panel); border: 1px solid var(--ep-line); border-radius: 12px; padding: 12px 14px; color: var(--field-text); font: inherit; cursor: pointer; }
+.exam-prep .ep-collection:hover { border-color: var(--field-cyan); }
+.exam-prep .ep-coll-title { display: block; font-size: 15px; font-weight: 600; }
+.exam-prep .ep-coll-meta { display: block; margin: 2px 0 8px; font-size: 12px; color: var(--field-muted); }
+.exam-prep .ep-track { display: flex; height: 6px; background: var(--ep-line); border-radius: 3px; overflow: hidden; }
+.exam-prep .ep-track-earned { background: var(--field-success); }
+.exam-prep .ep-track-practiced { background: var(--field-warning); }
+
+.exam-prep .ep-seg { display: flex; border: 1px solid var(--ep-line); border-radius: 9px; overflow: hidden; }
+.exam-prep .ep-seg-b { flex: 1; background: transparent; border: 0; border-right: 1px solid var(--ep-line); color: var(--field-muted); font: inherit; padding: 8px 4px; cursor: pointer; }
+.exam-prep .ep-seg-b:last-child { border-right: 0; }
+.exam-prep .ep-seg-b.on { background: var(--field-cyan); color: #04202a; }
+.exam-prep .ep-seg-name { display: block; font-size: 13px; }
+.exam-prep .ep-seg-hint { display: block; font-size: 10px; opacity: .7; }
+
+.exam-prep .ep-domains, .exam-prep .ep-actions, .exam-prep .ep-concepts, .exam-prep .ep-choices, .exam-prep .ep-pairs, .exam-prep .ep-steps { display: grid; gap: 8px; }
+.exam-prep .ep-dom { text-align: left; background: var(--field-panel); border: 1px solid var(--ep-line); border-left: 3px solid var(--ep-line); border-radius: 9px; padding: 10px 13px; color: var(--field-text); font: inherit; cursor: pointer; }
+.exam-prep .ep-dom.on { border-left-color: var(--field-cyan); background: var(--ep-raised); }
+.exam-prep .ep-dom-name { display: block; font-size: 14px; }
+.exam-prep .ep-dom-meta { display: block; font-size: 11px; color: var(--field-muted); }
+
+.exam-prep .ep-go { width: 100%; min-height: 46px; background: var(--field-cyan); color: #04202a; border: 0; border-radius: 999px; font: inherit; font-size: 15px; font-weight: 650; cursor: pointer; }
+.exam-prep .ep-go:hover:enabled { filter: brightness(1.08); }
+.exam-prep .ep-go:disabled { opacity: .4; cursor: default; }
+.exam-prep .ep-go.ghost { background: transparent; border: 1px solid var(--ep-line); color: var(--field-text); }
+.exam-prep .ep-go.miss { background: transparent; border: 1px solid var(--field-warning); color: var(--field-warning); }
+.exam-prep .ep-quit { width: 100%; margin-top: 10px; background: transparent; border: 1px solid var(--ep-line); color: var(--field-muted); font: inherit; font-size: 12px; padding: 10px; border-radius: 999px; cursor: pointer; }
+
+.exam-prep .ep-card { background: var(--field-panel); border: 1px solid var(--ep-line); border-radius: 14px; padding: 18px; margin-bottom: 12px; }
+.exam-prep .ep-card > .ep-go + .ep-go, .exam-prep .ep-card > .ep-fb + .ep-go { margin-top: 0; }
+.exam-prep .ep-scenario { margin: 0 0 10px; font-size: 13.5px; color: var(--field-muted); border-left: 2px solid var(--ep-line); padding-left: 11px; }
+.exam-prep .ep-prompt { margin: 0 0 15px; font-size: 18px; line-height: 1.45; }
+.exam-prep .ep-hint { margin: 0 0 14px; font-size: 12.5px; color: var(--field-muted); }
+.exam-prep .ep-kind { margin: 0 0 6px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--field-warning); }
+
+.exam-prep .ep-choice { text-align: left; background: var(--ep-deep); border: 1px solid var(--ep-line); color: var(--field-text); font: inherit; padding: 12px 14px; border-radius: 9px; cursor: pointer; }
+.exam-prep .ep-choice.picked { border-color: var(--field-cyan); background: var(--ep-raised); }
+.exam-prep .ep-choice.right { border-color: var(--field-success); }
+.exam-prep .ep-choice.wrong { border-color: var(--field-error); }
+.exam-prep .ep-choice-text { display: block; font-size: 14.5px; }
+.exam-prep .ep-choice-why { display: block; margin-top: 5px; font-size: 12px; color: var(--field-muted); }
+.exam-prep .ep-choices, .exam-prep .ep-pairs, .exam-prep .ep-steps { margin-bottom: 15px; }
+
+.exam-prep .ep-pair { display: block; background: var(--ep-deep); border: 1px solid var(--ep-line); border-radius: 9px; padding: 11px 13px; }
+.exam-prep .ep-pair.right { border-color: var(--field-success); }
+.exam-prep .ep-pair.wrong { border-color: var(--field-error); }
+.exam-prep .ep-pair-left { display: block; font-size: 14px; margin-bottom: 6px; }
+.exam-prep .ep-select { width: 100%; min-height: 38px; background: #061019; color: var(--field-text); border: 1px solid var(--ep-line); border-radius: 7px; padding: 6px 9px; font: inherit; font-size: 13.5px; }
+
+.exam-prep .ep-step { text-align: left; background: var(--ep-deep); border: 1px solid var(--ep-line); color: var(--field-text); font: inherit; font-size: 13.5px; padding: 11px 13px; border-radius: 9px; cursor: pointer; }
+.exam-prep .ep-step.chosen { display: flex; align-items: center; gap: 10px; cursor: default; background: var(--ep-raised); }
+.exam-prep .ep-step.chosen.right { border-color: var(--field-success); }
+.exam-prep .ep-step.chosen.wrong { border-color: var(--field-error); }
+.exam-prep .ep-step-n { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--field-cyan); color: #04202a; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+.exam-prep .ep-step-undo { margin-left: auto; background: transparent; border: 0; color: var(--field-muted); font: inherit; font-size: 11px; cursor: pointer; }
+
+.exam-prep .ep-fb { border-top: 1px solid var(--ep-line); padding-top: 13px; margin-bottom: 14px; }
+.exam-prep .ep-verdict { margin: 0 0 7px; font-size: 16px; font-weight: 650; }
+.exam-prep .ep-fb.ok .ep-verdict { color: var(--field-success); }
+.exam-prep .ep-fb.no .ep-verdict { color: var(--field-warning); }
+.exam-prep .ep-explain { margin: 0; font-size: 13.5px; color: #c9dcea; line-height: 1.6; }
+.exam-prep .ep-answer { margin: 0 0 8px; font-size: 17px; color: var(--field-cyan); line-height: 1.45; word-break: break-word; }
+.exam-prep .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.exam-prep .ep-mine { margin: 0 0 4px; font-size: 12.5px; color: var(--field-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.exam-prep .ep-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+
+.exam-prep .ep-type { width: 100%; min-height: 48px; padding: 10px 13px; margin-bottom: 10px; background: #061019; color: var(--field-text); border: 1px solid var(--ep-line); border-radius: 9px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 16px; }
+.exam-prep .ep-type.big { font-size: 20px; min-height: 52px; }
+.exam-prep .ep-timer { height: 3px; background: var(--ep-line); border-radius: 2px; overflow: hidden; }
+.exam-prep .ep-bar { height: 100%; background: var(--field-cyan); transition: width 1s linear; }
+.exam-prep .ep-secs { font-size: 11px; color: var(--field-muted); text-align: right; min-height: 15px; margin-top: 3px; }
+.exam-prep .ep-stats { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; }
+.exam-prep .ep-stats span { display: flex; flex-direction: column; }
+.exam-prep .ep-stats em { font-style: normal; font-size: 10px; letter-spacing: .09em; color: var(--field-muted); }
+.exam-prep .ep-stats b { font-size: 17px; color: var(--field-cyan); }
+.exam-prep .ep-work { margin: 0 0 14px; padding-left: 20px; font-size: 13px; color: #c9dcea; line-height: 1.6; }
+.exam-prep .ep-work li { margin-bottom: 5px; }
+
+.exam-prep .ep-legend, .exam-prep .ep-boxes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+.exam-prep .ep-lg, .exam-prep .ep-tile { background: var(--field-panel); border: 1px solid var(--ep-line); border-radius: 9px; padding: 9px; text-align: center; }
+.exam-prep .ep-lg b, .exam-prep .ep-tile b { display: block; font-size: 20px; color: var(--field-cyan); }
+.exam-prep .ep-lg span, .exam-prep .ep-tile span { font-size: 11px; color: var(--field-muted); }
+.exam-prep .ep-lg-earned b { color: var(--field-success); }
+.exam-prep .ep-lg-practiced b { color: var(--field-warning); }
+.exam-prep .ep-lg-unseen b { color: var(--field-muted); }
+
+.exam-prep .ep-concept { background: var(--field-panel); border: 1px solid var(--ep-line); border-left: 3px solid var(--ep-line); border-radius: 10px; padding: 11px 13px; }
+.exam-prep .ep-concept.st-earned { border-left-color: var(--field-success); }
+.exam-prep .ep-concept.st-practiced { border-left-color: var(--field-warning); }
+.exam-prep .ep-concept-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.exam-prep .ep-concept-name { font-size: 14px; }
+.exam-prep .ep-badge { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--ep-line); color: var(--field-muted); }
+.exam-prep .b-earned { color: var(--field-success); border-color: var(--field-success); }
+.exam-prep .b-practiced { color: var(--field-warning); border-color: var(--field-warning); }
+.exam-prep .ep-concept-meta { margin: 5px 0 8px; font-size: 11.5px; color: var(--field-muted); }
+.exam-prep .ep-concept-acts { display: flex; flex-wrap: wrap; gap: 7px; }
+.exam-prep .ep-mini { background: var(--field-cyan); color: #04202a; border: 0; border-radius: 999px; font: inherit; font-size: 12px; font-weight: 600; padding: 6px 12px; cursor: pointer; }
+.exam-prep .ep-mini.ghost { background: transparent; border: 1px solid var(--ep-line); color: var(--field-text); font-weight: 400; }
+@media (prefers-reduced-motion: reduce) { .exam-prep .ep-bar { transition: none; } }

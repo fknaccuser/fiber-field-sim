@@ -606,6 +606,23 @@ export function renderStudy(state, actions = {}) {
   backButton.addEventListener('click', () => actions.onHome?.());
   container.appendChild(backButton);
 
+  // One way into exam prep, from inside Study, so the home screen does not
+  // gain a second study entry.
+  if (!session.lessonId) {
+    const prep = document.createElement('button');
+    prep.type = 'button';
+    prep.className = 'study-exam-prep';
+    const title = document.createElement('span');
+    title.className = 'study-exam-prep-title';
+    title.textContent = 'CCNA exam prep';
+    const sub = document.createElement('span');
+    sub.className = 'study-exam-prep-sub';
+    sub.textContent = 'Quiz, weighted mock exams, subnet drill, flashcards, type-it, and your collection.';
+    prep.append(title, sub);
+    prep.addEventListener('click', () => actions.onOpenExamPrep?.());
+    container.appendChild(prep);
+  }
+
   if (session.lessonId) {
     const lesson = lessonById(session.lessonId);
     const lessonBackButton = document.createElement('button');

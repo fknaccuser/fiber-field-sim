@@ -1,4 +1,5 @@
 import { createIssueLibrary } from './issue-library.js';
+import { createExamPrep } from './study/hub.js';
 import {
   createInitialState,
   submitOpeningCommand,
@@ -95,6 +96,7 @@ let updateAvailable = false;
 let updateServiceWorkerFn = null;
 let builderScreen = null;
 let libraryScreen = null;
+let examPrepScreen = null;
 
 function render() {
   const focusedCommand = document.activeElement?.matches('.terminal-input') ? { name: document.activeElement.getAttribute('aria-label'), value: document.activeElement.value, start: document.activeElement.selectionStart, end: document.activeElement.selectionEnd } : null;
@@ -105,6 +107,7 @@ function render() {
   }
   if (builderScreen) { root.appendChild(builderScreen); return; }
   if (libraryScreen) { root.appendChild(libraryScreen); return; }
+  if (examPrepScreen) { root.appendChild(examPrepScreen); return; }
   if (state.screen === 'opening') {
     root.appendChild(renderOpening());
   } else if (state.screen === 'initializing') {
@@ -151,6 +154,7 @@ function render() {
     root.appendChild(
       renderStudy(state, {
         onHome: closeStudyScreen,
+        onOpenExamPrep: openExamPrep,
         onSelectFamily: pickStudyFamily,
         onOpenLesson: openStudyLesson,
         onCloseLesson: closeStudyLesson,
@@ -367,6 +371,20 @@ function progressToHome() {
 
 function openStudyScreen() {
   state = openStudy(state);
+  render();
+}
+
+// Exam prep runs as a self-contained screen, the same way the issue library
+// does, so it never touches the mission state machine. It reads completed
+// runs from the profile to decide what the trainee has earned, and hands a
+// case code back when a concept sends them into the Field.
+function openExamPrep() {
+  const close = () => { examPrepScreen?.destroy?.(); examPrepScreen = null; };
+  examPrepScreen = createExamPrep({
+    getCompletedRuns: () => state.profile?.completedRuns ?? [],
+    onExit: () => { close(); render(); },
+    onLaunch: (code) => { close(); startCode(code); },
+  });
   render();
 }
 
