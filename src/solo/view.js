@@ -7,10 +7,13 @@ import { nextGuidance, trainingMode, showMeAvailable, guidanceOverride } from '.
 import { walkthroughPosition, checkBlank } from './walkthrough.js';
 import { attachMentor, explainDevice, explainPort, explainConcept } from './mentor.js';
 import { careerProgress } from './career.js';
+import { renderPatchPanel } from './patch-panel.js';
+import { conceptsForRecipes } from './study/concepts.js';
 
 const canvasViews = new Map();
 const inspectorViews = new Map();
 const coachingExpanded = new Map();
+let homeMoreOpen = false;
 import { terminalSessionFor, currentHintRecipeId, showCauseCount, showHarmlessDetail } from './app.js';
 import {
   renderClientForm,
@@ -145,200 +148,210 @@ function renderPendingMissionPrompt(state, actions) {
   return box;
 }
 
+// Small element builder for the reworked screens.
+function h(tag, cls, text) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text != null) node.textContent = text;
+  return node;
+}
+function btn(cls, text, onClick) {
+  const b = h('button', cls, text);
+  b.type = 'button';
+  if (onClick) b.addEventListener('click', onClick);
+  return b;
+}
+
+// Career titles read "Ticket #1 — “I can’t get on the network”". The part in
+// quotes is the customer's complaint, which is the headline; the rest is the
+// ticket label above it.
+function splitTicketTitle(title) {
+  const [label, ...rest] = String(title ?? '').split(' — ');
+  const headline = rest.join(' — ').replace(/^[“"]|[”"]$/g, '');
+  if (!headline) return { label: '', headline: label };
+  return { label, headline: headline.charAt(0).toUpperCase() + headline.slice(1) };
+}
+
 export function renderHome(state, actions = {}) {
-  const container = document.createElement('div');
-  container.className = 'home-screen';
-
-  const heading = document.createElement('h1');
-  heading.textContent = 'The Field';
-  container.appendChild(heading);
-  const subtitle = document.createElement('p');
-  subtitle.className = 'home-subtitle';
-  subtitle.textContent = 'Understand the connection.';
-  container.appendChild(subtitle);
-
-  // Career path: the guided, story-driven way in — recommended for beginners.
+  const container = h('div', 'home-screen');
   const career = careerProgress(state.profile);
-  const careerCard = document.createElement('section');
-  careerCard.className = 'home-career';
-  const careerCopy = document.createElement('div');
-  const careerKicker = document.createElement('span'); careerKicker.className = 'section-kicker'; careerKicker.textContent = 'CAREER PATH · GUIDED';
-  const careerTitle = document.createElement('h2');
-  careerTitle.textContent = career.allComplete ? 'You made Network Engineer.' : `Start as a Junior Tech. Work your way up.`;
-  const careerText = document.createElement('p');
-  careerText.textContent = career.allComplete
-    ? 'Every rank cleared. Jump back into any ticket or design a network of your own.'
-    : 'A step-by-step path from your first “I can’t get online” ticket to designing whole networks — every device and step explained as you go.';
-  const careerButton = document.createElement('button'); careerButton.type = 'button'; careerButton.className = 'primary-button'; careerButton.textContent = career.completedCount > 0 ? 'Resume career →' : 'Begin your career →';
-  careerButton.addEventListener('click', () => actions.onOpenCareer?.());
-  const careerMeta = document.createElement('p'); careerMeta.className = 'home-career-meta';
-  careerMeta.textContent = `${career.completedCount} of ${career.total} assignments complete`;
-  careerCopy.append(careerKicker, careerTitle, careerText, careerButton, careerMeta);
-  const careerLadder = document.createElement('div'); careerLadder.className = 'home-career-ladder'; careerLadder.setAttribute('aria-hidden', 'true');
-  for (const rank of career.ranks) {
-    const pip = document.createElement('span');
-    pip.className = `career-rank-pip${rank.complete ? ' is-complete' : rank.started ? ' is-active' : ''}`;
-    pip.textContent = rank.badge;
-    pip.title = rank.title;
-    careerLadder.append(pip);
+  const snapshot = actions.prepSnapshot ?? { mastery: [], cardsDue: 0, typeDue: 0, started: false };
+  const earned = snapshot.mastery.filter(r => r.state === 'earned').length;
+
+  // ---- top bar ----
+  const bar = h('header', 'home-bar');
+  const mark = h('h1', 'home-mark', 'The Field');
+  bar.append(mark);
+  if (actions.themeToggle) bar.append(actions.themeToggle);
+  container.append(bar);
+
+  if (state.pendingMissionRequest) container.append(renderPendingMissionPrompt(state, actions));
+  // Only a failed save needs attention on home; "Saved" is noise here.
+  if (state.saveStatus === 'error' || state.saveStatus === 'quota') {
+    const saveBanner = renderSaveStatusBanner(state, actions);
+    saveBanner.className = 'home-save-banner';
+    container.append(saveBanner);
   }
-  careerCard.append(careerCopy, careerLadder);
-  container.appendChild(careerCard);
-
-  const studio = document.createElement('section');
-  studio.className = 'home-studio';
-  const studioCopy = document.createElement('div');
-  const studioLabel = document.createElement('span'); studioLabel.className = 'section-kicker'; studioLabel.textContent = 'NETWORK STUDIO';
-  const studioTitle = document.createElement('h2'); studioTitle.textContent = 'Small lab. Entire campus. Your network.';
-  const studioText = document.createElement('p'); studioText.textContent = 'Build connected sites with a clear view of every device. Practice real troubleshooting in the guided labs below.';
-  const studioButton = document.createElement('button'); studioButton.type = 'button'; studioButton.className = 'primary-button'; studioButton.textContent = 'Design a network →';
-  studioButton.addEventListener('click', () => actions.onOpenBuilder?.());
-  studioCopy.append(studioLabel, studioTitle, studioText, studioButton);
-  const studioArt = document.createElement('div'); studioArt.className = 'home-studio-art'; studioArt.setAttribute('aria-hidden', 'true');
-  for (const kind of ['server', 'switch', 'router', 'client']) studioArt.append(equipmentIcon(kind));
-  studio.append(studioCopy, studioArt); container.append(studio);
-  const library = document.createElement('section'); library.className = 'home-issue-library';
-  const libraryCopy = document.createElement('div'); const libraryTitle = document.createElement('h2'); libraryTitle.textContent = 'Practice the problems you will meet in the field.';
-  const libraryText = document.createElement('p'); libraryText.textContent = '200 issues · foundational, common, and rare · live repair labs and evidence-based case studies.'; libraryCopy.append(libraryTitle, libraryText);
-  const libraryButton = document.createElement('button'); libraryButton.type = 'button'; libraryButton.textContent = 'Explore issue library'; libraryButton.addEventListener('click', () => actions.onOpenIssues?.()); library.append(libraryCopy, libraryButton); container.append(library);
-
-  // S19.md: "Show Ready offline only after worker activation and successful
-  // required-cache checks" — actions.offlineReady is set only once the
-  // service worker's onOfflineReady fires, which Workbox only calls after
-  // precaching every required asset succeeds.
-  if (actions.offlineReady) {
-    const offlineNote = document.createElement('p');
-    offlineNote.className = 'home-offline-ready';
-    offlineNote.setAttribute('role', 'status');
-    offlineNote.textContent = 'Ready offline';
-    container.appendChild(offlineNote);
-  }
-
-  if (state.pendingMissionRequest) {
-    container.appendChild(renderPendingMissionPrompt(state, actions));
-  }
-
-  const continueButton = document.createElement('button');
-  continueButton.type = 'button';
-  continueButton.className = 'home-continue';
-  continueButton.textContent = 'Continue mission';
-  const hasMission = Boolean(state.mission);
-  continueButton.disabled = !hasMission;
-  continueButton.setAttribute('aria-disabled', String(!hasMission));
-  if (hasMission) {
-    continueButton.addEventListener('click', () => actions.onContinue?.());
-  }
-  container.appendChild(continueButton);
-
-  container.appendChild(renderSaveStatusBanner(state, actions));
-
   if (state.error) {
-    const error = document.createElement('p');
-    error.className = 'form-error';
+    const error = h('p', 'form-error', state.error);
     error.setAttribute('role', 'alert');
-    error.textContent = state.error;
-    container.appendChild(error);
+    container.append(error);
   }
 
-  const recommendedHeading = document.createElement('h2');
-  recommendedHeading.className = 'home-section-heading';
-  recommendedHeading.textContent = 'Recommended job';
-  container.appendChild(recommendedHeading);
-  const recommendedRow = document.createElement('div');
-  recommendedRow.className = 'home-recommended-row';
-  const recommendedText = document.createElement('span');
-  const recommendation = actions.recommendation ?? { kind: 'code', code: 'TF1-HM-1-P-START' };
-  recommendedText.textContent =
-    recommendation.kind === 'code'
-      ? recommendation.code
-      : `${familyLabel(recommendation.family)}, tier ${recommendation.tier}`;
-  const startRecommended = document.createElement('button');
-  startRecommended.type = 'button';
-  startRecommended.textContent = 'Start';
-  startRecommended.addEventListener('click', () => actions.onStartRecommended?.());
-  recommendedRow.append(recommendedText, startRecommended);
-  container.appendChild(recommendedRow);
+  const grid = h('div', 'home-grid');
 
-  const skillsHeading = document.createElement('h2');
-  skillsHeading.className = 'home-section-heading';
-  skillsHeading.textContent = 'Choose a skill';
-  container.appendChild(skillsHeading);
-  const skillsRow = document.createElement('div');
-  skillsRow.className = 'home-skills-row';
+  // ---- next ticket: the one loud thing on the screen ----
+  const next = h('section', 'next-ticket');
+  next.setAttribute('aria-labelledby', 'next-ticket-headline');
+
+  // Only an active ticket is "in progress"; a closed one gives way to the
+  // next. This matches when starting another ticket asks to replace it.
+  const active = state.mission?.status === 'active';
+  if (active) {
+    const resume = h('div', 'resume-strip');
+    const resumeText = h('div', 'resume-text');
+    resumeText.append(h('span', 'resume-label', 'In progress'));
+    resumeText.append(h('span', 'resume-code mono', state.mission.caseCode ?? `Configure ${state.mission.network?.layoutId ?? ''}`.trim()));
+    const cont = btn('home-continue btn-primary', 'Resume', () => actions.onContinue?.());
+    resume.append(resumeText, cont);
+    next.append(resume);
+  }
+
+  const assignment = career.activeAssignment;
+  const row = h('div', 'home-recommended-row');
+  if (assignment) {
+    const { label, headline } = splitTicketTitle(assignment.title);
+    const top = h('div', 'ticket-top');
+    top.append(h('span', 'ticket-kicker', active ? 'Next ticket' : 'Your next ticket'));
+    top.append(h('span', 'ticket-code mono', assignment.start.kind === 'code' ? assignment.start.code : label));
+    const title = h('h2', 'ticket-headline', headline);
+    title.id = 'next-ticket-headline';
+    const story = h('p', 'ticket-story', assignment.story);
+    const meta = h('div', 'ticket-meta');
+    meta.append(h('span', 'chip', assignment.skill));
+    if (assignment.tier) meta.append(h('span', 'chip', `Tier ${assignment.tier}`));
+    if (career.completedCount === 0) meta.append(h('span', 'chip chip-accent', 'Guided'));
+    const start = btn(active ? '' : 'btn-primary ticket-start', active ? 'Start instead' : 'Start ticket', () => actions.onStartAssignment?.(assignment.id));
+    row.append(top, title, story, meta, start);
+  } else {
+    const recommendation = actions.recommendation ?? { kind: 'code', code: 'TF1-HM-1-P-START' };
+    const top = h('div', 'ticket-top');
+    top.append(h('span', 'ticket-kicker', 'Every rank cleared'));
+    top.append(h('span', 'ticket-code mono', recommendation.kind === 'code' ? recommendation.code : 'New case'));
+    const title = h('h2', 'ticket-headline', recommendation.kind === 'code' ? 'Recommended job' : `${familyLabel(recommendation.family)}, tier ${recommendation.tier}`);
+    title.id = 'next-ticket-headline';
+    const story = h('p', 'ticket-story', 'Picked from the skill you have practiced least.');
+    const start = btn(active ? '' : 'btn-primary ticket-start', active ? 'Start instead' : 'Start ticket', () => actions.onStartRecommended?.());
+    row.append(top, title, story, start);
+  }
+  next.append(row);
+  grid.append(next);
+
+  // ---- three doors ----
+  const side = h('div', 'home-side');
+  const doors = h('nav', 'home-doors');
+  doors.setAttribute('aria-label', 'Sections');
+  const door = (cls, name, status, onClick) => {
+    const b = btn(`door ${cls}`, '', onClick);
+    b.append(h('span', 'door-name', name), h('span', 'door-status', status));
+    return b;
+  };
+  doors.append(door('home-tickets-button', 'Tickets', `${career.completedCount} of ${career.total} closed`, () => actions.onOpenCareer?.()));
+  const due = snapshot.cardsDue + snapshot.typeDue;
+  doors.append(door('home-study-button', 'Study', due ? `${due} reviews due` : (snapshot.started ? 'Nothing due' : 'Quiz, drills, cards'), () => actions.onOpenStudy?.()));
+  side.append(doors);
+
+  // The collection is the third door: the whole panel opens it.
+  const collection = btn('home-collection home-collection-button', '', () => actions.onOpenCollection?.());
+  const head = h('span', 'home-collection-head');
+  head.append(h('span', 'door-name', 'Collection'));
+  head.append(h('span', 'door-status', `${earned} of ${snapshot.mastery.length || 8} earned`));
+  collection.append(head);
+  if (snapshot.mastery.length) collection.append(renderPatchPanel(snapshot.mastery, { compact: true }));
+  collection.append(h('span', 'home-collection-legend', 'Green is earned in the Field. Orange is practiced.'));
+  side.append(collection);
+
+  const tools = h('div', 'home-tools');
+  tools.append(btn('home-progress-button btn-quiet', 'Progress', () => actions.onOpenProgress?.()));
+  tools.append(btn('home-reference-button btn-quiet', 'Reference', () => actions.onOpenReference?.()));
+  side.append(tools);
+  grid.append(side);
+  container.append(grid);
+
+  // ---- more: everything else, one tap deeper ----
+  // Re-rendering must not collapse a section the learner opened, and an
+  // import preview or error inside it has to be visible when it appears.
+  const more = h('details', 'home-more');
+  more.open = homeMoreOpen || Boolean(actions.importPreview || actions.importError);
+  more.addEventListener('toggle', () => { homeMoreOpen = more.open; });
+  more.append(h('summary', 'home-more-summary', 'More ways to practice'));
+  const body = h('div', 'home-more-body');
+
+  const skills = h('section', 'more-block');
+  skills.append(h('h3', null, 'Practice one skill'));
+  const skillsRow = h('div', 'home-skills-row');
   for (const skill of SKILLS) {
-    const button = document.createElement('button');
-    button.type = 'button';
     const tier = recommendedTier(state.profile, skill.family);
-    button.textContent = `${skill.label} · Tier ${tier}`;
-    button.addEventListener('click', () => actions.onStartVariation?.(skill.family));
-    skillsRow.appendChild(button);
+    const b = btn('', '', () => actions.onStartVariation?.(skill.family));
+    b.append(h('span', 'skill-name', skill.label), h('span', 'skill-tier', `Tier ${tier}`));
+    skillsRow.append(b);
   }
-  container.appendChild(skillsRow);
+  skills.append(skillsRow);
+  body.append(skills);
 
-  const seedHeading = document.createElement('h2');
-  seedHeading.className = 'home-section-heading';
-  seedHeading.textContent = 'Enter seed';
-  container.appendChild(seedHeading);
-  const seedForm = document.createElement('form');
-  seedForm.className = 'home-seed-form';
-  const seedInput = document.createElement('input');
+  const seed = h('section', 'more-block');
+  seed.append(h('h3', null, 'Open a case code'));
+  const seedForm = h('form', 'home-seed-form');
+  const seedInput = h('input', 'mono');
   seedInput.type = 'text';
   seedInput.placeholder = 'TF1-BR-3-D-12345';
+  seedInput.autocapitalize = 'characters';
+  seedInput.spellcheck = false;
   seedInput.setAttribute('aria-label', 'Case code');
-  const seedButton = document.createElement('button');
+  const seedButton = h('button', null, 'Go');
   seedButton.type = 'submit';
-  seedButton.textContent = 'Go';
   seedForm.append(seedInput, seedButton);
   seedForm.addEventListener('submit', (event) => {
     event.preventDefault();
     if (seedInput.value.trim() === '') return;
     actions.onStartCode?.(seedInput.value.trim());
   });
-  container.appendChild(seedForm);
+  seed.append(seedForm);
+  body.append(seed);
 
-  const configureHeading = document.createElement('h2');
-  configureHeading.className = 'home-section-heading';
-  configureHeading.textContent = 'Configure a network';
-  container.appendChild(configureHeading);
-
-  const configureRow = document.createElement('div');
-  configureRow.className = 'home-configure-row';
-  for (const [layoutId, label] of [
-    ['HM', 'Home lab'],
-    ['BR', 'Branch'],
-    ['OF', 'Office'],
-  ]) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'home-configure-button';
-    button.textContent = label;
-    button.addEventListener('click', () => actions.onStartConfigure?.(layoutId));
-    configureRow.appendChild(button);
+  const configure = h('section', 'more-block');
+  configure.append(h('h3', null, 'Configure a healthy network'));
+  configure.append(h('p', 'more-note', 'Nothing is broken. Change settings freely and see what happens.'));
+  const configureRow = h('div', 'home-configure-row');
+  for (const [layoutId, label] of [['HM', 'Home lab'], ['BR', 'Branch'], ['OF', 'Office']]) {
+    configureRow.append(btn('home-configure-button', label, () => actions.onStartConfigure?.(layoutId)));
   }
-  container.appendChild(configureRow);
+  configure.append(configureRow);
+  body.append(configure);
 
-  const progressButton = document.createElement('button');
-  progressButton.type = 'button';
-  progressButton.className = 'home-progress-button';
-  progressButton.textContent = 'Progress';
-  progressButton.addEventListener('click', () => actions.onOpenProgress?.());
-  container.appendChild(progressButton);
+  const build = h('section', 'more-block');
+  build.append(h('h3', null, 'Build and browse'));
+  const buildRow = h('div', 'home-build-row');
+  buildRow.append(btn('home-studio-button', 'Design a network', () => actions.onOpenBuilder?.()));
+  buildRow.append(btn('home-library-button', 'Issue library', () => actions.onOpenIssues?.()));
+  build.append(buildRow);
+  body.append(build);
 
-  const studyButton = document.createElement('button');
-  studyButton.type = 'button';
-  studyButton.className = 'home-study-button';
-  studyButton.textContent = 'Study';
-  studyButton.addEventListener('click', () => actions.onOpenStudy?.());
-  container.appendChild(studyButton);
+  body.append(renderBackupSection(actions));
+  more.append(body);
+  container.append(more);
 
-  const referenceButton = document.createElement('button');
-  referenceButton.type = 'button';
-  referenceButton.className = 'home-reference-button';
-  referenceButton.textContent = 'Reference';
-  referenceButton.addEventListener('click', () => actions.onOpenReference?.());
-  container.appendChild(referenceButton);
-
-  container.appendChild(renderBackupSection(actions));
+  // S19.md: "Show Ready offline only after worker activation and successful
+  // required-cache checks". actions.offlineReady is set only once Workbox
+  // reports every required asset precached.
+  if (actions.offlineReady) {
+    const offline = h('p', 'home-offline');
+    offline.append(h('span', 'led led-ok'));
+    const note = h('span', 'home-offline-ready', 'Ready offline');
+    note.setAttribute('role', 'status');
+    offline.append(note);
+    container.append(offline);
+  }
 
   return container;
 }
@@ -356,22 +369,21 @@ export function renderCareer(state, actions = {}) {
   const header = document.createElement('div');
   header.className = 'career-header';
   const back = document.createElement('button');
-  back.type = 'button'; back.className = 'career-back'; back.textContent = '← Home';
+  back.type = 'button'; back.className = 'career-back screen-back btn-quiet'; back.textContent = 'Home';
   back.addEventListener('click', () => actions.onHome?.());
   header.appendChild(back);
-  const kicker = document.createElement('span'); kicker.className = 'section-kicker'; kicker.textContent = 'NORTHLINE · FIELD OPERATIONS';
-  const title = document.createElement('h1'); title.textContent = 'Your career';
+  const title = document.createElement('h1'); title.textContent = 'Tickets';
   const lead = document.createElement('p'); lead.className = 'career-lead';
   lead.textContent = progress.allComplete
-    ? 'You’ve reached Network Engineer. Every ticket is replayable — or design a network of your own.'
-    : 'Clear each assignment to earn the next rank. Everything is explained as you go — hover any device or interface for a plain-language breakdown.';
+    ? 'You made Network Engineer. Every ticket can be replayed, or design a network of your own.'
+    : 'Work up the ranks in order, or take any ticket now. The hard ones will hurt, and that is the only gate.';
   const meter = document.createElement('div'); meter.className = 'career-meter';
   const meterFill = document.createElement('div'); meterFill.className = 'career-meter-fill';
   meterFill.style.width = `${Math.round((progress.completedCount / progress.total) * 100)}%`;
   meter.appendChild(meterFill);
   const meterLabel = document.createElement('p'); meterLabel.className = 'career-meter-label';
-  meterLabel.textContent = `${progress.completedCount} of ${progress.total} assignments complete`;
-  header.append(kicker, title, lead, meter, meterLabel);
+  meterLabel.textContent = `${progress.completedCount} of ${progress.total} closed`;
+  header.append(title, lead, meter, meterLabel);
   container.appendChild(header);
 
   if (state.pendingMissionRequest) {
@@ -414,11 +426,17 @@ function renderAssignmentCard(assignment, actions) {
   const card = document.createElement('article');
   card.className = `career-assignment is-${assignment.status}`;
   const head = document.createElement('div'); head.className = 'career-assignment-head';
-  const marker = document.createElement('span'); marker.className = 'career-assignment-marker';
-  marker.textContent = assignment.status === 'done' ? '✓' : assignment.status === 'active' ? '▶' : '↗';
-  const title = document.createElement('h3'); title.textContent = assignment.title;
-  head.append(marker, title);
-  card.appendChild(head);
+  // Lead with the customer's complaint, the ticket label small above it,
+  // and a status LED: green closed, yellow next, dark ahead.
+  const { label, headline } = splitTicketTitle(assignment.title);
+  const marker = document.createElement('span');
+  marker.className = `led career-assignment-marker${assignment.status === 'done' ? ' led-ok' : assignment.status === 'active' ? ' led-next' : ''}`;
+  marker.setAttribute('aria-hidden', 'true');
+  const labelText = document.createElement('span'); labelText.className = 'career-assignment-label';
+  labelText.textContent = assignment.status === 'done' ? `${label}, closed` : assignment.status === 'active' ? `${label}, up next` : label;
+  const title = document.createElement('h3'); title.textContent = headline;
+  head.append(marker, labelText);
+  card.append(head, title);
 
   const story = document.createElement('p'); story.className = 'career-assignment-story'; story.textContent = assignment.story;
   card.appendChild(story);
@@ -788,7 +806,17 @@ export function renderReference(state, actions = {}) {
   list.className = 'reference-list';
   for (const entry of results) {
     const dt = document.createElement('dt');
-    dt.textContent = entry.deviceKind ? `${entry.title} [${entry.deviceKind}]` : entry.title;
+    // Titles already end in "(switch)" and the like, so the kind appeared
+    // twice. Show the command once, in mono, with the kind as a chip.
+    const command = document.createElement('code');
+    command.textContent = entry.deviceKind ? entry.title.replace(new RegExp(`\\s*\\(${entry.deviceKind}\\)\\s*$`, 'i'), '') : entry.title;
+    dt.append(command);
+    if (entry.deviceKind) {
+      const kind = document.createElement('span');
+      kind.className = 'chip';
+      kind.textContent = entry.deviceKind;
+      dt.append(kind);
+    }
     const dd = document.createElement('dd');
     dd.textContent = entry.body;
     list.append(dt, dd);
@@ -1150,7 +1178,11 @@ function renderFindings(state, actions) {
   for (const check of actions.completionChecks ?? []) {
     const item = document.createElement('li');
     item.className = check.passed ? 'checklist-pass' : 'checklist-fail';
-    item.textContent = `${check.passed ? '✓' : '✗'} ${check.message}`;
+    // The marker is drawn in CSS; screen readers get the state in words.
+    const state = document.createElement('span');
+    state.className = 'visually-hidden';
+    state.textContent = check.passed ? 'Done: ' : 'To do: ';
+    item.append(state, check.message);
     checklist.appendChild(item);
   }
   container.appendChild(checklist);
@@ -1220,10 +1252,25 @@ function renderBrief(state, actions) {
   }
 
   const requirements = mission.requirements;
-  const req = document.createElement('p');
-  req.className = 'brief-requirements';
-  req.textContent = `Intended target subnet ${requirements.targetSubnet}/${requirements.targetPrefix} (VLAN ${requirements.targetVlan}); protected subnet ${requirements.protectedSubnet}/${requirements.protectedPrefix} (VLAN ${requirements.protectedVlan}); portal ${mission.targetName}.`;
-  container.appendChild(req);
+  const spec = document.createElement('dl');
+  spec.className = 'brief-requirements brief-spec';
+  for (const [term, value] of [
+    ['Customer subnet', `${requirements.targetSubnet}/${requirements.targetPrefix}`],
+    ['Customer VLAN', String(requirements.targetVlan)],
+    ['Protected subnet', `${requirements.protectedSubnet}/${requirements.protectedPrefix}`],
+    ['Protected VLAN', String(requirements.protectedVlan)],
+    ['Portal', mission.targetName],
+  ]) {
+    const dt = document.createElement('dt');
+    dt.textContent = term;
+    const dd = document.createElement('dd');
+    dd.className = 'mono';
+    dd.textContent = value;
+    spec.append(dt, dd);
+  }
+  const specHeading = document.createElement('h3');
+  specHeading.textContent = 'Intended design';
+  container.append(specHeading, spec);
 
   const timer = document.createElement('p');
   timer.className = 'brief-timer';
@@ -1268,241 +1315,263 @@ function renderBrief(state, actions) {
 // The Field workspace (UI_AND_STORAGE.md "Mission"). Below 900px this shows one
 // tab at a time; the ≥900px 40/60 split is CSS-only (styles.css) — the same
 // panels are all rendered here, just laid out differently.
+// The mission workspace.
+//
+// Phone: one panel at a time, chosen by the tab bar along the bottom:
+//   Network (guidance and the map) | Device | Findings | Ticket.
+// Desktop (900px and up): the map is always visible, and an inspector beside
+// it shows Device, Findings or Ticket. With the Network tab active on
+// desktop, the inspector shows the ticket, so it is never empty.
+//
+// Which panel shows is driven by data-active-tab on the container and the
+// CSS in theme.css, so there is one source of truth for both widths.
 export function renderMission(state, actions = {}, activeTab = 'network') {
   const mission = state.mission;
-  const container = document.createElement('div');
-  container.className = 'mission-screen';
+  const container = h('div', 'mission-screen');
   container.dataset.activeTab = activeTab;
   const mode = trainingMode(mission, state.profile);
   container.dataset.trainingMode = mode;
-
-  const header = document.createElement('div');
-  header.className = 'mission-header';
-  const brand = document.createElement('div'); brand.className = 'workspace-brand'; brand.textContent = 'FIELD';
-  const brandSub = document.createElement('span'); brandSub.textContent = 'PRACTICE LAB'; brand.append(brandSub); header.append(brand);
-  const title = document.createElement('span');
-  title.className = 'mission-title';
-  title.textContent =
-    mission.mode === 'configure' ? `Configure: ${mission.network.layoutId}` : (mission.caseCode ?? 'Mission');
-  header.appendChild(title);
-  if (mission.caseCode) {
-    const replayButton = document.createElement('button');
-    replayButton.type = 'button';
-    replayButton.className = 'mission-replay';
-    replayButton.textContent = 'Replay';
-    replayButton.addEventListener('click', () => actions.onReplay?.());
-    header.appendChild(replayButton);
-    const variationButton = document.createElement('button');
-    variationButton.type = 'button';
-    variationButton.className = 'mission-variation';
-    variationButton.textContent = 'New variation';
-    variationButton.addEventListener('click', () => actions.onNewVariation?.());
-    header.appendChild(variationButton);
-  } else if (mission.mode === 'configure') {
-    // Configure sessions have no caseCode to Replay from (S15.md); Reset
-    // restores the same attempt's own stored initial (healthy) network.
-    const resetButton = document.createElement('button');
-    resetButton.type = 'button';
-    resetButton.className = 'mission-reset';
-    resetButton.textContent = 'Reset';
-    resetButton.addEventListener('click', () => actions.onRequestReset?.());
-    header.appendChild(resetButton);
-  }
-  const referenceButton = document.createElement('button');
-  referenceButton.type = 'button';
-  referenceButton.className = 'mission-reference';
-  referenceButton.textContent = 'Reference';
-  referenceButton.addEventListener('click', () => actions.onOpenReference?.());
-  header.appendChild(referenceButton);
-  const exitButton = document.createElement('button');
-  exitButton.type = 'button';
-  exitButton.className = 'mission-exit';
-  exitButton.textContent = 'Exit';
-  exitButton.addEventListener('click', () => actions.onExit?.());
-  header.appendChild(exitButton);
-  container.appendChild(header);
-  if (state.saveStatus === 'error' || state.saveStatus === 'quota') {
-    container.appendChild(renderSaveStatusBanner(state, actions));
-  }
-  if (state.error) {
-    const error = document.createElement('p');
-    error.className = 'form-error';
-    error.setAttribute('role', 'alert');
-    error.textContent = state.error;
-    container.appendChild(error);
-  }
-  if (state.pendingReset) {
-    const resetPrompt = document.createElement('div');
-    resetPrompt.className = 'home-pending-prompt';
-    resetPrompt.setAttribute('role', 'alertdialog');
-    const message = document.createElement('p');
-    message.textContent = 'Reset will discard every change and restore the original healthy network.';
-    resetPrompt.appendChild(message);
-    const cancelButton = document.createElement('button');
-    cancelButton.type = 'button';
-    cancelButton.textContent = 'Cancel';
-    cancelButton.addEventListener('click', () => actions.onCancelReset?.());
-    const confirmButton = document.createElement('button');
-    confirmButton.type = 'button';
-    confirmButton.textContent = 'Reset';
-    confirmButton.addEventListener('click', () => actions.onConfirmReset?.());
-    resetPrompt.append(cancelButton, confirmButton);
-    container.appendChild(resetPrompt);
-  }
-  if (state.pendingMissionRequest) {
-    container.appendChild(renderPendingMissionPrompt(state, actions));
-  }
-  container.classList.add('field-device');
-  const level = mode === 'console' ? 'independent' : mode, next = nextGuidance(mission);
+  const level = mode === 'console' ? 'independent' : mode;
+  const next = nextGuidance(mission);
   // In guided mode the walkthrough names the actual devices in this case;
   // nextGuidance stays as the fallback for anything it has no steps for.
   const walk = mode === 'guided' ? walkthroughPosition(mission) : null;
   const beat = walk?.step ?? null;
   const override = guidanceOverride(state.profile);
+  const selectedDevice = mission.network.devices.find(d => d.id === state.selectedDeviceId);
+  const shortName = name => String(name ?? '').replace(/^[^:]+:\s*/, '');
 
-  // One device surface: the topology map is the home; device, findings and the
-  // work order open as sheets over it, so the learner never flips to a page.
-  const stage = document.createElement('div'); stage.className = 'fd-stage';
+  // ---- header ----
+  const header = h('header', 'mission-header');
+  const exit = btn('mission-exit btn-quiet', 'Exit', () => actions.onExit?.());
+  exit.setAttribute('aria-label', 'Exit to home');
+  const titleBlock = h('div', 'mission-heading');
+  titleBlock.append(h('span', 'mission-kind', mission.mode === 'configure' ? 'Configure lab' : 'Repair ticket'));
+  const title = h('span', 'mission-title mono', mission.mode === 'configure' ? `Configure: ${mission.network.layoutId}` : (mission.caseCode ?? 'Mission'));
+  titleBlock.append(title);
+  const levelChip = h('span', `chip mission-level${level === 'guided' ? ' chip-accent' : ''}`,
+    level === 'guided' ? `Guided ${walk ? walk.index + 1 : next.step} of 4` : level === 'coached' ? 'Coached' : 'On your own');
 
-  // Slim, collapsible coaching ribbon across the top of the map.
-  const guide = document.createElement('section'); guide.className = 'fd-guide'; guide.setAttribute('aria-label', 'Learning guidance');
-  const guideLabel = document.createElement('span'); guideLabel.className = 'guide-stage'; guideLabel.textContent = level === 'guided' ? `GUIDED · ${walk ? walk.index + 1 : next.step}/4` : level === 'coached' ? 'COACHED' : 'INDEPENDENT';
-  const guideCopy = document.createElement('div'); guideCopy.className = 'fd-guide-copy';
-  const guideTitle = document.createElement('strong'); guideTitle.textContent = level === 'independent' ? 'Your workspace. Your investigation.' : (beat?.title ?? next.title);
-  const guideDetail = document.createElement('p'); guideDetail.textContent = mode === 'console' ? 'Use the device consoles to inspect, configure, and verify. Test the portal with curl from both workstations, then cite evidence in Findings. Physical cable repairs remain on the canvas. Type ? for supported commands.' : (beat?.detail ?? next.detail);
-  guideDetail.hidden = !(coachingExpanded.get(mission.id) ?? level === 'guided');
-  const help = document.createElement('button'); help.type = 'button'; help.className = 'fd-guide-toggle'; help.textContent = guideDetail.hidden ? 'Show' : 'Hide'; help.setAttribute('aria-expanded', String(!guideDetail.hidden)); help.setAttribute('aria-label', guideDetail.hidden ? 'Show guidance' : 'Hide guidance');
-  container.classList.toggle('coach-hidden', guideDetail.hidden);
-  help.addEventListener('click', () => { guideDetail.hidden = !guideDetail.hidden; container.classList.toggle('coach-hidden', guideDetail.hidden); coachingExpanded.set(mission.id, !guideDetail.hidden); help.textContent = guideDetail.hidden ? 'Show' : 'Hide'; help.setAttribute('aria-expanded', String(!guideDetail.hidden)); });
-  guideCopy.append(guideTitle, guideDetail);
+  const menu = h('details', 'mission-menu');
+  const menuSummary = h('summary', 'mission-menu-button');
+  menuSummary.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="13" cy="8" r="1.6"/></svg>';
+  menuSummary.setAttribute('aria-label', 'Ticket menu');
+  const menuList = h('div', 'mission-menu-list');
+  if (mission.caseCode) {
+    menuList.append(btn('mission-replay', 'Replay this case', () => actions.onReplay?.()));
+    menuList.append(btn('mission-variation', 'New variation', () => actions.onNewVariation?.()));
+  } else if (mission.mode === 'configure') {
+    // Configure sessions have no caseCode to Replay from (S15.md); Reset
+    // restores the same attempt's own stored initial (healthy) network.
+    menuList.append(btn('mission-reset', 'Reset to healthy', () => actions.onRequestReset?.()));
+  }
+  menuList.append(btn('mission-reference', 'Command reference', () => actions.onOpenReference?.()));
+  menu.append(menuSummary, menuList);
+  header.append(exit, titleBlock, levelChip, menu);
+  container.append(header);
+
+  // ---- banners: one container, so the desktop grid has fixed rows ----
+  const banners = h('div', 'mission-banners');
+  if (state.saveStatus === 'error' || state.saveStatus === 'quota') {
+    const banner = renderSaveStatusBanner(state, actions);
+    banner.className = 'mission-banner is-fault';
+    banners.append(banner);
+  }
+  if (state.error) {
+    const error = h('p', 'form-error mission-banner is-fault', state.error);
+    error.setAttribute('role', 'alert');
+    banners.append(error);
+  }
+  if (state.pendingReset) {
+    const resetPrompt = h('div', 'home-pending-prompt mission-banner');
+    resetPrompt.setAttribute('role', 'alertdialog');
+    resetPrompt.append(h('p', null, 'Reset will discard every change and restore the original healthy network.'));
+    resetPrompt.append(btn('', 'Cancel', () => actions.onCancelReset?.()));
+    resetPrompt.append(btn('btn-primary', 'Reset', () => actions.onConfirmReset?.()));
+    banners.append(resetPrompt);
+  }
+  if (state.pendingMissionRequest) banners.append(renderPendingMissionPrompt(state, actions));
+  container.append(banners);
+
+  const body = h('div', 'mission-body');
+
+  // ---- main column: guidance and the map ----
+  const main = h('div', 'mission-main');
+
+  const guide = h('section', 'fd-guide');
+  guide.setAttribute('aria-label', 'Learning guidance');
+  const expanded = coachingExpanded.get(mission.id) ?? level === 'guided';
+  container.classList.toggle('coach-hidden', !expanded);
+  const guideHead = h('div', 'fd-guide-head');
+  const guideTitle = h('strong', 'fd-guide-title', level === 'independent' ? 'Your investigation' : (beat?.title ?? next.title));
+  const toggle = btn('fd-guide-toggle btn-quiet', expanded ? 'Hide' : 'Show');
+  toggle.setAttribute('aria-expanded', String(expanded));
+  toggle.setAttribute('aria-label', expanded ? 'Hide guidance' : 'Show guidance');
+  guideHead.append(guideTitle, toggle);
+  const guideBody = h('div', 'fd-guide-copy');
+  guideBody.hidden = !expanded;
+  const detail = h('p', 'fd-guide-detail', mode === 'console'
+    ? 'Use the device consoles to inspect, configure, and verify. Test the portal from both workstations, then cite evidence in Findings. Cable repairs stay on the map. Type ? in a console for its commands.'
+    : (beat?.detail ?? next.detail));
+  // On a phone the text is clamped to three lines; a tap shows all of it.
+  detail.addEventListener('click', () => detail.classList.toggle('is-open'));
+  guideBody.append(detail);
+  toggle.addEventListener('click', () => {
+    const open = guideBody.hidden;
+    guideBody.hidden = !open;
+    container.classList.toggle('coach-hidden', !open);
+    coachingExpanded.set(mission.id, open);
+    toggle.textContent = open ? 'Hide' : 'Show';
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.setAttribute('aria-label', open ? 'Hide guidance' : 'Show guidance');
+  });
 
   // The walkthrough's last step stops demonstrating and asks for the fix.
-  if (beat?.blank && !guideDetail.hidden) {
-    const blank = document.createElement('div'); blank.className = 'fd-guide-blank';
-    const prompt = document.createElement('label'); prompt.className = 'fd-guide-blank-prompt'; prompt.textContent = beat.blank.prompt;
-    const input = document.createElement('input'); input.type = 'text'; input.className = 'fd-guide-blank-input'; input.setAttribute('aria-label', beat.blank.prompt);
-    const check = document.createElement('button'); check.type = 'button'; check.className = 'fd-guide-blank-check'; check.textContent = 'Check';
-    const feedback = document.createElement('p'); feedback.className = 'fd-guide-blank-feedback'; feedback.setAttribute('role', 'status');
+  if (beat?.blank) {
+    const blank = h('div', 'fd-guide-blank');
+    const prompt = h('label', 'fd-guide-blank-prompt', beat.blank.prompt);
+    const input = h('input', 'fd-guide-blank-input mono');
+    input.type = 'text';
+    input.setAttribute('aria-label', beat.blank.prompt);
+    const check = btn('fd-guide-blank-check', 'Check');
+    const feedback = h('p', 'fd-guide-blank-feedback');
+    feedback.setAttribute('role', 'status');
     const verify = () => {
       const result = checkBlank(mission, input.value);
       blank.dataset.result = result.ok ? 'correct' : 'incorrect';
-      feedback.textContent = result.ok
-        ? 'That is the change. Make it on the device, then test again to prove it.'
-        : result.reason;
+      feedback.textContent = result.ok ? 'That is the change. Make it on the device, then test again to prove it.' : result.reason;
     };
     check.addEventListener('click', verify);
     input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); verify(); } });
-    prompt.appendChild(input); blank.append(prompt, check, feedback); guideCopy.appendChild(blank);
+    const row = h('div', 'fd-guide-blank-row');
+    row.append(input, check);
+    prompt.append(row);
+    blank.append(prompt, feedback);
+    guideBody.append(blank);
   }
 
   // Both directions stay reachable: drop the rails early, or put them back.
-  const controls = document.createElement('div'); controls.className = 'fd-guide-controls';
-  if (mode !== 'console') {
-    const tryIt = document.createElement('button');
-    tryIt.type = 'button'; tryIt.className = 'fd-guide-try'; tryIt.textContent = 'Let me try';
-    tryIt.addEventListener('click', () => actions.onSetGuidance?.('independent'));
-    controls.appendChild(tryIt);
+  const controls = h('div', 'fd-guide-controls');
+  if (mode !== 'console') controls.append(btn('fd-guide-try', 'Let me try', () => actions.onSetGuidance?.('independent')));
+  if (showMeAvailable(mission, state.profile)) controls.append(btn('fd-guide-showme', 'Show me', () => actions.onRequestHint?.()));
+  if (override || mode === 'console') {
+    controls.append(btn('fd-guide-restore', override ? 'Use my earned level' : 'Turn help back on', () => actions.onSetGuidance?.(override ? null : 'guided')));
   }
-  if (showMeAvailable(mission, state.profile)) {
-    const showMe = document.createElement('button');
-    showMe.type = 'button'; showMe.className = 'fd-guide-showme'; showMe.textContent = 'Show me';
-    showMe.addEventListener('click', () => actions.onRequestHint?.());
-    controls.appendChild(showMe);
-  }
-  const restore = document.createElement('button');
-  restore.type = 'button'; restore.className = 'fd-guide-restore';
-  restore.textContent = override ? 'Use my earned level' : 'Turn help back on';
-  restore.addEventListener('click', () => actions.onSetGuidance?.(override ? null : 'guided'));
-  if (override || mode === 'console') controls.appendChild(restore);
-  if (controls.childElementCount) guideCopy.appendChild(controls);
+  if (controls.childElementCount) guideBody.append(controls);
+  guide.append(guideHead, guideBody);
+  main.append(guide);
 
-  guide.append(guideLabel, guideCopy, help); stage.append(guide);
-
-  // The map — always present, the home surface.
-  const networkPanel = document.createElement('div');
-  networkPanel.className = 'mission-panel mission-panel-network fd-map';
+  const networkPanel = h('div', 'mission-panel mission-panel-network');
   if (!canvasViews.has(mission.id)) canvasViews.set(mission.id, {});
   const targetPortIds = mission.network.ports.filter(p => p.deviceId === mission.targetClientId).map(p => p.id);
-  const guideCable = mode === 'guided' && next.step === 3 ? mission.network.links.find(l => !l.connected && (targetPortIds.includes(l.aPortId) || targetPortIds.includes(l.bPortId))) : null;
-  networkPanel.appendChild(
-    renderTopology(mission.network, {
-      selectedDeviceId: state.selectedDeviceId,
-      onSelectDevice: actions.onSelectDevice,
-      onSelectLink: actions.onSelectLink,
-      reconnectLinkId: state.reconnect?.linkId ?? null,
-      viewState: canvasViews.get(mission.id),
-      compactList: true,
-      guideDeviceId: mode === 'guided' && next.step === 1 ? mission.targetClientId : null,
-      guideLinkId: guideCable?.id,
-    }),
-  );
-  if (state.reconnect) {
-    networkPanel.appendChild(renderReconnectPanel(state, actions));
-  }
+  const guideCable = mode === 'guided' && next.step === 3
+    ? mission.network.links.find(l => !l.connected && (targetPortIds.includes(l.aPortId) || targetPortIds.includes(l.bPortId)))
+    : null;
+  networkPanel.append(renderTopology(mission.network, {
+    selectedDeviceId: state.selectedDeviceId,
+    onSelectDevice: actions.onSelectDevice,
+    onSelectLink: actions.onSelectLink,
+    reconnectLinkId: state.reconnect?.linkId ?? null,
+    viewState: canvasViews.get(mission.id),
+    compactList: true,
+    guideDeviceId: mode === 'guided' && next.step === 1 ? mission.targetClientId : null,
+    guideLinkId: guideCable?.id,
+  }));
+  if (state.reconnect) networkPanel.append(renderReconnectPanel(state, actions));
   if (guideCable) {
-    const tip = document.createElement('aside'); tip.className = 'action-coach cable-coach';
-    tip.textContent = state.reconnect ? '↓ Choose the workstation endpoint and its assigned access-switch port, then Connect. The work order identifies the assigned VLAN.' : '↙ The dashed cable is disconnected. Select it to inspect both endpoints and reconnect the workstation.';
-    if (!state.reconnect) { const inspect = document.createElement('button'); inspect.type = 'button'; inspect.textContent = 'Inspect highlighted cable'; inspect.addEventListener('click', () => actions.onSelectLink?.(guideCable.id)); tip.append(inspect); }
+    const tip = h('aside', 'action-coach cable-coach', state.reconnect
+      ? 'Choose the workstation end and its assigned access-switch port, then Connect. The ticket names the assigned VLAN.'
+      : 'The dashed orange cable is disconnected. Select it to see both ends and reconnect the workstation.');
+    if (!state.reconnect) tip.append(btn('', 'Inspect the cable', () => actions.onSelectLink?.(guideCable.id)));
     networkPanel.prepend(tip);
   }
-  stage.appendChild(networkPanel);
+  main.append(networkPanel);
+  body.append(main);
 
-  // A sheet slides up over the map instead of switching to a separate page.
-  const makeSheet = (kind, titleText, contentNode, onClose, closeLabel = '▾ Map') => {
-    const el = document.createElement('section'); el.className = `fd-sheet fd-sheet-${kind}`;
-    const bar = document.createElement('div'); bar.className = 'fd-sheet-bar';
-    const grab = document.createElement('span'); grab.className = 'fd-grab'; grab.setAttribute('aria-hidden', 'true');
-    const h = document.createElement('h2'); h.className = 'fd-sheet-title'; h.textContent = titleText;
-    const close = document.createElement('button'); close.type = 'button'; close.className = 'fd-sheet-close'; close.textContent = closeLabel; close.setAttribute('aria-label', 'Back to the network map'); close.addEventListener('click', onClose);
-    bar.append(grab, h, close);
-    const body = document.createElement('div'); body.className = 'fd-sheet-body'; body.appendChild(contentNode);
-    el.append(bar, body); return el;
-  };
-  const selectedDevice = mission.network.devices.find(d => d.id === state.selectedDeviceId);
-  const shortName = name => String(name ?? '').replace(/^[^:]+:\s*/, '');
-  const deviceSheetContent = renderDevicePanel(state, actions);
-  const deviceSheet = makeSheet('device', selectedDevice ? shortName(selectedDevice.name) : 'Device', deviceSheetContent, () => actions.onTabChange?.('network'));
-  deviceSheet.hidden = activeTab !== 'device';
-  stage.appendChild(deviceSheet);
-
-  const findingsSheet = makeSheet('findings', mission.mode === 'repair' ? 'Findings & submit' : 'Checklist & submit',
-    renderFindings(state, { ...actions, completionChecks: mission.mode === 'repair' ? evaluateCompletion(mission).checks : evaluateConfigureChecklist(mission).checks }),
-    () => actions.onTabChange?.('network'));
-  findingsSheet.hidden = activeTab !== 'findings';
-  stage.appendChild(findingsSheet);
-
-  const briefSheet = makeSheet('brief', mission.mode === 'repair' ? 'Work order' : 'Lab brief', renderBrief(state, actions), () => { briefSheet.hidden = true; }, '▾ Close');
-  briefSheet.hidden = true;
-  stage.appendChild(briefSheet);
-
-  container.appendChild(stage);
-
-  // Bottom dock — the device's controls; the map is always one tap away.
-  const dock = document.createElement('nav'); dock.className = 'fd-dock'; dock.setAttribute('aria-label', 'Workspace controls');
-  const dockButton = (glyph, label, isActive, onClick, extraClass = '') => {
-    const b = document.createElement('button'); b.type = 'button'; b.className = ('fd-dock-btn ' + extraClass).trim();
-    b.setAttribute('aria-pressed', String(isActive)); if (isActive) b.classList.add('is-active');
-    const g = document.createElement('span'); g.className = 'fd-dock-glyph'; g.setAttribute('aria-hidden', 'true'); g.textContent = glyph;
-    const t = document.createElement('span'); t.className = 'fd-dock-label'; t.textContent = label;
-    b.append(g, t); b.addEventListener('click', onClick); dock.appendChild(b); return b;
-  };
-  dockButton('◹', 'Map', activeTab === 'network', () => actions.onTabChange?.('network'));
-  if (selectedDevice) dockButton('▤', shortName(selectedDevice.name), activeTab === 'device', () => actions.onTabChange?.('device'), 'fd-dock-device');
+  // ---- inspector: device, findings, ticket ----
+  const inspector = h('div', 'mission-inspector');
+  const tabs = h('nav', 'mission-tabs');
+  tabs.setAttribute('role', 'tablist');
+  tabs.setAttribute('aria-label', 'Workspace');
   const findingsCount = mission.events.filter(e => e.kind === 'inspection' || e.kind === 'test').length;
-  const findingsBtn = dockButton('✔', 'Findings', activeTab === 'findings', () => actions.onTabChange?.('findings'));
-  if (findingsCount) { const badge = document.createElement('span'); badge.className = 'fd-dock-badge'; badge.textContent = String(findingsCount); findingsBtn.appendChild(badge); }
-  dockButton('❐', 'Brief', false, () => { briefSheet.hidden = false; });
-  container.appendChild(dock);
+  // On desktop the Network tab is hidden (the map is always visible), and the
+  // ticket fills the inspector until something else is chosen.
+  const shown = activeTab;
+  const tab = (id, label, extra) => {
+    const selected = shown === id || (id === 'brief' && shown === 'network');
+    const b = btn(`mission-tab mission-tab-${id}`, '', () => actions.onTabChange?.(id));
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', String(shown === id));
+    b.dataset.desktopSelected = String(selected);
+    b.setAttribute('aria-label', label);
+    const text = h('span', 'mission-tab-label', label);
+    if (extra?.classList.contains('mission-tab-count')) text.append(extra);
+    b.append(text);
+    if (extra && !extra.classList.contains('mission-tab-count')) b.append(extra);
+    tabs.append(b);
+    return b;
+  };
+  tab('network', 'Network');
+  const deviceHint = selectedDevice ? h('span', 'mission-tab-sub', shortName(selectedDevice.name)) : null;
+  if (deviceHint) deviceHint.setAttribute('aria-hidden', 'true');
+  tab('device', 'Device', deviceHint);
+  let countBadge = null;
+  if (findingsCount) { countBadge = h('span', 'mission-tab-count', String(findingsCount)); countBadge.setAttribute('aria-hidden', 'true'); }
+  const findingsTab = tab('findings', 'Findings', countBadge);
+  tab('brief', 'Ticket');
+
+  const devicePanel = h('section', 'mission-panel mission-panel-device');
+  devicePanel.setAttribute('role', 'tabpanel');
+  devicePanel.setAttribute('aria-label', 'Device');
+  let deviceContent = null;
+  if (selectedDevice) {
+    deviceContent = renderDevicePanel(state, actions);
+    devicePanel.append(deviceContent);
+  } else {
+    const empty = h('div', 'panel-empty');
+    empty.append(h('p', 'panel-empty-title', 'No device selected'));
+    empty.append(h('p', null, 'Tap a device on the map to inspect it, run tests from it, or open its console.'));
+    const go = btn('', 'Go to the map', () => actions.onTabChange?.('network'));
+    go.classList.add('panel-empty-map');
+    empty.append(go);
+    devicePanel.append(empty);
+  }
+
+  const findingsPanel = h('section', 'mission-panel mission-panel-findings');
+  findingsPanel.setAttribute('role', 'tabpanel');
+  findingsPanel.setAttribute('aria-label', 'Findings');
+  findingsPanel.append(h('h2', 'panel-title', mission.mode === 'repair' ? 'Findings and submit' : 'Checklist and submit'));
+  findingsPanel.append(renderFindings(state, {
+    ...actions,
+    completionChecks: mission.mode === 'repair' ? evaluateCompletion(mission).checks : evaluateConfigureChecklist(mission).checks,
+  }));
+
+  const briefPanel = h('section', 'mission-panel mission-panel-brief');
+  briefPanel.setAttribute('role', 'tabpanel');
+  briefPanel.setAttribute('aria-label', 'Ticket');
+  briefPanel.append(h('h2', 'panel-title', mission.mode === 'repair' ? 'Work order' : 'Lab brief'));
+  briefPanel.append(renderBrief(state, actions));
+
+  const panels = h('div', 'mission-inspector-panels');
+  panels.append(devicePanel, findingsPanel, briefPanel);
+  inspector.append(panels);
+  body.append(inspector);
+  container.append(body);
+  container.append(tabs);
+
+  // ---- coaching pointers inside the panels ----
   if (mode === 'guided') {
-    if (next.step === 2 || (next.step === 3 && !guideCable)) {
-      const target = next.step === 2 ? deviceSheetContent.querySelector('.device-tests button') : deviceSheetContent.querySelector('#inspector-tab-configure');
+    if ((next.step === 2 || (next.step === 3 && !guideCable)) && deviceContent) {
+      const target = next.step === 2 ? deviceContent.querySelector('.device-tests button') : deviceContent.querySelector('#inspector-tab-configure');
       if (target) {
-        const hint = next.step === 2 ? '↓ Run a baseline test. A failure is useful evidence.' : '↓ Compare settings with the work order before changing them.';
-        const tip = document.createElement('p'); tip.className = 'action-coach'; tip.id = 'action-coach-tip'; tip.textContent = hint;
-        target.parentElement.insertBefore(tip, target); target.classList.add('coach-target'); target.setAttribute('aria-describedby', tip.id);
+        const tip = h('p', 'action-coach', next.step === 2 ? 'Run a baseline test. A failure is useful evidence.' : 'Compare these settings with the ticket before changing them.');
+        tip.id = 'action-coach-tip';
+        target.parentElement.insertBefore(tip, target);
+        target.classList.add('coach-target');
+        target.setAttribute('aria-describedby', tip.id);
       }
     } else if (next.step === 4) {
-      findingsBtn.classList.add('coach-target');
+      findingsTab.classList.add('coach-target');
     }
   }
 
@@ -1596,10 +1665,23 @@ export function renderDebrief(state, actions = {}) {
   }
   container.appendChild(investigationList);
 
-  const lessonNote = document.createElement('p');
-  lessonNote.className = 'debrief-lesson-note';
-  lessonNote.textContent = 'Related lesson: available once the study pack is built.';
-  container.appendChild(lessonNote);
+  // What this ticket did to the collection: earned without help, practiced
+  // with it. A practiced skill points straight at its study material.
+  const concepts = conceptsForRecipes(mission.recipeIds ?? []);
+  if (mission.mode === 'repair' && concepts.length) {
+    const names = concepts.map(c => c.label).join(' and ');
+    const next = h('section', `debrief-next${mission.assisted ? ' is-practiced' : ' is-earned'}`);
+    const led = h('span', `led ${mission.assisted ? 'led-warn' : 'led-ok'}`);
+    led.setAttribute('aria-hidden', 'true');
+    const text = h('div', 'debrief-next-text');
+    text.append(h('strong', null, mission.assisted ? `Practiced: ${names}` : `Earned: ${names}`));
+    text.append(h('p', null, mission.assisted
+      ? 'You used hints, so this counts as practice. Close one like it without hints to earn it.'
+      : 'Closed without help, so it is lit on your patch panel.'));
+    next.append(led, text);
+    if (mission.assisted && actions.onOpenCollection) next.append(btn('', 'Study it', () => actions.onOpenCollection()));
+    container.appendChild(next);
+  }
 
   const actionsRow = document.createElement('div');
   actionsRow.className = 'debrief-actions';
@@ -1616,6 +1698,7 @@ export function renderDebrief(state, actions = {}) {
   }
   const homeButton = document.createElement('button');
   homeButton.type = 'button';
+  homeButton.className = 'btn-primary debrief-home';
   homeButton.textContent = 'Home';
   homeButton.addEventListener('click', () => actions.onHome?.());
   actionsRow.append(homeButton);

@@ -1,5 +1,6 @@
 import { createIssueLibrary } from './issue-library.js';
-import { createExamPrep } from './study/hub.js';
+import { createExamPrep, prepSnapshot } from './study/hub.js';
+import { createThemeToggle } from './backlight.js';
 import {
   createInitialState,
   submitOpeningCommand,
@@ -129,6 +130,10 @@ function render() {
         onOpenStudy: openStudyScreen,
         onOpenReference: openReferenceScreen,
         onOpenCareer: openCareer,
+        onStartAssignment: startAssignment,
+        onOpenCollection: () => openExamPrep('collection'),
+        prepSnapshot: prepSnapshot(state.profile?.completedRuns ?? []),
+        themeToggle: createThemeToggle(),
         recommendation: recommendMission(state.profile),
         onExportBackup: exportBackupAction,
         offlineReady,
@@ -154,7 +159,7 @@ function render() {
     root.appendChild(
       renderStudy(state, {
         onHome: closeStudyScreen,
-        onOpenExamPrep: openExamPrep,
+        onOpenExamPrep: () => openExamPrep('home'),
         onSelectFamily: pickStudyFamily,
         onOpenLesson: openStudyLesson,
         onCloseLesson: closeStudyLesson,
@@ -213,6 +218,8 @@ function render() {
         onReplay: replay,
         onNewVariation: newVariation,
         onHome: debriefToHome,
+        // Leave the debrief first, so closing exam prep lands on home.
+        onOpenCollection: () => { debriefToHome(); openExamPrep('collection'); },
       }),
     );
   }
@@ -378,9 +385,10 @@ function openStudyScreen() {
 // does, so it never touches the mission state machine. It reads completed
 // runs from the profile to decide what the trainee has earned, and hands a
 // case code back when a concept sends them into the Field.
-function openExamPrep() {
+function openExamPrep(initialScreen = 'home') {
   const close = () => { examPrepScreen?.destroy?.(); examPrepScreen = null; };
   examPrepScreen = createExamPrep({
+    initialScreen,
     getCompletedRuns: () => state.profile?.completedRuns ?? [],
     onExit: () => { close(); render(); },
     onLaunch: (code) => { close(); startCode(code); },
@@ -730,9 +738,13 @@ function renderOpening() {
   line.className = 'opening-line';
   line.setAttribute('aria-hidden', 'true');
 
+  const brand = document.createElement('p');
+  brand.className = 'opening-brand';
+  brand.textContent = 'The Field';
+
   const prompt = document.createElement('span');
   prompt.className = 'opening-prompt';
-  prompt.textContent = '> ';
+  prompt.textContent = 'field>';
 
   const typed = document.createElement('span');
   typed.className = 'opening-typed';
@@ -783,7 +795,19 @@ function renderOpening() {
     }
   });
 
-  container.append(line, label, input, errorLine);
+  // The ritual stays, but nobody should be stuck on screen one. The hint
+  // names the command and says what it does, which is the first IOS lesson.
+  const hint = document.createElement('p');
+  hint.className = 'opening-hint';
+  const cmd = document.createElement('kbd');
+  cmd.textContent = 'enable';
+  hint.append('Type ', cmd, ' and press Enter. On a Cisco device it unlocks privileged mode, and here it lets you in.');
+
+  const tap = document.createElement('p');
+  tap.className = 'opening-tap';
+  tap.textContent = 'Tap anywhere to bring up the keyboard.';
+
+  container.append(brand, line, label, input, errorLine, hint, tap);
 
   queueMicrotask(() => input.focus());
 

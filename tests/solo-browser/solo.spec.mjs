@@ -9,6 +9,13 @@ import { test, expect } from '@playwright/test';
 // explicitly.
 const BASE_URL = 'http://localhost:4173';
 
+// Case codes, configure labs and backup moved into home's "More ways to
+// practice" section in the UI rework. Open it before using them.
+async function openMore(page) {
+  const more = page.locator('.home-more');
+  if (!(await more.evaluate(el => el.open))) await page.click('.home-more-summary');
+}
+
 async function enableApp(page) {
   await page.goto('/');
   await page.fill('#opening-command', 'enable');
@@ -59,6 +66,7 @@ test.describe('The Field Solo', () => {
 
   test('a seeded DNS repair (TF1-HM-2-D-e2edns1, deterministically D1) can be solved end to end', async ({ page }) => {
     await enableApp(page);
+    await openMore(page);
     await page.fill('.home-seed-form input', 'TF1-HM-2-D-e2edns1');
     await page.click('.home-seed-form button:has-text("Go")');
     await expect(page.locator('.mission-screen')).toBeVisible();
@@ -105,6 +113,7 @@ test.describe('The Field Solo', () => {
 
   test('GUI and CLI agree on network state in both directions', async ({ page }) => {
     await enableApp(page);
+    await openMore(page);
     await page.click('.home-configure-row button:has-text("Home lab")');
     await expect(page.locator('.mission-screen')).toBeVisible();
 
@@ -144,8 +153,9 @@ test.describe('The Field Solo', () => {
 
   test('backup import preview can be cancelled without replacing anything', async ({ page }) => {
     await enableApp(page);
-    const recommendedBefore = await page.locator('.home-recommended-row span').textContent();
+    const recommendedBefore = await page.locator('.home-recommended-row .ticket-code').textContent();
 
+    await openMore(page);
     const [download] = await Promise.all([
       page.waitForEvent('download'),
       page.click('.home-export-button'),
@@ -159,7 +169,7 @@ test.describe('The Field Solo', () => {
     await page.click('.home-pending-prompt button:has-text("Cancel")');
     await expect(page.locator('.home-pending-prompt')).toHaveCount(0);
 
-    const recommendedAfter = await page.locator('.home-recommended-row span').textContent();
+    const recommendedAfter = await page.locator('.home-recommended-row .ticket-code').textContent();
     expect(recommendedAfter).toBe(recommendedBefore);
   });
 
@@ -227,6 +237,7 @@ test.describe('Determinism and storage across separate browser contexts', () => 
 
     for (const page of [pageA, pageB]) {
       await enableApp(page);
+      await openMore(page);
       await page.fill('.home-seed-form input', 'TF1-BR-2-I-detcheck1');
       await page.click('.home-seed-form button:has-text("Go")');
       await expect(page.locator('.mission-screen')).toBeVisible();

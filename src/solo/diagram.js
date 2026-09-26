@@ -2,13 +2,16 @@ import { svgEl, equipmentGlyph, EQUIPMENT } from './equipment.js';
 import { fitTopologyBounds, resizeTopologyDrawer } from './topology-viewport.js';
 import { attachMentor, explainDevice, explainCable, createGuideToggle } from './mentor.js';
 
-// Per-kind node glow colour so each device reads as a luminous point in the web.
-const NODE_COLOR = { client: '#3dd6f5', switch: '#6ee7f5', router: '#ffb257', server: '#b585ff', firewall: '#ff6fa5', accessPoint: '#7bf0c8', cloud: '#9edbed', fiber: '#ffb257', site: '#9edbed' };
+// Colours live in theme.css. Devices and cables are neutral by default and
+// take colour only for state: selected, disconnected, powered off.
 
 export function positionsFor(network, compact = false) {
   const hasDistribution = network.devices.some(d => d.id === 'SW2');
   const fixed = compact
-    ? { PC1: [90, 95], PC2: [310, 95], SW1: [200, 240], SW2: [200, 380], R1: [200, hasDistribution ? 520 : 380], S1: [200, hasDistribution ? 660 : 520], PC3: [390, 380] }
+    // Phone layout: workstations across the top, the rest in one vertical
+    // chain at x=200. Names go above the top row and to the right of the
+    // chain, so no name ever sits on a cable.
+    ? { PC1: [10, 95], PC2: [390, 95], SW1: [200, 245], SW2: [200, 395], R1: [200, hasDistribution ? 545 : 395], S1: [200, hasDistribution ? 695 : 545], PC3: [10, 395] }
     : { PC1: [120, 125], PC2: [120, 360], SW1: [340, 240], SW2: [560, 240], R1: [780, 240], S1: [1000, 240], PC3: [560, 420] };
   return Object.fromEntries(network.devices.map((d, i) => [d.id, d.position ?? fixed[d.id] ?? [130 + (i % 5) * 200, 130 + Math.floor(i / 5) * 160]]));
 }
@@ -39,10 +42,43 @@ export function renderTopology(network, options = {}) {
     svg.classList.toggle('topology-overview', (view.k ?? 1) < .55);
     for (const text of world.querySelectorAll('.node-label, .site-label')) text.style.fontSize = `${Math.max(14, 11 / (view.k ?? 1))}px`;
     for (const text of world.querySelectorAll('.node-type')) text.style.fontSize = `${Math.max(13, 11 / (view.k ?? 1))}px`;
+    svg.classList.toggle('is-compact', Boolean(view.compact));
+    const labelSize = Math.max(14, 11 / (view.k ?? 1));
+    const lineHeight = labelSize * 1.15;
+    const ys = Object.values(positions).map(p => p[1]);
+    const topY = ys.length ? Math.min(...ys) : 0;
     for (const node of world.querySelectorAll('.diagram-device:not([data-kind="site"])')) {
+      const [px, py] = positions[node.dataset.deviceId] ?? [0, 0];
+      const wide = node.querySelector('.node-label-wide');
+      const stack = node.querySelector('.node-label-stack');
+      const detail = node.querySelector('.node-detail');
+      const arrow = node.querySelector('.device-guide-arrow');
+      const lines = Number(stack?.dataset.lines ?? 1);
       const nameY = 61 + Math.max(19, 16 / (view.k ?? 1));
-      node.querySelector('.node-label').setAttribute('y', nameY);
-      node.querySelector('.node-detail').setAttribute('y', nameY + 19);
+      wide.setAttribute('y', nameY);
+      detail.setAttribute('y', nameY + 19);
+      let place = 'below';
+      if (view.compact) place = Math.abs(px - 200) < 1 ? 'right' : py <= topY + 1 ? 'above' : 'below';
+      const spans = stack ? [...stack.querySelectorAll('tspan')] : [];
+      const setX = (x, anchor) => { stack.setAttribute('x', x); stack.setAttribute('text-anchor', anchor); for (const t of spans) t.setAttribute('x', x); };
+      if (stack) {
+        if (place === 'right') { setX(46, 'start'); stack.setAttribute('y', labelSize * 0.35 - ((lines - 1) * lineHeight) / 2); }
+        else if (place === 'above') { setX(0, 'middle'); stack.setAttribute('y', -52 - (lines - 1) * lineHeight); }
+        else { setX(0, 'middle'); stack.setAttribute('y', nameY); }
+      }
+      if (arrow) arrow.setAttribute('transform', place === 'above' ? `translate(0 ${-(lines * lineHeight + 6)})` : 'translate(0 0)');
+      // One tap target for the whole device: the icon and its name.
+      const hit = node.querySelector('.device-hit');
+      if (hit) {
+        let x1 = -48, y1 = -45, x2 = 48, y2 = 45;
+        const label = view.compact ? stack : wide;
+        try {
+          const b = label?.getBBox();
+          if (b && b.width) { x1 = Math.min(x1, b.x); y1 = Math.min(y1, b.y); x2 = Math.max(x2, b.x + b.width); y2 = Math.max(y2, b.y + b.height); }
+        } catch { /* not rendered yet; the icon box stands in */ }
+        hit.setAttribute('x', x1 - 6); hit.setAttribute('y', y1 - 6);
+        hit.setAttribute('width', x2 - x1 + 12); hit.setAttribute('height', y2 - y1 + 12);
+      }
     }
   };
   const fit = () => {
@@ -90,17 +126,10 @@ export function renderTopology(network, options = {}) {
     group.append(label); world.append(group);
   }
   const paths = [];
-  // Glowing multi-hue web: each connected cable takes an accent colour so the
-  // topology reads like the reference network art rather than a flat diagram.
-  const LINK_COLORS = ['#3dd6f5', '#b585ff', '#ff6fa5', '#ffb257', '#7bf0c8', '#6ee7f5'];
-  let linkIndex = 0;
   for (const link of network.links) {
     const [a, b] = ends(link); if (!positions[a] || !positions[b]) continue;
     const g = svgEl('g', { class: `topology-cable${link.connected === false ? ' is-disconnected' : ''}${link.id === reconnectLinkId ? ' is-selected' : ''}${link.id === options.guideLinkId ? ' cable-coach-target' : ''}${selectedDeviceId && a !== selectedDeviceId && b !== selectedDeviceId ? ' is-muted' : ''}` });
-    const linkColor = link.connected === false ? '#ff9d5c' : LINK_COLORS[linkIndex++ % LINK_COLORS.length];
     const line = svgEl('path', { class: `diagram-link${link.connected === false ? ' diagram-link-down' : ''}`, fill: 'none' });
-    line.style.setProperty('--link-color', linkColor);
-    line.style.setProperty('--link-glow', linkColor);
     const hit = svgEl('path', { class: 'cable-hit', fill: 'none', tabindex: 0, role: 'button', 'aria-label': `Cable ${link.id}, ${link.connected === false ? 'disconnected' : 'connected'}` });
     const act = () => onSelectLink?.(link.id); hit.addEventListener('click', act);
     hit.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(); } });
@@ -116,25 +145,37 @@ export function renderTopology(network, options = {}) {
     }
   }
   drawPaths();
-  let drag = null, suppressClick = false, nodeIndex = 0;
+  let drag = null, suppressClick = false;
   const pointer = e => { const box = svg.getBoundingClientRect(); return [e.clientX - box.left, e.clientY - box.top]; };
   for (const device of network.devices) {
     const [x, y] = positions[device.id];
     const g = svgEl('g', { class: `diagram-device${device.id === selectedDeviceId ? ' diagram-device-selected' : ''}`, 'data-kind': device.kind, 'data-device-id': device.id, transform: `translate(${x} ${y})`, tabindex: 0, role: 'button', 'aria-label': `${device.name} (${device.kind})`, 'aria-pressed': device.id === selectedDeviceId });
-    const nodeColor = NODE_COLOR[device.kind] ?? '#3dd6f5';
-    g.style.setProperty('--node-color', nodeColor);
     g.append(svgEl('title', {}, device.name));
-    const halo = svgEl('circle', { class: 'device-halo', cx: 0, cy: 0, r: 34 });
-    halo.style.animationDelay = `${(nodeIndex++ % 6) * 0.55}s`;
-    g.append(halo, svgEl('rect', { class: 'device-selection', x: -48, y: -45, width: 96, height: 90, rx: 14 }), equipmentGlyph(device.kind));
+    g.append(svgEl('rect', { class: 'device-hit', x: -54, y: -51, width: 108, height: 102 }));
+    g.append(svgEl('rect', { class: 'device-selection', x: -48, y: -45, width: 96, height: 90, rx: 14 }), equipmentGlyph(device.kind));
     if (device.kind !== 'site') g.append(svgEl('text', { class: 'node-type', x: 0, y: 61, 'text-anchor': 'middle' }, device.kind === 'client' ? 'PC' : EQUIPMENT[device.kind] ?? device.kind));
-    g.append(svgEl('text', { class: 'node-label diagram-device-label', x: 0, y: 61, 'text-anchor': 'middle' }, String(device.name ?? '').replace(/^[^:]+:\s*/, '')));
+    // Two versions of the name: one line for wide canvases, and stacked
+    // over two lines for the compact phone layout, where neighbouring
+    // one-line names would collide.
+    const shortName = String(device.name ?? '').replace(/^[^:]+:\s*/, '');
+    g.append(svgEl('text', { class: 'node-label node-label-wide diagram-device-label', x: 0, y: 61, 'text-anchor': 'middle' }, shortName));
+    const words = shortName.split(' ');
+    const stack = svgEl('text', { class: 'node-label node-label-stack', x: 0, y: 61, 'text-anchor': 'middle', 'aria-hidden': 'true' });
+    if (words.length > 1) {
+      const cut = Math.ceil(words.length / 2);
+      stack.append(svgEl('tspan', { x: 0 }, words.slice(0, cut).join(' ')), svgEl('tspan', { x: 0, dy: '1.15em' }, words.slice(cut).join(' ')));
+      stack.dataset.lines = '2';
+    } else {
+      stack.textContent = shortName;
+      stack.dataset.lines = '1';
+    }
+    g.append(stack);
     g.append(svgEl('text', { class: 'node-detail', x: 0, y: 80, 'text-anchor': 'middle' }, device.subtitle ?? `${device.id} · ${EQUIPMENT[device.kind] ?? 'Site'}`));
     if (device.powered !== undefined) g.append(svgEl('circle', { cx: 35, cy: -31, r: 4, class: device.powered ? 'power-on' : 'power-off' }));
     if (options.guideDeviceId === device.id) {
       const pointer = svgEl('g', { class: 'device-guide-arrow', 'aria-hidden': 'true' });
-      pointer.append(svgEl('path', { d: 'M0,-100V-58M-10,-69L0,-58L10,-69', fill: 'none', stroke: '#6ee7f5', 'stroke-width': 4 }));
-      pointer.append(svgEl('text', { x: 0, y: -112, 'text-anchor': 'middle', fill: '#b7f3ff', 'font-size': 20 }, 'Start here'));
+      pointer.append(svgEl('path', { class: 'guide-arrow-line', d: 'M0,-100V-58M-10,-69L0,-58L10,-69', fill: 'none', 'stroke-width': 4 }));
+      pointer.append(svgEl('text', { class: 'guide-arrow-label', x: 0, y: -112, 'text-anchor': 'middle', 'font-size': 20 }, 'Start here'));
       g.append(pointer);
     }
     attachMentor(g, () => explainDevice(device));

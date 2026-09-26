@@ -3,6 +3,13 @@
 // built dist/sw.js against a real browser network toggle.
 import { test, expect } from '@playwright/test';
 
+// Case codes, configure labs and backup moved into home's "More ways to
+// practice" section in the UI rework. Open it before using them.
+async function openMore(page) {
+  const more = page.locator('.home-more');
+  if (!(await more.evaluate(el => el.open))) await page.click('.home-more-summary');
+}
+
 async function enableApp(page) {
   await page.goto('/');
   await page.fill('#opening-command', 'enable');
@@ -45,6 +52,7 @@ test.describe('Offline installation and update behavior', () => {
     await context.setOffline(true);
 
     // Open a fresh seeded case entirely offline.
+    await openMore(page);
     await page.fill('.home-seed-form input', 'TF1-BR-2-V-offline1');
     await page.click('.home-seed-form button:has-text("Go")');
     await expect(page.locator('.mission-screen')).toBeVisible();

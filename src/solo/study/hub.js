@@ -17,6 +17,7 @@ import { conceptById } from './concepts.js';
 import { masteryOf, collectionSummary, studyAfterTicket } from './mastery.js';
 import { TIERS, tierById, generate, isCorrect as drillCorrect, emptySession, record, averageSeconds, shouldShowWork } from '../drills/subnet.js';
 import { parameters } from '../seed.js';
+import { renderPatchPanel } from '../patch-panel.js';
 
 export const STORAGE_KEY = 'field-exam-prep-v1';
 
@@ -51,14 +52,35 @@ function loadSaved() {
   }
 }
 
-export function createExamPrep({ onExit, onLaunch, getCompletedRuns } = {}) {
+// Flashcards review bank questions, so they count toward question practice
+// alongside quiz answers. Type-it reviews deck cards.
+function practiceFrom(saved) {
+  const questions = { ...saved.quiz };
+  for (const [id, card] of Object.entries(saved.cards)) {
+    questions[id] = { right: (questions[id]?.right ?? 0) + (card.right ?? 0), seen: (questions[id]?.seen ?? 0) + (card.seen ?? 0) };
+  }
+  return { questions, cards: saved.typeit };
+}
+
+// What the home screen shows about study, read without opening the hub.
+export function prepSnapshot(completedRuns = [], now = Date.now()) {
+  const saved = loadSaved();
+  return {
+    mastery: masteryOf({ completedRuns: completedRuns.filter(Boolean), practice: practiceFrom(saved) }),
+    cardsDue: dueCards(CARD_IDS, saved.cards, now).filter(id => saved.cards[id]).length,
+    typeDue: dueCards(TYPE_IDS, saved.typeit, now).filter(id => saved.typeit[id]).length,
+    started: Object.keys(saved.cards).length + Object.keys(saved.typeit).length + Object.keys(saved.quiz).length > 0,
+  };
+}
+
+export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScreen = 'home' } = {}) {
   const root = el('main', 'exam-prep');
   const saved = loadSaved();
   let storageError = '';
   let ticker = null;
 
   const ui = {
-    screen: 'home',
+    screen: ['home', 'collection', 'drill'].includes(initialScreen) ? initialScreen : 'home',
     domains: new Set(DOMAINS.map(d => d.id)),
     deck: [], at: 0, pick: [], shown: null, graded: null, right: 0, exam: false, shortfalls: [],
     recallKind: null, queue: [], recallAt: 0, recallRight: 0, flipped: false, typed: null,
@@ -73,14 +95,7 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns } = {}) {
 
   function runs() { return (getCompletedRuns?.() ?? []).filter(Boolean); }
 
-  function practice() {
-    const questions = { ...saved.quiz };
-    for (const [id, card] of Object.entries(saved.cards)) {
-      questions[id] = { right: (questions[id]?.right ?? 0) + (card.right ?? 0), seen: (questions[id]?.seen ?? 0) + (card.seen ?? 0) };
-    }
-    return { questions, cards: saved.typeit };
-  }
-  const mastery = () => masteryOf({ completedRuns: runs(), practice: practice() });
+  const mastery = () => masteryOf({ completedRuns: runs(), practice: practiceFrom(saved) });
 
   function stopTicker() { if (ticker) { clearInterval(ticker); ticker = null; } }
   function go(screen) { stopTicker(); ui.screen = screen; draw(); }
@@ -157,12 +172,8 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns } = {}) {
     const sum = collectionSummary(mastery());
     const coll = btn('ep-collection', '', () => go('collection'));
     coll.append(el('span', 'ep-coll-title', 'Collection'));
-    coll.append(el('span', 'ep-coll-meta', `${sum.earned} earned · ${sum.practiced} practiced · ${sum.unseen} unseen`));
-    const track = el('span', 'ep-track');
-    const e = el('span', 'ep-track-earned'); e.style.width = `${(100 * sum.earned) / sum.total}%`;
-    const p = el('span', 'ep-track-practiced'); p.style.width = `${(100 * sum.practiced) / sum.total}%`;
-    track.append(e, p);
-    coll.append(track);
+    coll.append(el('span', 'ep-coll-meta', `${sum.earned} of ${sum.total} earned`));
+    coll.append(renderPatchPanel(mastery(), { compact: true }));
     root.append(coll);
 
     root.append(el('p', 'ep-label', 'Blueprint'));
@@ -214,14 +225,13 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns } = {}) {
     const rows = mastery();
     const sum = collectionSummary(rows);
     root.append(header('Collection', 'Drilling gets a concept to practiced. Only fixing it in the Field without help earns it.'));
-    const legend = el('div', 'ep-legend');
-    for (const [cls, name, n] of [['earned', 'Earned', sum.earned], ['practiced', 'Practiced', sum.practiced], ['unseen', 'Unseen', sum.unseen]]) {
-      const item = el('span', `ep-lg ep-lg-${cls}`);
-      item.append(el('b', null, String(n)));
-      item.append(el('span', null, name));
-      legend.append(item);
-    }
-    root.append(legend);
+    const panelCard = el('section', 'ep-card ep-patch');
+    const counts = el('p', 'ep-patch-counts');
+    counts.append(el('span', 'led led-ok'), ` ${sum.earned} earned`, el('span', 'led led-warn'), ` ${sum.practiced} practiced`, el('span', 'led'), ` ${sum.unseen} not started`);
+    panelCard.append(renderPatchPanel(rows), counts);
+    root.append(panelCard);
+    // One loud button on the screen: the first skill not yet earned.
+    const nextUp = rows.find(r => r.state !== 'earned')?.id;
 
     const last = [...runs()].reverse().find(r => r.mode === 'repair');
     if (last) {
@@ -254,7 +264,7 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns } = {}) {
       const acts = el('div', 'ep-concept-acts');
       const recipe = concept.recipes[0];
       if (recipe && row.state !== 'earned') {
-        acts.append(btn('ep-mini', `Take a ${recipe} ticket`, () => {
+        acts.append(btn(row.id === nextUp ? 'ep-mini' : 'ep-mini ghost', `Take a ${recipe} ticket`, () => {
           const code = codeForRecipe(recipe);
           if (code) { stopTicker(); onLaunch?.(code); }
         }));
@@ -505,6 +515,10 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns } = {}) {
 
   function draw() {
     root.textContent = '';
+    const back = ui.screen === 'home'
+      ? btn('screen-back btn-quiet', 'Home', exit)
+      : btn('screen-back btn-quiet', 'Exam prep', () => go('home'));
+    root.append(back);
     const screens = { home: drawHome, collection: drawCollection, quiz: drawQuestion, done: drawDone, recall: drawRecall, drill: drawDrill };
     (screens[ui.screen] ?? drawHome)();
   }

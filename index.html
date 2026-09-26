@@ -2,14 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Apply a pinned backlight mode before first paint, so the page never
+      // flashes the other one. Storage can be unavailable; then the system
+      // setting decides.
+      try { var t = localStorage.getItem('field-theme'); if (t === 'sun' || t === 'night') document.documentElement.dataset.theme = t; } catch (e) {}
+    </script>
     <link rel="icon" type="image/png" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b0f14" />
+    <meta name="theme-color" content="#131517" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#e8eae3" media="(prefers-color-scheme: light)" />
     <title>Field Sim</title>
     <link rel="stylesheet" href="/src/solo/styles.css" />
     <link rel="stylesheet" href="/src/solo/workspace.css" />
-    <link rel="stylesheet" href="/src/solo/atmosphere.css" />
+    <link rel="stylesheet" href="/src/solo/theme.css" />
   </head>
   <body>
     <div id="root"></div>
