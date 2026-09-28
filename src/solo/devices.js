@@ -298,7 +298,9 @@ const TEST_KINDS = [
   { id: 'checkProtected', label: 'Check protected client' },
 ];
 
-export function renderTests(deviceId, onRunTest) {
+// options.labels swaps in plain button names (guided mode); options.terms
+// adds the technician's name for each test in small print beneath it.
+export function renderTests(deviceId, onRunTest, options = {}) {
   const container = document.createElement('div');
   container.className = 'device-tests';
   const heading = document.createElement('h3');
@@ -312,7 +314,16 @@ export function renderTests(deviceId, onRunTest) {
   for (const test of TEST_KINDS) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = test.label;
+    button.dataset.test = test.id;
+    const plain = options.labels?.[test.id];
+    if (plain) {
+      button.classList.add('has-term');
+      const main = document.createElement('span'); main.className = 'test-label'; main.textContent = plain;
+      const term = document.createElement('span'); term.className = 'test-term'; term.textContent = test.label;
+      button.append(main, term);
+    } else {
+      button.textContent = test.label;
+    }
     button.addEventListener('click', () => onRunTest(test.id, deviceId));
     // Beginner mentor tooltip: what this specific test proves, in plain terms.
     attachMentor(button, () => explainTest(test.id));

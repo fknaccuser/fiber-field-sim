@@ -5,6 +5,8 @@ import { renderTopology } from './diagram.js';
 import { equipmentIcon } from './equipment.js';
 import { nextGuidance, trainingMode, showMeAvailable, guidanceOverride } from './guidance.js';
 import { walkthroughPosition, checkBlank } from './walkthrough.js';
+import { currentGuidedStep, PLAIN_TEST_LABELS, testCommand } from './guide-steps.js';
+import { mountSpotlight } from './spotlight.js';
 import { attachMentor, explainDevice, explainPort, explainConcept } from './mentor.js';
 import { careerProgress } from './career.js';
 import { renderPatchPanel } from './patch-panel.js';
@@ -839,6 +841,7 @@ function renderInspect(network, device) {
     dt.textContent = term;
     const dd = document.createElement('dd');
     dd.textContent = value;
+    dt.dataset.row = term; dd.dataset.row = term;
     list.append(dt, dd);
     return { dt, dd };
   };
@@ -971,11 +974,22 @@ function renderDevicePanel(state, actions) {
   }
 
   if (device.kind === 'client' && mode !== 'console') {
-    container.appendChild(renderTests(device.id, (testKind, deviceId) => actions.onRunTest?.(testKind, deviceId)));
+    const guided = mode === 'guided';
+    container.appendChild(renderTests(device.id, (testKind, deviceId) => actions.onRunTest?.(testKind, deviceId), guided ? { labels: PLAIN_TEST_LABELS } : {}));
     const latestTest = state.mission.events.findLast(event => event.kind === 'test' && event.deviceId === device.id);
     if (latestTest) {
-      const feedback = document.createElement('p'); feedback.className = 'test-feedback'; feedback.setAttribute('role', 'status');
-      feedback.textContent = describeEvent(state.mission, latestTest); container.append(feedback);
+      const feedback = document.createElement('div'); feedback.className = 'test-feedback'; feedback.setAttribute('role', 'status');
+      const ok = latestTest.details.result.ok;
+      feedback.classList.add(ok ? 'is-pass' : 'is-fail');
+      if (guided) {
+        const kind = latestTest.details.testKind;
+        feedback.append(h('strong', null, `${PLAIN_TEST_LABELS[kind] ?? kind}: ${ok ? 'it worked' : 'it failed'}`));
+        const command = testCommand(state.mission, kind, device.id);
+        if (command) feedback.append(h('span', 'test-feedback-command mono', command));
+      } else {
+        feedback.textContent = describeEvent(state.mission, latestTest);
+      }
+      container.append(feedback);
     }
   }
 
@@ -1091,6 +1105,19 @@ const TEST_LABELS = {
   checkProtected: 'Check protected client',
 };
 
+const CHANGE_LABELS = {
+  setLinkConnected: 'Reconnected a cable',
+  moveCable: 'Moved a cable',
+  setPortAdmin: 'Changed a port on/off state',
+  setAccessVlan: 'Changed a port VLAN',
+  setTrunkAllowedVlans: 'Changed the trunk VLAN list',
+  setClientAddress: 'Changed the IP address',
+  setClientGateway: 'Changed the default gateway',
+  setClientDns: 'Changed the DNS server',
+  setRouterSegmentAddress: 'Changed a router address',
+  setDnsRecord: 'Changed a DNS record',
+};
+
 // Findings rows (UI_AND_STORAGE.md "Findings rows show observation, device and
 // sequence"). Selecting supporting rows for a completion submission is
 // grade.js's job, a later task — this is the read-only observation record.
@@ -1108,7 +1135,7 @@ function describeEvent(mission, event) {
   if (event.kind === 'change') {
     const action = event.details.action;
     const entityLabel = device ? deviceName : (action?.linkId ?? action?.portId ?? 'the network');
-    return `${action?.type ?? 'Configuration change'} on ${entityLabel}`;
+    return `${CHANGE_LABELS[action?.type] ?? action?.type ?? 'Configuration change'} on ${entityLabel}`;
   }
   return `${event.kind} on ${deviceName}`;
 }
@@ -1123,12 +1150,22 @@ function renderFindings(state, actions) {
 
   const findingsHeading = document.createElement('h3');
   findingsHeading.className = 'findings-heading mentor-hoverable';
-  findingsHeading.textContent = 'Findings — your evidence';
+  findingsHeading.textContent = 'Findings: your evidence';
   findingsHeading.tabIndex = 0;
   attachMentor(findingsHeading, () => explainConcept('findings'));
   container.appendChild(findingsHeading);
 
-  const capturedEvents = mission.events.filter((e) => e.kind === 'inspection' || e.kind === 'test');
+  // Tapping the same device again records the same observation again; show
+  // it once, so the list reads as evidence rather than a click log.
+  const seen = new Set();
+  const capturedEvents = mission.events.filter((e) => {
+    if (e.kind === 'test') return true;
+    if (e.kind !== 'inspection') return false;
+    const key = `${e.revision}|${describeEvent(mission, e)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   if (capturedEvents.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'findings-empty';
@@ -1151,7 +1188,7 @@ function renderFindings(state, actions) {
       checkbox.checked = mission.selectedFindingIds.includes(event.id);
       checkbox.addEventListener('change', () => actions.onToggleFinding?.(event.id));
       const text = document.createElement('span');
-      text.textContent = ` #${event.index} · ${describeEvent(mission, event)}`;
+      text.textContent = ` ${describeEvent(mission, event)}`;
       label.append(checkbox, text);
       item.appendChild(label);
       list.appendChild(item);
@@ -1328,8 +1365,19 @@ function renderBrief(state, actions) {
 export function renderMission(state, actions = {}, activeTab = 'network') {
   const mission = state.mission;
   const container = h('div', 'mission-screen');
-  container.dataset.activeTab = activeTab;
   const mode = trainingMode(mission, state.profile);
+  // The spotlight guide (guided mode): one instruction at a time, from the
+  // complaint to closing the ticket. Entering a step moves to the tab it needs.
+  const guide = actions.guide ?? {};
+  const spot = mode === 'guided' && mission.mode === 'repair' && mission.status === 'active'
+    ? currentGuidedStep(mission, guide.acks ?? new Set()) : null;
+  const spotOn = Boolean(spot) && !guide.hidden;
+  if (spotOn && spot.step.tab && guide.tabStep !== spot.step.id) {
+    activeTab = spot.step.tab;
+    actions.onAutoTab?.(spot.step.id, spot.step.tab);
+  }
+  if (spotOn && spot.step.id === 'look' && state.selectedDeviceId) inspectorViews.set(`${mission.id}:${state.selectedDeviceId}`, 'inspect');
+  container.dataset.activeTab = activeTab;
   container.dataset.trainingMode = mode;
   const level = mode === 'console' ? 'independent' : mode;
   const next = nextGuidance(mission);
@@ -1350,7 +1398,7 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   const title = h('span', 'mission-title mono', mission.mode === 'configure' ? `Configure: ${mission.network.layoutId}` : (mission.caseCode ?? 'Mission'));
   titleBlock.append(title);
   const levelChip = h('span', `chip mission-level${level === 'guided' ? ' chip-accent' : ''}`,
-    level === 'guided' ? `Guided ${walk ? walk.index + 1 : next.step} of 4` : level === 'coached' ? 'Coached' : 'On your own');
+    level === 'guided' ? (spot ? `Step ${spot.index + 1} of ${spot.total}` : `Guided ${walk ? walk.index + 1 : next.step} of 4`) : level === 'coached' ? 'Coached' : 'On your own');
 
   const menu = h('details', 'mission-menu');
   const menuSummary = h('summary', 'mission-menu-button');
@@ -1398,12 +1446,12 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   // ---- main column: guidance and the map ----
   const main = h('div', 'mission-main');
 
-  const guide = h('section', 'fd-guide');
-  guide.setAttribute('aria-label', 'Learning guidance');
+  const guideBox = h('section', 'fd-guide');
+  guideBox.setAttribute('aria-label', 'Learning guidance');
   const expanded = coachingExpanded.get(mission.id) ?? level === 'guided';
   container.classList.toggle('coach-hidden', !expanded);
   const guideHead = h('div', 'fd-guide-head');
-  const guideTitle = h('strong', 'fd-guide-title', level === 'independent' ? 'Your investigation' : (beat?.title ?? next.title));
+  const guideTitle = h('strong', 'fd-guide-title', level === 'independent' ? 'Your investigation' : (spot?.step.title ?? beat?.title ?? next.title));
   const toggle = btn('fd-guide-toggle btn-quiet', expanded ? 'Hide' : 'Show');
   toggle.setAttribute('aria-expanded', String(expanded));
   toggle.setAttribute('aria-label', expanded ? 'Hide guidance' : 'Show guidance');
@@ -1412,7 +1460,7 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   guideBody.hidden = !expanded;
   const detail = h('p', 'fd-guide-detail', mode === 'console'
     ? 'Use the device consoles to inspect, configure, and verify. Test the portal from both workstations, then cite evidence in Findings. Cable repairs stay on the map. Type ? in a console for its commands.'
-    : (beat?.detail ?? next.detail));
+    : (spot?.step.body ?? beat?.detail ?? next.detail));
   // On a phone the text is clamped to three lines; a tap shows all of it.
   detail.addEventListener('click', () => detail.classList.toggle('is-open'));
   guideBody.append(detail);
@@ -1427,7 +1475,7 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   });
 
   // The walkthrough's last step stops demonstrating and asks for the fix.
-  if (beat?.blank) {
+  if (beat?.blank && !spot) {
     const blank = h('div', 'fd-guide-blank');
     const prompt = h('label', 'fd-guide-blank-prompt', beat.blank.prompt);
     const input = h('input', 'fd-guide-blank-input mono');
@@ -1452,19 +1500,20 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
 
   // Both directions stay reachable: drop the rails early, or put them back.
   const controls = h('div', 'fd-guide-controls');
+  if (spot && guide.hidden) controls.append(btn('fd-guide-show btn-primary', 'Show the guide', () => actions.onGuideHide?.(false)));
   if (mode !== 'console') controls.append(btn('fd-guide-try', 'Let me try', () => actions.onSetGuidance?.('independent')));
   if (showMeAvailable(mission, state.profile)) controls.append(btn('fd-guide-showme', 'Show me', () => actions.onRequestHint?.()));
   if (override || mode === 'console') {
     controls.append(btn('fd-guide-restore', override ? 'Use my earned level' : 'Turn help back on', () => actions.onSetGuidance?.(override ? null : 'guided')));
   }
   if (controls.childElementCount) guideBody.append(controls);
-  guide.append(guideHead, guideBody);
-  main.append(guide);
+  guideBox.append(guideHead, guideBody);
+  main.append(guideBox);
 
   const networkPanel = h('div', 'mission-panel mission-panel-network');
   if (!canvasViews.has(mission.id)) canvasViews.set(mission.id, {});
   const targetPortIds = mission.network.ports.filter(p => p.deviceId === mission.targetClientId).map(p => p.id);
-  const guideCable = mode === 'guided' && next.step === 3
+  const guideCable = mode === 'guided' && next.step === 3 && !spot
     ? mission.network.links.find(l => !l.connected && (targetPortIds.includes(l.aPortId) || targetPortIds.includes(l.bPortId)))
     : null;
   networkPanel.append(renderTopology(mission.network, {
@@ -1474,7 +1523,9 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
     reconnectLinkId: state.reconnect?.linkId ?? null,
     viewState: canvasViews.get(mission.id),
     compactList: true,
-    guideDeviceId: mode === 'guided' && next.step === 1 ? mission.targetClientId : null,
+    guideDeviceId: spot ? (spot.step.target?.kind === 'device' ? spot.step.target.id : null) : (mode === 'guided' && next.step === 1 ? mission.targetClientId : null),
+    hideList: mode === 'guided',
+    guideLabel: spot?.step.id === 'pick-fault-device' ? 'Tap here' : undefined,
     guideLinkId: guideCable?.id,
   }));
   if (state.reconnect) networkPanel.append(renderReconnectPanel(state, actions));
@@ -1560,7 +1611,7 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
   container.append(tabs);
 
   // ---- coaching pointers inside the panels ----
-  if (mode === 'guided') {
+  if (mode === 'guided' && !spot) {
     if ((next.step === 2 || (next.step === 3 && !guideCable)) && deviceContent) {
       const target = next.step === 2 ? deviceContent.querySelector('.device-tests button') : deviceContent.querySelector('#inspector-tab-configure');
       if (target) {
@@ -1575,7 +1626,114 @@ export function renderMission(state, actions = {}, activeTab = 'network') {
     }
   }
 
+  if (spotOn) {
+    const card = renderSpotCard(state, spot, actions, guide);
+    mountSpotlight(container, { card, stepKey: spot.step.id, resolve: () => resolveSpotTarget(container, spot.step) });
+  }
+
   return container;
+}
+
+// The element(s) a spotlight step points at. When the target lives on a tab
+// that is not showing (a phone showing one panel at a time), the tab button
+// itself is lit instead, so the way there is always the lit thing.
+function resolveSpotTarget(container, step) {
+  const target = step.target;
+  if (!target) return [];
+  const visible = (el) => { if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  let found = [];
+  if (target.kind === 'device') found = [container.querySelector(`.diagram-device[data-device-id="${target.id}"]`)];
+  else if (target.kind === 'cable') found = [container.querySelector(`.topology-cable[data-link-id="${target.id}"] .diagram-link`)];
+  else if (target.kind === 'test') found = [container.querySelector(`.mission-panel-device .device-tests button[data-test="${target.testKind}"]`)];
+  else if (target.kind === 'feedback') found = [container.querySelector('.mission-panel-device .test-feedback')];
+  else if (target.kind === 'row') found = [...container.querySelectorAll('.mission-panel-device .device-inspect [data-row]')].filter((el) => el.dataset.row === target.label);
+  else if (target.kind === 'panel') found = [container.querySelector('.mission-panel-device .device-panel')];
+  found = found.filter(visible);
+  if (found.length) return found;
+  const tabButton = step.tab ? container.querySelector(`.mission-tab-${step.tab}`) : null;
+  return visible(tabButton) ? [tabButton] : [];
+}
+
+function renderSpotCard(state, spot, actions, guide) {
+  const mission = state.mission;
+  const { step } = spot;
+  const card = h('div', 'spot-card');
+  card.dataset.step = step.id;
+  card.append(h('p', 'spot-count', `Step ${spot.index + 1} of ${spot.total}`));
+  const title = h('h2', 'spot-title', step.title);
+  title.id = 'spot-title';
+  card.setAttribute('aria-labelledby', title.id);
+  card.append(title);
+  if (step.body && !step.blank) card.append(h('p', 'spot-body', step.body));
+  const actionsRow = h('div', 'spot-actions');
+
+  if (step.ack) {
+    actionsRow.append(btn('btn-primary spot-go', step.button ?? 'Next', () => actions.onGuideAck?.(step.id)));
+  }
+
+  // A read step about a device that is not open: one tap opens it.
+  if (step.id === 'look' && step.device && state.selectedDeviceId !== step.device) {
+    actionsRow.prepend(btn('spot-show', 'Show me', () => actions.onSelectDevice?.(step.device)));
+  }
+
+  if (step.blank) {
+    const form = h('form', 'spot-blank');
+    const label = h('label', 'spot-body', step.blank.prompt);
+    const input = h('input', 'spot-input mono');
+    input.type = 'text';
+    input.autocomplete = 'off';
+    input.autocapitalize = 'off';
+    input.spellcheck = false;
+    input.value = guide.draft ?? '';
+    input.setAttribute('aria-label', step.blank.prompt);
+    label.append(input);
+    form.append(label);
+    const feedback = guide.feedback;
+    if (feedback?.text) {
+      const line = h('p', `spot-feedback${feedback.ok ? ' is-ok' : ' is-wrong'}`, feedback.text);
+      line.setAttribute('role', 'status');
+      form.append(line);
+    }
+    const go = btn('btn-primary spot-go', 'Fix it');
+    go.type = 'submit';
+    form.addEventListener('submit', (event) => { event.preventDefault(); actions.onGuideFix?.(input.value); });
+    const row = h('div', 'spot-actions');
+    if (feedback?.wrong) row.append(btn('spot-answer', 'Show me the answer', () => actions.onGuideShowAnswer?.()));
+    row.append(go);
+    form.append(row);
+    card.append(form);
+    requestAnimationFrame(() => { if (input.isConnected && !input.value) input.focus({ preventScroll: true }); });
+  }
+
+  if (step.finish === 'verify') {
+    if (guide.feedback?.text) {
+      const line = h('p', 'spot-feedback is-wrong', guide.feedback.text);
+      line.setAttribute('role', 'status');
+      card.append(line);
+    }
+    actionsRow.append(btn('btn-primary spot-go', 'Check it works', () => actions.onGuideVerify?.()));
+  }
+
+  if (step.finish === 'close') {
+    const checks = h('ul', 'spot-checks');
+    checks.append(h('li', null, 'The customer\'s computer opens the website'));
+    checks.append(h('li', null, 'The other office still works'));
+    card.append(checks);
+    const label = h('label', 'spot-note-label', 'Note for the customer');
+    const note = h('textarea', 'spot-note');
+    note.rows = 3;
+    note.value = mission.completionNote ?? '';
+    label.append(note);
+    card.append(label);
+    actionsRow.append(btn('btn-primary spot-go', 'Close the ticket', () => actions.onGuideClose?.(note.value)));
+  }
+
+  if (step.term) card.append(h('p', 'spot-term', step.term));
+  if (actionsRow.childElementCount) card.append(actionsRow);
+  const foot = h('div', 'spot-foot');
+  foot.append(btn('btn-quiet spot-hide', 'Hide the guide', () => actions.onGuideHide?.(true)));
+  card.append(foot);
+  return card;
 }
 
 // MASTER_DESIGN.md §9's expert methodology, as a fixed authored checklist —
@@ -1614,9 +1772,26 @@ export function renderDebrief(state, actions = {}) {
       : 'Configure session saved.';
   container.appendChild(status);
 
+  // Closed from the guide: lead with what happened in plain words, then the
+  // patch panel and the way home; the full record folds away below.
+  const simple = Boolean(actions.simple) && mission.mode === 'repair';
+  let detailsHost = container;
+  if (simple) {
+    status.textContent = mission.assisted ? 'You fixed it with some help from the guide.' : 'You fixed it.';
+    if (mission.completionNote) {
+      const did = h('p', 'debrief-summary', mission.completionNote);
+      container.appendChild(did);
+    }
+  }
+  const details = simple ? h('details', 'debrief-details') : null;
+  if (details) {
+    details.append(h('summary', null, 'Full ticket details'));
+    detailsHost = details;
+  }
+
   const timer = document.createElement('p');
   timer.textContent = `Elapsed ${formatDuration(mission.elapsedMs)}.`;
-  container.appendChild(timer);
+  detailsHost.appendChild(timer);
 
   if (mission.mode === 'repair') {
     // Short, static (reduced-motion-safe) practice feedback tied to real
@@ -1627,11 +1802,11 @@ export function renderDebrief(state, actions = {}) {
     feedback.textContent = families
       .map((family) => `Recommended tier for ${familyLabel(family)}: ${recommendedTier(state.profile, family)}.`)
       .join(' ');
-    container.appendChild(feedback);
+    detailsHost.appendChild(feedback);
 
     const causesHeading = document.createElement('h2');
     causesHeading.textContent = 'Causes';
-    container.appendChild(causesHeading);
+    detailsHost.appendChild(causesHeading);
     const causesList = document.createElement('ul');
     const x = xFromNetwork(mission.network);
     for (const recipeId of mission.recipeIds) {
@@ -1640,30 +1815,30 @@ export function renderDebrief(state, actions = {}) {
       item.textContent = `${hint.clue} ${renderHintText(hint.step, x)}`;
       causesList.appendChild(item);
     }
-    container.appendChild(causesList);
+    detailsHost.appendChild(causesList);
   }
 
   const historyHeading = document.createElement('h2');
   historyHeading.textContent = 'Your key observations and changes';
-  container.appendChild(historyHeading);
+  detailsHost.appendChild(historyHeading);
   const historyList = document.createElement('ol');
   for (const event of mission.events) {
     const item = document.createElement('li');
     item.textContent = describeEvent(mission, event);
     historyList.appendChild(item);
   }
-  container.appendChild(historyList);
+  detailsHost.appendChild(historyList);
 
   const investigationHeading = document.createElement('h2');
   investigationHeading.textContent = 'Example investigation';
-  container.appendChild(investigationHeading);
+  detailsHost.appendChild(investigationHeading);
   const investigationList = document.createElement('ol');
   for (const step of EXPERT_SEQUENCE) {
     const item = document.createElement('li');
     item.textContent = step;
     investigationList.appendChild(item);
   }
-  container.appendChild(investigationList);
+  detailsHost.appendChild(investigationList);
 
   // What this ticket did to the collection: earned without help, practiced
   // with it. A practiced skill points straight at its study material.
@@ -1682,6 +1857,7 @@ export function renderDebrief(state, actions = {}) {
     if (mission.assisted && actions.onOpenCollection) next.append(btn('', 'Study it', () => actions.onOpenCollection()));
     container.appendChild(next);
   }
+  if (details) container.appendChild(details);
 
   const actionsRow = document.createElement('div');
   actionsRow.className = 'debrief-actions';

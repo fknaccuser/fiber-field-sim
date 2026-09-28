@@ -16,6 +16,14 @@ async function openMore(page) {
   if (!(await more.evaluate(el => el.open))) await page.click('.home-more-summary');
 }
 
+// Guided tickets open with the spotlight guide over the workspace. Tests that
+// drive the workspace by hand hide it first, the way a trainee would.
+async function hideGuide(page) {
+  const hide = page.locator('.spot-hide');
+  if (await hide.count()) await hide.click();
+  await expect(page.locator('.spotlight')).toHaveCount(0);
+}
+
 async function enableApp(page) {
   await page.goto('/');
   await page.fill('#opening-command', 'enable');
@@ -24,12 +32,52 @@ async function enableApp(page) {
 }
 
 test.describe('The Field Solo', () => {
-  test('launch enable, start the recommended cable-repair job, verify both clients and complete with a note', async ({ page }) => {
+  test('the spotlight guide walks a first ticket from the complaint to closing it', async ({ page }) => {
+    await enableApp(page);
+    await page.click('.home-recommended-row button:has-text("Start")');
+    const card = page.locator('.spot-card');
+    await expect(card).toHaveAttribute('data-step', 'intro');
+    await page.click('.spot-go');
+
+    // Only the lit thing takes taps: a tap on the dimmed tab bar does nothing.
+    await expect(card).toHaveAttribute('data-step', 'pick-client');
+    const ticketTab = await page.locator('.mission-tab-brief').boundingBox();
+    await page.mouse.click(ticketTab.x + ticketTab.width / 2, ticketTab.y + ticketTab.height / 2);
+    await expect(page.locator('.mission-screen')).toHaveAttribute('data-active-tab', 'network');
+    await page.click('.diagram-device[data-device-id="PC1"]');
+
+    await expect(card).toHaveAttribute('data-step', 'try-site');
+    await page.click('.device-tests button[data-test="openPortal"]');
+    await expect(card).toHaveAttribute('data-step', 'result');
+    await expect(card).toContainText('not connected');
+    await page.click('.spot-go');
+    await expect(card).toHaveAttribute('data-step', 'look');
+    await page.click('.spot-go');
+
+    await expect(card).toHaveAttribute('data-step', 'fix');
+    await page.fill('.spot-input', 'Gi0/9');
+    await page.click('.spot-go');
+    await expect(page.locator('.spot-feedback')).toContainText('Not quite');
+    await page.fill('.spot-input', 'Gi0/1');
+    await page.click('.spot-go');
+
+    await expect(card).toHaveAttribute('data-step', 'verify');
+    await page.click('.spot-go');
+    await expect(card).toHaveAttribute('data-step', 'close');
+    await expect(page.locator('.spot-note')).toHaveValue(/Gi0\/1/);
+    await page.click('.spot-go');
+
+    await expect(page.locator('.debrief-screen')).toBeVisible();
+    await expect(page.locator('.debrief-summary')).toContainText('Gi0/1');
+  });
+
+  test('with the guide hidden, the recommended cable-repair job can be verified and completed by hand', async ({ page }) => {
     await enableApp(page);
     await expect(page.locator('.home-recommended-row')).toContainText('TF1-HM-1-P-START');
 
     await page.click('.home-recommended-row button:has-text("Start")');
     await expect(page.locator('.mission-screen')).toBeVisible();
+    await hideGuide(page);
 
     // Reconnect PC1's cable (P1: disconnected Ethernet cable).
     await page.click('.cable-hit >> nth=0');
@@ -196,6 +244,7 @@ test.describe('The Field Solo', () => {
 
       // Mission tab navigation at phone width (one panel visible at a time).
       await page.click('.home-recommended-row button:has-text("Start")');
+      await hideGuide(page);
       await expect(page.locator('.mission-panel-network')).toBeVisible();
       await expect(page.locator('.mission-panel-device')).toBeHidden();
       await page.click('.diagram-device >> nth=0');
@@ -213,6 +262,7 @@ test.describe('The Field Solo', () => {
       await enableApp(page);
       await page.click('.home-recommended-row button:has-text("Start")');
       await expect(page.locator('.mission-screen')).toBeVisible();
+      await hideGuide(page);
       await expect(page.locator('.mission-tabs')).toBeVisible();
       await expect(page.locator('.mission-panel-network')).toBeVisible();
       await expect(page.locator('.mission-panel-findings')).toBeHidden();
@@ -261,6 +311,7 @@ test.describe('Determinism and storage across separate browser contexts', () => 
     await enableApp(page);
     await page.click('.home-recommended-row button:has-text("Start")');
     await expect(page.locator('.mission-screen')).toBeVisible();
+    await hideGuide(page);
     await page.click('.cable-hit >> nth=0');
     await page.selectOption('.reconnect-panel select', 'PC1:eth0');
     await page.click('.reconnect-panel button:has-text("Next")');
@@ -273,6 +324,7 @@ test.describe('Determinism and storage across separate browser contexts', () => 
     await page.press('#opening-command', 'Enter');
     await page.click('.home-continue');
     await expect(page.locator('.mission-screen')).toBeVisible();
+    await hideGuide(page);
     // The repaired cable's state survived the reload (read from IndexedDB,
     // not memory) — the link list no longer reads "disconnected".
     await expect(page.locator('.cable-hit').first()).toHaveAttribute('aria-label', 'Cable L1, connected');

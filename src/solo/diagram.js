@@ -128,7 +128,7 @@ export function renderTopology(network, options = {}) {
   const paths = [];
   for (const link of network.links) {
     const [a, b] = ends(link); if (!positions[a] || !positions[b]) continue;
-    const g = svgEl('g', { class: `topology-cable${link.connected === false ? ' is-disconnected' : ''}${link.id === reconnectLinkId ? ' is-selected' : ''}${link.id === options.guideLinkId ? ' cable-coach-target' : ''}${selectedDeviceId && a !== selectedDeviceId && b !== selectedDeviceId ? ' is-muted' : ''}` });
+    const g = svgEl('g', { 'data-link-id': link.id, class: `topology-cable${link.connected === false ? ' is-disconnected' : ''}${link.id === reconnectLinkId ? ' is-selected' : ''}${link.id === options.guideLinkId ? ' cable-coach-target' : ''}${selectedDeviceId && a !== selectedDeviceId && b !== selectedDeviceId ? ' is-muted' : ''}` });
     const line = svgEl('path', { class: `diagram-link${link.connected === false ? ' diagram-link-down' : ''}`, fill: 'none' });
     const hit = svgEl('path', { class: 'cable-hit', fill: 'none', tabindex: 0, role: 'button', 'aria-label': `Cable ${link.id}, ${link.connected === false ? 'disconnected' : 'connected'}` });
     const act = () => onSelectLink?.(link.id); hit.addEventListener('click', act);
@@ -175,7 +175,7 @@ export function renderTopology(network, options = {}) {
     if (options.guideDeviceId === device.id) {
       const pointer = svgEl('g', { class: 'device-guide-arrow', 'aria-hidden': 'true' });
       pointer.append(svgEl('path', { class: 'guide-arrow-line', d: 'M0,-100V-58M-10,-69L0,-58L10,-69', fill: 'none', 'stroke-width': 4 }));
-      pointer.append(svgEl('text', { class: 'guide-arrow-label', x: 0, y: -112, 'text-anchor': 'middle', 'font-size': 20 }, 'Start here'));
+      pointer.append(svgEl('text', { class: 'guide-arrow-label', x: 0, y: -112, 'text-anchor': 'middle', 'font-size': 20 }, options.guideLabel ?? 'Start here'));
       g.append(pointer);
     }
     attachMentor(g, () => explainDevice(device));
@@ -209,6 +209,7 @@ export function renderTopology(network, options = {}) {
   const splitter = document.createElement('div'); splitter.className = 'topology-splitter'; splitter.tabIndex = 0; splitter.setAttribute('role', 'separator'); splitter.setAttribute('aria-orientation', 'horizontal'); splitter.setAttribute('aria-label', 'Resize device and cable list'); splitter.title = 'Drag down for more topology space; drag up to open the list. Arrow keys also resize.';
   const grip = document.createElement('span'); grip.className = 'topology-splitter-grip'; grip.setAttribute('aria-hidden', 'true'); splitter.append(grip);
   const listWrap = document.createElement('details'); listWrap.className = 'topology-index';
+  if (options.hideList) { splitter.hidden = true; listWrap.hidden = true; }
   view.drawerHeight ??= compactList ? 0 : 140;
   listWrap.open = view.drawerHeight > 0;
   const summary = document.createElement('summary'); summary.textContent = 'Device & cable list'; listWrap.append(summary);

@@ -1,6 +1,8 @@
 import { createIssueLibrary } from './issue-library.js';
 import { createExamPrep, prepSnapshot } from './study/hub.js';
 import { createThemeToggle } from './backlight.js';
+import { guidedFix, guidedVerify, guidedNote, plainResult } from './guide-steps.js';
+import { checkBlank, walkthroughFor } from './walkthrough.js';
 import {
   createInitialState,
   submitOpeningCommand,
@@ -63,6 +65,14 @@ import { executeCommand } from './cli.js';
 import { recommendMission, recommendedTier } from './progress.js';
 import { recordStudyAnswer, recordCardReview } from './study.js';
 import { createBuilder } from './builder.js';
+
+// ---- the spotlight guide's view state (per ticket, not saved) ----
+const guideAcks = new Map();
+const guideTabStep = new Map();
+const guideHidden = new Set();
+let guideFeedback = null;
+let debriefSimple = false;
+let guideDraft = null;
 
 const INIT_LINES = ['Initializing local session.', 'Preparing The Field.', 'Ready.'];
 const INIT_LINE_DELAY_MS = 200;
@@ -208,6 +218,14 @@ function render() {
           onToggleFinding: toggleFindingAction,
           onNoteChange: noteChange,
           onSubmit: submitCompletion,
+          guide: guideFor(state.mission),
+          onAutoTab: autoTab,
+          onGuideAck: guideAck,
+          onGuideHide: guideHide,
+          onGuideFix: guideFixAction,
+          onGuideShowAnswer: guideShowAnswer,
+          onGuideVerify: guideVerifyAction,
+          onGuideClose: guideClose,
         },
         missionTab,
       ),
@@ -218,6 +236,7 @@ function render() {
         onReplay: replay,
         onNewVariation: newVariation,
         onHome: debriefToHome,
+        simple: debriefSimple,
         // Leave the debrief first, so closing exam prep lands on home.
         onOpenCollection: () => { debriefToHome(); openExamPrep('collection'); },
       }),
@@ -684,7 +703,10 @@ function noteChange(text) {
   // autosave-triggering action (a test, a config change, or Submit itself).
 }
 
-function submitCompletion() {
+// simple: the ticket was closed from the guide, so the debrief leads with the
+// plain summary and folds the details away.
+function submitCompletion(simple = false) {
+  debriefSimple = simple === true;
   const { state: nextState, result } = completeRun(state);
   state = nextState;
   missionTab = 'network';
@@ -692,6 +714,91 @@ function submitCompletion() {
   if (result.ok) {
     persistProfileAndMission();
   }
+}
+
+
+function guideFor(mission) {
+  const id = mission?.id;
+  if (!guideAcks.has(id)) guideAcks.set(id, new Set());
+  const mine = guideFeedback?.missionId === id;
+  return {
+    acks: guideAcks.get(id),
+    hidden: guideHidden.has(id),
+    tabStep: guideTabStep.get(id),
+    feedback: mine ? guideFeedback : null,
+    draft: mine ? guideDraft : null,
+  };
+}
+
+// Called while rendering: records the move without drawing twice.
+function autoTab(stepId, tab) {
+  guideTabStep.set(state.mission.id, stepId);
+  missionTab = tab;
+}
+
+function clearGuideFeedback() {
+  guideFeedback = null;
+  guideDraft = null;
+}
+
+function guideAck(stepId) {
+  guideFor(state.mission).acks.add(stepId);
+  clearGuideFeedback();
+  render();
+}
+
+function guideHide(hidden) {
+  if (hidden) guideHidden.add(state.mission.id); else guideHidden.delete(state.mission.id);
+  render();
+}
+
+function guideFixAction(value) {
+  const missionId = state.mission.id;
+  const check = checkBlank(state.mission, value);
+  if (!check.ok) {
+    guideFeedback = { missionId, ok: false, wrong: true, text: 'Not quite. Compare it with the example above and try again, or tap "Show me the answer".' };
+    guideDraft = value;
+    render();
+    return;
+  }
+  const { state: nextState, result } = guidedFix(state, value);
+  if (!result.ok) {
+    guideFeedback = { missionId, ok: false, wrong: true, text: result.message || 'That change did not go in. Try again.' };
+    guideDraft = value;
+    render();
+    return;
+  }
+  state = { ...nextState, error: null };
+  clearGuideFeedback();
+  render();
+  persistMission();
+}
+
+function guideShowAnswer() {
+  // Being shown the answer is help, so the ticket counts as practice.
+  state = requestHint(state);
+  persistMission();
+  guideDraft = walkthroughFor(state.mission)?.steps?.[3]?.blank?.answer ?? '';
+  guideFeedback = { missionId: state.mission.id, ok: true, wrong: false, text: 'Here is the answer. Tap Fix it.' };
+  render();
+}
+
+function guideVerifyAction() {
+  state = guidedVerify(state);
+  const [target, other] = state.mission.events.slice(-2);
+  const failed = [target, other].find((e) => !e?.details?.result?.ok);
+  guideFeedback = failed
+    ? { missionId: state.mission.id, ok: false, text: `Not working yet. ${plainResult(failed.details.result.code)}` }
+    : null;
+  render();
+  persistMission();
+}
+
+function guideClose(note) {
+  const text = String(note ?? '').trim().length >= 10 ? note : guidedNote(state.mission);
+  state = setCompletionNote(state, text);
+  clearGuideFeedback();
+  submitCompletion(true);
 }
 
 function debriefToHome() {
