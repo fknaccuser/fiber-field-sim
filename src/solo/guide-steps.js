@@ -43,20 +43,20 @@ function trunkPortOf(mission) {
 
 // What a failed test means, for someone who has never heard the error code.
 const PLAIN_RESULT = {
-  LINK_DOWN: 'The computer is not connected to the network. Something between it and the switch is off or unplugged.',
-  GATEWAY_UNREACHABLE: 'The computer cannot reach the router, which is its door out of the office.',
-  NO_ROUTE: 'The computer does not know a way to the website.',
-  VLAN_PATH_BLOCKED: 'The traffic ends up in the wrong VLAN. Think of it as a letter delivered to the wrong room.',
-  DNS_UNREACHABLE: 'The computer cannot reach the server that turns website names into addresses.',
-  DNS_NOT_FOUND: 'The name lookup found nothing for the website.',
-  WRONG_SERVICE: 'The website name leads to the wrong server.',
-  RETURN_PATH_FAILED: 'The request goes out, but the answer cannot find its way back.',
-  DUPLICATE_IP: 'Two devices are using the same address.',
-  INVALID_ADDRESS: 'The computer has an address that cannot work.',
-};
+  LINK_DOWN: 'the computer is not connected to the network',
+  GATEWAY_UNREACHABLE: 'the computer cannot reach the router, its door out of the office',
+  NO_ROUTE: 'the computer does not know a way to the website',
+  VLAN_PATH_BLOCKED: 'the traffic lands in the wrong VLAN, like mail sent to the wrong room',
+  DNS_UNREACHABLE: 'the computer cannot reach the server that looks up website names',
+  DNS_NOT_FOUND: 'the name lookup found nothing for the website',
+  WRONG_SERVICE: 'the website name leads to the wrong server',
+  RETURN_PATH_FAILED: 'the answer cannot find its way back',
+  DUPLICATE_IP: 'two devices are using the same address',
+  INVALID_ADDRESS: 'the computer has an address that cannot work',
+}
 
 export function plainResult(code) {
-  return PLAIN_RESULT[code] ?? 'The website did not open.';
+  return PLAIN_RESULT[code] ?? 'the website did not open';
 }
 
 // The command a test button stands for, so the button teaches the command.
@@ -86,17 +86,17 @@ const FAULTS = {
   P1: (m) => ({
     look: { target: { kind: 'cable', id: accessPortOf(m).link?.id }, tab: 'network',
       title: 'See the dashed line?',
-      body: 'That is the customer\'s network cable. It has come unplugged from the switch, so the computer is cut off.' },
-    ask: `The cable belongs in switch port ${accessPortOf(m).port?.label ?? 'Gi0/1'}. Type ${accessPortOf(m).port?.label ?? 'Gi0/1'} to plug it back in.`,
+      body: 'It\'s the customer\'s cable, unplugged from the switch.' },
+    ask: `Type ${accessPortOf(m).port?.label ?? 'Gi0/1'}, the switch port it belongs in.`,
     term: 'Techs call this reseating the cable.',
     fix: () => [{ type: 'setLinkConnected', linkId: accessPortOf(m).link.id, connected: true }],
     note: `Reconnected the customer's cable to switch port ${accessPortOf(m).port?.label ?? 'Gi0/1'}.`,
   }),
   P2: (m) => ({
-    select: { id: accessPortOf(m).port?.deviceId, title: 'Tap the switch', body: 'The switch is the box the customer\'s cable plugs into. Tap it on the map.' },
+    select: { id: accessPortOf(m).port?.deviceId, title: 'Tap the switch', body: 'The box the customer\'s cable plugs into.' },
     look: { target: { kind: 'row', label: `Port ${accessPortOf(m).port?.label}` }, tab: 'device',
       title: 'This port is switched off',
-      body: `Port ${accessPortOf(m).port?.label} is where the customer plugs in. It says "administratively down": someone turned the port off.` },
+      body: `Port ${accessPortOf(m).port?.label}, the customer's port, says "administratively down".` },
     ask: 'Type up to turn the port back on.',
     term: 'On a Cisco switch the command is no shutdown.',
     fix: () => [{ type: 'setPortAdmin', portId: accessPortOf(m).port.id, adminUp: true }],
@@ -105,8 +105,8 @@ const FAULTS = {
   I1: (m) => ({
     look: { target: { kind: 'row', label: 'IP address' }, tab: 'device',
       title: 'The address is in the wrong place',
-      body: `Every computer in this office has an address starting with ${prefixOf(m)}. This one does not, so it cannot talk to the router.` },
-    ask: `Type a new address that starts with ${prefixOf(m)}. For example: ${prefixOf(m)}.50`,
+      body: `Everyone in this office starts with ${prefixOf(m)}. This computer doesn't.` },
+    ask: `Type a new address, like ${prefixOf(m)}.50`,
     term: `Techs say it belongs in the ${prefixOf(m)}.0/24 subnet.`,
     fix: (value) => [{ type: 'setClientAddress', deviceId: m.targetClientId, ip: String(value).trim(), prefix: m.requirements.targetPrefix }],
     note: `Moved the customer's computer to an address in ${prefixOf(m)}.0/24.`,
@@ -114,28 +114,28 @@ const FAULTS = {
   I2: (m) => ({
     look: { target: { kind: 'row', label: 'Gateway' }, tab: 'device',
       title: 'The door out points nowhere',
-      body: `The gateway is the computer's door out of the office. It is set to ${device(m, m.targetClientId)?.gateway}, and nothing answers there.` },
-    ask: `The router's address in this office is ${prefixOf(m)}.1. Type it in.`,
+      body: `The gateway is the door out of the office. ${device(m, m.targetClientId)?.gateway} leads nowhere.` },
+    ask: `Type the router's address: ${prefixOf(m)}.1`,
     term: 'Techs call this the default gateway.',
     fix: (value) => [{ type: 'setClientGateway', deviceId: m.targetClientId, gateway: String(value).trim() }],
     note: `Set the customer's default gateway to ${prefixOf(m)}.1.`,
   }),
   V1: (m) => ({
-    select: { id: accessPortOf(m).port?.deviceId, title: 'Tap the switch', body: 'The switch is the box the customer\'s cable plugs into. Tap it on the map.' },
+    select: { id: accessPortOf(m).port?.deviceId, title: 'Tap the switch', body: 'The box the customer\'s cable plugs into.' },
     look: { target: { kind: 'row', label: `Port ${accessPortOf(m).port?.label}` }, tab: 'device',
       title: 'The port is in the wrong VLAN',
-      body: `A VLAN is like a separate room on the same switch. The customer's port was moved into VLAN ${accessPortOf(m).port?.accessVlan}, but the customer belongs in VLAN ${m.requirements.targetVlan}.` },
-    ask: `The work order says the customer is on VLAN ${m.requirements.targetVlan}. Type ${m.requirements.targetVlan}.`,
+      body: `A VLAN is a separate room on the switch. This port is in VLAN ${accessPortOf(m).port?.accessVlan}; the customer belongs in ${m.requirements.targetVlan}.` },
+    ask: `Type ${m.requirements.targetVlan}, the customer's VLAN.`,
     term: 'Techs call this the access VLAN.',
     fix: (value) => [{ type: 'setAccessVlan', portId: accessPortOf(m).port.id, vlanId: Number(String(value).trim()) }],
     note: `Put switch port ${accessPortOf(m).port?.label} back in VLAN ${m.requirements.targetVlan}.`,
   }),
   V2: (m) => ({
-    select: { id: accessPortOf(m).port?.deviceId, title: 'Tap the switch', body: 'The switch is the box the customer\'s cable plugs into. Tap it on the map.' },
+    select: { id: accessPortOf(m).port?.deviceId, title: 'Tap the switch', body: 'The box the customer\'s cable plugs into.' },
     look: { target: { kind: 'row', label: `Port ${trunkPortOf(m)?.label}` }, tab: 'device',
       title: 'The link between switches is missing a VLAN',
-      body: `Port ${trunkPortOf(m)?.label} is the trunk: one cable that carries several VLANs between switches. The customer's VLAN ${m.requirements.targetVlan} is missing from its list.` },
-    ask: `Both offices must cross this cable: VLAN ${m.requirements.targetVlan} and VLAN ${m.requirements.protectedVlan}. Type ${m.requirements.targetVlan},${m.requirements.protectedVlan}`,
+      body: `${trunkPortOf(m)?.label} is the trunk, the cable that carries VLANs between switches. VLAN ${m.requirements.targetVlan} is missing.` },
+    ask: `Type both offices' VLANs: ${m.requirements.targetVlan},${m.requirements.protectedVlan}`,
     term: 'Techs call this the trunk allowed VLAN list.',
     fix: (value) => [{ type: 'setTrunkAllowedVlans', portId: trunkPortOf(m).id, vlans: String(value).split(/[,\s]+/).map(Number).filter(Number.isInteger) }],
     note: `Added VLAN ${m.requirements.targetVlan} back to the trunk on ${trunkPortOf(m)?.label}.`,
@@ -143,18 +143,18 @@ const FAULTS = {
   D1: (m) => ({
     look: { target: { kind: 'row', label: 'DNS' }, tab: 'device',
       title: 'The name helper is wrong',
-      body: `DNS turns a website name into an address. This computer asks ${device(m, m.targetClientId)?.dns} for names, and nothing answers there.` },
-    ask: `The DNS server is at ${serverAddress(m)}. Type it in.`,
+      body: `DNS looks up website names. This computer asks ${device(m, m.targetClientId)?.dns}, and nobody answers.` },
+    ask: `Type the DNS server's address: ${serverAddress(m)}`,
     term: 'Techs call this the DNS resolver.',
     fix: (value) => [{ type: 'setClientDns', deviceId: m.targetClientId, dns: String(value).trim() }],
     note: `Pointed the customer's DNS at ${serverAddress(m)}.`,
   }),
   D2: (m) => ({
-    select: { id: m.requirements.portalServerId, title: 'Tap the server', body: 'The server holds the website and the list of names. Tap it on the map.' },
-    look: { target: { kind: 'panel' }, tab: 'device',
+    select: { id: m.requirements.portalServerId, title: 'Tap the server', body: 'It holds the website and the list of names.' },
+    look: { target: { kind: 'heading' }, tab: 'device',
       title: 'The website name points to the wrong place',
-      body: `The server's name list sends ${PORTAL} to the wrong address. The website lives on this server, at ${serverAddress(m)}.` },
-    ask: `Type the server's own address: ${serverAddress(m)}`,
+      body: `Its name list sends the website to the wrong address.` },
+    ask: `Type this server's address: ${serverAddress(m)}`,
     term: 'Techs call this fixing the DNS A record.',
     fix: (value) => [{ type: 'setDnsRecord', serverId: m.requirements.portalServerId, name: PORTAL, address: String(value).trim() }],
     note: `Corrected the ${PORTAL} DNS record to ${serverAddress(m)}.`,
@@ -213,44 +213,50 @@ export function guidedSteps(mission) {
   const repaired = () => isRecipeRepaired(mission, walkthrough.recipeId);
   const baseline = baselineTest(mission);
 
+  // Every step is something to do; there are no read-and-tap-Next steps.
+  // What the last step achieved rides at the top of the next card as `news`,
+  // so each action gets its result right away and the story keeps moving.
+  const failed = baseline && !baseline.details.result?.ok;
+  const cause = rootCauseCode(mission, baseline);
+  const resultNews = !baseline ? null : failed
+    ? { ok: false, text: `It failed: ${plainResult(cause?.plain)}.`, code: cause?.code }
+    : { ok: true, text: 'The website test passed. The fault is somewhere else.' };
+  const pickFault = fault.select?.id && fault.select.id !== mission.targetClientId;
+
   const steps = [
-    { id: 'intro', ack: true, button: 'Start',
-      title: 'A customer cannot open the company website',
-      body: 'You are the technician. You will find out why and fix it, one step at a time.' },
     { id: 'pick-client', target: { kind: 'device', id: mission.targetClientId }, tab: 'network',
-      title: 'Tap the customer\'s computer',
+      title: 'A customer can\'t open the website. Tap their computer.',
       body: 'It is the one marked "Start here" on the map.',
       done: () => inspected(mission.targetClientId) },
     { id: 'try-site', target: { kind: 'test', testKind: 'openPortal' }, tab: 'device',
+      news: { ok: true, text: 'Opened the customer\'s computer.' },
       title: 'Tap "Try the website"',
-      body: 'See the problem for yourself before you fix anything.',
+      body: 'See the problem for yourself first.',
       term: `Techs run this as: curl http://${PORTAL}`,
       done: () => Boolean(baseline) },
-    { id: 'result', ack: true, button: 'Next', target: { kind: 'feedback' }, tab: 'device',
-      title: baseline?.details?.result?.ok ? 'That worked' : 'It failed, just like the customer said',
-      body: baseline?.details?.result?.ok ? 'This test passed. The next steps show where the fault is.' : plainResult(rootCauseCode(mission, baseline)?.plain),
-      term: baseline?.details?.result?.ok ? null : `Error code: ${rootCauseCode(mission, baseline)?.code}` },
   ];
-  if (fault.select?.id && fault.select.id !== mission.targetClientId) {
+  if (pickFault) {
     steps.push({ id: 'pick-fault-device', target: { kind: 'device', id: fault.select.id }, tab: 'network',
+      news: resultNews,
       title: fault.select.title, body: fault.select.body,
       done: () => events.some((e) => e.kind === 'inspection' && e.deviceId === fault.select.id && e.index > (baseline?.index ?? -1)) });
   }
   steps.push(
-    { id: 'look', ack: true, button: 'Got it', target: fault.look.target, tab: fault.look.tab,
+    { id: 'fix', target: fault.look.target, tab: fault.look.tab,
       device: fault.select?.id ?? mission.targetClientId,
-      title: fault.look.title, body: fault.look.body },
-    { id: 'fix', blank: { ...blank, prompt: fault.ask }, term: fault.term,
-      title: 'Your turn: fix it',
-      body: fault.ask,
+      news: pickFault ? { ok: true, text: 'Found it.' } : resultNews,
+      title: fault.look.title, body: fault.look.body,
+      blank: { ...blank, prompt: fault.ask }, term: fault.term,
       done: repaired },
     { id: 'verify', finish: 'verify',
-      title: 'Fixed. Now check it works',
-      body: 'One tap tries the website from the customer\'s computer and from the other office.',
+      news: { ok: true, text: 'Fixed. Your change is in.' },
+      title: 'Check that it works',
+      body: 'One tap tries the website from both offices.',
       done: () => verifiedNow(mission, mission.targetClientId, 'openPortal') && verifiedNow(mission, mission.protectedClientId, 'checkProtected') },
     { id: 'close', finish: 'close',
-      title: 'Both offices work. Close the ticket',
-      body: 'Here is a note for the customer. You can change it or keep it.',
+      news: { ok: true, text: 'Both offices can open the website.' },
+      title: 'Close the ticket',
+      body: 'Here is a note for the customer. Change it or keep it.',
       done: () => mission.status === 'completed' },
   );
   return steps;

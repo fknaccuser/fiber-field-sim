@@ -1241,9 +1241,13 @@ button.patch-port:hover .patch-jack { border-color: var(--ink-2); }
   box-shadow: 0 18px 50px rgb(0 0 0 / 0.45);
   display: grid; gap: 10px;
 }
-.spotlight[data-card-at='bottom'] .spot-card { bottom: max(12px, env(safe-area-inset-bottom)); }
-.spotlight[data-card-at='top'] .spot-card { top: max(12px, env(safe-area-inset-top)); }
-.spotlight[data-card-at='middle'] .spot-card { top: max(12px, 12vh); }
+.spotlight[data-card-at='bottom'] .spot-card { bottom: max(var(--spot-floor, 12px), env(safe-area-inset-bottom)); max-height: min(62dvh, calc(100dvh - var(--spot-floor, 12px) - 24px)); }
+.spotlight[data-card-at='top'] .spot-card { top: max(12px, env(safe-area-inset-top)); max-height: 62dvh; }
+/* The ring and the dimming glide to the next target instead of blinking. */
+.spotlight-ring, .spotlight-block { transition: top 0.22s ease, left 0.22s ease, width 0.22s ease, height 0.22s ease; }
+.spot-card.is-new { animation: spot-arrive 0.24s ease-out; }
+@keyframes spot-arrive { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .spotlight-ring, .spotlight-block { transition: none; } .spot-card.is-new { animation: none; } }
 .spot-card.is-nudged { animation: spot-nudge 0.4s ease; }
 @keyframes spot-nudge { 0%, 100% { transform: translateX(-50%); } 25% { transform: translateX(calc(-50% - 8px)); } 75% { transform: translateX(calc(-50% + 8px)); } }
 @media (prefers-reduced-motion: reduce) { .spot-card.is-nudged { animation: none; outline: 3px solid var(--accent); } }
@@ -1285,3 +1289,31 @@ button.patch-port:hover .patch-jack { border-color: var(--ink-2); }
 .debrief-details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 8px; }
 .debrief-details > summary { cursor: pointer; min-height: var(--tap); display: flex; align-items: center; color: var(--ink-2); font-weight: 600; }
 .debrief-actions .debrief-home { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 700; min-height: 52px; font-size: 18px; }
+
+/* What the last action achieved, at the top of the next card. */
+.spot-news { margin: 0; display: flex; gap: 10px; align-items: flex-start; font-size: 16px; line-height: 1.4; font-weight: 600; padding: 8px 12px; border-radius: var(--r-sm); }
+.spot-news.is-ok { background: var(--ok-soft); color: var(--ink); }
+.spot-news.is-fail { background: var(--warn-soft); color: var(--ink); }
+.spot-news-mark { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; color: var(--bg); }
+.spot-news.is-ok .spot-news-mark { background: var(--ok); }
+.spot-news.is-fail .spot-news-mark { background: var(--warn); }
+.spot-news.is-ok .spot-news-mark { animation: spot-pop 0.35s ease-out; }
+@keyframes spot-pop { 0% { transform: scale(0.4); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .spot-news-mark { animation: none; } }
+.spot-ask { display: grid; gap: 10px; margin: 0; font-size: 18px; line-height: 1.4; font-weight: 600; color: var(--ink); }
+
+.spot-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: -4px; }
+.spot-head .spot-hide { min-height: 32px; padding: 0 8px; font-size: 13px; color: var(--ink-3); }
+@media (max-width: 899px) {
+  .spot-card { padding: 14px 16px 14px; gap: 8px; }
+  .spot-title { font-size: 23px; }
+  .spot-body, .spot-ask { font-size: 17px; }
+  /* Room to scroll a lit target clear of the card. */
+  .mission-screen:has(.spotlight) .mission-main,
+  .mission-screen:has(.spotlight) .mission-inspector { padding-bottom: 80vh; }
+}
+
+/* The guide points at one thing; the map's zoom tools would only sit on top of it. */
+.mission-screen:has(.spotlight) .canvas-toolbar { display: none; }
+/* The card says it all while the guide is on; the guidance box would only repeat it. */
+.mission-screen:has(.spotlight) .fd-guide { display: none; }

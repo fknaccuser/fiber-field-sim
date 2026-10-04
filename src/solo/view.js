@@ -1642,12 +1642,13 @@ function resolveSpotTarget(container, step) {
   if (!target) return [];
   const visible = (el) => { if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   let found = [];
-  if (target.kind === 'device') found = [container.querySelector(`.diagram-device[data-device-id="${target.id}"]`)];
+  // The device's tap area (icon and name), leaving its "Tap here" arrow outside the ring.
+  if (target.kind === 'device') found = [container.querySelector(`.diagram-device[data-device-id="${target.id}"] .device-hit`) ?? container.querySelector(`.diagram-device[data-device-id="${target.id}"]`)];
   else if (target.kind === 'cable') found = [container.querySelector(`.topology-cable[data-link-id="${target.id}"] .diagram-link`)];
   else if (target.kind === 'test') found = [container.querySelector(`.mission-panel-device .device-tests button[data-test="${target.testKind}"]`)];
   else if (target.kind === 'feedback') found = [container.querySelector('.mission-panel-device .test-feedback')];
   else if (target.kind === 'row') found = [...container.querySelectorAll('.mission-panel-device .device-inspect [data-row]')].filter((el) => el.dataset.row === target.label);
-  else if (target.kind === 'panel') found = [container.querySelector('.mission-panel-device .device-panel')];
+  else if (target.kind === 'heading') found = [container.querySelector('.mission-panel-device .device-panel h2')];
   found = found.filter(visible);
   if (found.length) return found;
   const tabButton = step.tab ? container.querySelector(`.mission-tab-${step.tab}`) : null;
@@ -1659,26 +1660,37 @@ function renderSpotCard(state, spot, actions, guide) {
   const { step } = spot;
   const card = h('div', 'spot-card');
   card.dataset.step = step.id;
-  card.append(h('p', 'spot-count', `Step ${spot.index + 1} of ${spot.total}`));
+  // What the last action achieved, so every tap gets its answer right away.
+  if (step.news) {
+    const news = h('p', `spot-news ${step.news.ok ? 'is-ok' : 'is-fail'}`);
+    news.setAttribute('role', 'status');
+    news.append(h('span', 'spot-news-mark', step.news.ok ? '\u2713' : '\u2715'));
+    news.append(h('span', null, step.news.text));
+    card.append(news);
+  }
+  const head = h('div', 'spot-head');
+  head.append(h('p', 'spot-count', `Step ${spot.index + 1} of ${spot.total}`));
+  head.append(btn('btn-quiet spot-hide', 'Hide guide', () => actions.onGuideHide?.(true)));
+  card.append(head);
   const title = h('h2', 'spot-title', step.title);
   title.id = 'spot-title';
   card.setAttribute('aria-labelledby', title.id);
   card.append(title);
-  if (step.body && !step.blank) card.append(h('p', 'spot-body', step.body));
+  if (step.body) card.append(h('p', 'spot-body', step.body));
   const actionsRow = h('div', 'spot-actions');
 
   if (step.ack) {
     actionsRow.append(btn('btn-primary spot-go', step.button ?? 'Next', () => actions.onGuideAck?.(step.id)));
   }
 
-  // A read step about a device that is not open: one tap opens it.
-  if (step.id === 'look' && step.device && state.selectedDeviceId !== step.device) {
+  // The fault is on a device that is not open: one tap opens it.
+  if (step.blank && step.device && state.selectedDeviceId !== step.device && step.tab === 'device') {
     actionsRow.prepend(btn('spot-show', 'Show me', () => actions.onSelectDevice?.(step.device)));
   }
 
   if (step.blank) {
     const form = h('form', 'spot-blank');
-    const label = h('label', 'spot-body', step.blank.prompt);
+    const label = h('label', 'spot-ask', step.blank.prompt);
     const input = h('input', 'spot-input mono');
     input.type = 'text';
     input.autocomplete = 'off';
@@ -1702,7 +1714,9 @@ function renderSpotCard(state, spot, actions, guide) {
     row.append(go);
     form.append(row);
     card.append(form);
-    requestAnimationFrame(() => { if (input.isConnected && !input.value) input.focus({ preventScroll: true }); });
+    // Focus straight away only with a physical keyboard; on a phone that would
+    // throw the on-screen keyboard over the thing being explained.
+    if (window.matchMedia?.('(hover: hover)').matches) requestAnimationFrame(() => { if (input.isConnected && !input.value) input.focus({ preventScroll: true }); });
   }
 
   if (step.finish === 'verify') {
@@ -1730,9 +1744,6 @@ function renderSpotCard(state, spot, actions, guide) {
 
   if (step.term) card.append(h('p', 'spot-term', step.term));
   if (actionsRow.childElementCount) card.append(actionsRow);
-  const foot = h('div', 'spot-foot');
-  foot.append(btn('btn-quiet spot-hide', 'Hide the guide', () => actions.onGuideHide?.(true)));
-  card.append(foot);
   return card;
 }
 

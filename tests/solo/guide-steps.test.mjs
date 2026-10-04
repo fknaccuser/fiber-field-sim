@@ -30,23 +30,20 @@ test('every fault walks from the complaint to a passing completion', () => {
     let state = stateFor(caseFor(recipeId));
     const acks = new Set();
     const at = () => currentGuidedStep(state.mission, acks)?.step.id;
-    assert.equal(at(), 'intro', recipeId);
-    acks.add('intro');
     assert.equal(at(), 'pick-client', recipeId);
     state = selectDevice(state, state.mission.targetClientId);
     assert.equal(at(), 'try-site', recipeId);
     state = recordTestEvent(state, 'openPortal', state.mission.targetClientId, runMissionTest(state.mission, 'openPortal', state.mission.targetClientId));
-    assert.equal(at(), 'result', recipeId);
-    acks.add('result');
     const steps = guidedSteps(state.mission);
+    assert.ok(steps.every((s) => !s.ack), `${recipeId} has a read-only step`);
     const pick = steps.find((s) => s.id === 'pick-fault-device');
     if (pick) {
       assert.equal(at(), 'pick-fault-device', recipeId);
+      assert.equal(pick.news.ok, false, `${recipeId} should report the failed test`);
       state = selectDevice(state, pick.target.id);
     }
-    assert.equal(at(), 'look', recipeId);
-    acks.add('look');
     assert.equal(at(), 'fix', recipeId);
+    if (!pick) assert.equal(steps.find((s) => s.id === 'fix').news.ok, false, `${recipeId} should report the failed test`);
     const { answer } = walkthroughFor(state.mission).steps[3].blank;
     assert.equal(checkBlank(state.mission, answer).ok, true, recipeId);
     const fixed = guidedFix(state, answer);
@@ -61,13 +58,12 @@ test('every fault walks from the complaint to a passing completion', () => {
   }
 });
 
-test('read-only steps are skipped once later work is done', () => {
-  let state = stateFor(caseFor('P1'));
-  state = selectDevice(state, 'PC1');
-  assert.equal(currentGuidedStep(state.mission, new Set()).step.id, 'try-site');
+test('a first ticket is five steps, each one an action', () => {
+  const state = stateFor(caseFor('P1'));
+  assert.deepEqual(guidedSteps(state.mission).map((s) => s.id), ['pick-client', 'try-site', 'fix', 'verify', 'close']);
 });
 
 test('every result code has a plain explanation and unknown ones fall back', () => {
   assert.match(plainResult('LINK_DOWN'), /not connected/);
-  assert.equal(plainResult('SOMETHING_NEW'), 'The website did not open.');
+  assert.equal(plainResult('SOMETHING_NEW'), 'the website did not open');
 });

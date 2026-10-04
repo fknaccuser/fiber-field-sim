@@ -36,8 +36,6 @@ test.describe('The Field Solo', () => {
     await enableApp(page);
     await page.click('.home-recommended-row button:has-text("Start")');
     const card = page.locator('.spot-card');
-    await expect(card).toHaveAttribute('data-step', 'intro');
-    await page.click('.spot-go');
 
     // Only the lit thing takes taps: a tap on the dimmed tab bar does nothing.
     await expect(card).toHaveAttribute('data-step', 'pick-client');
@@ -46,15 +44,12 @@ test.describe('The Field Solo', () => {
     await expect(page.locator('.mission-screen')).toHaveAttribute('data-active-tab', 'network');
     await page.click('.diagram-device[data-device-id="PC1"]');
 
+    // Each action's result rides at the top of the next card; no Next taps.
     await expect(card).toHaveAttribute('data-step', 'try-site');
+    await expect(page.locator('.spot-news')).toContainText("Opened the customer's computer");
     await page.click('.device-tests button[data-test="openPortal"]');
-    await expect(card).toHaveAttribute('data-step', 'result');
-    await expect(card).toContainText('not connected');
-    await page.click('.spot-go');
-    await expect(card).toHaveAttribute('data-step', 'look');
-    await page.click('.spot-go');
-
     await expect(card).toHaveAttribute('data-step', 'fix');
+    await expect(page.locator('.spot-news')).toContainText('not connected');
     await page.fill('.spot-input', 'Gi0/9');
     await page.click('.spot-go');
     await expect(page.locator('.spot-feedback')).toContainText('Not quite');

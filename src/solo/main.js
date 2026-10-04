@@ -788,7 +788,7 @@ function guideVerifyAction() {
   const [target, other] = state.mission.events.slice(-2);
   const failed = [target, other].find((e) => !e?.details?.result?.ok);
   guideFeedback = failed
-    ? { missionId: state.mission.id, ok: false, text: `Not working yet. ${plainResult(failed.details.result.code)}` }
+    ? { missionId: state.mission.id, ok: false, text: `Not working yet: ${plainResult(failed.details.result.code)}.` }
     : null;
   render();
   persistMission();
