@@ -12,10 +12,12 @@
 import { CCNA_MAP, TIERS, treeById, branchById } from './ccna.js';
 import {
   emptyRecord, normalizeRecord, mapProgress, knowCheckDeck, treeExamDeck, finalDeck,
-  recordKnowCheck, recordTreeExam, recordFinal, newlyLit, markSeen,
+  recordKnowCheck, recordTreeExam, recordFinal, recordLab, newlyLit, markSeen,
   EXAM_PASS, KNOW_CHECK_SIZE, TREE_EXAM_SIZE, FINAL_SIZE,
 } from './progress.js';
 import { codeForRecipe } from '../study/hub.js';
+import { labsForBranch } from '../labs/catalog.js';
+import { createLabScreen } from '../labs/screen.js';
 
 export const STORAGE_KEY = 'field-skill-tree-v1';
 const SVG = 'http://www.w3.org/2000/svg';
@@ -139,7 +141,7 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz } = 
   const root = el('main', 'skillmap');
   let record = load();
   let storageError = '';
-  const ui = { view: 'map', treeId: null, branchId: null };
+  const ui = { view: 'map', treeId: null, branchId: null, labEl: null };
 
   const runs = () => (getCompletedRuns?.() ?? []).filter(Boolean);
   const progress = () => mapProgress({ record, completedRuns: runs(), now: Date.now() });
@@ -182,6 +184,18 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz } = 
   }
 
   function go(view, extra = {}) { Object.assign(ui, { view, ...extra }); draw(); }
+
+  function openLab(lab, branch) {
+    ui.labEl = createLabScreen({
+      lab,
+      branchName: branch.name,
+      onFinish: ({ assisted }) => { record = recordLab(record, lab.id, { assisted }); save(); },
+      onExit: () => { ui.labEl = null; ui.view = 'tree'; draw(); window.scrollTo?.(0, 0); },
+    });
+    ui.view = 'lab';
+    draw();
+    window.scrollTo?.(0, 0);
+  }
 
   // Lights that came on since the last look run their pulse once.
   function takeNew(p) {
@@ -319,12 +333,26 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz } = 
         row.append(el('span', 'sk-soon', tier === 'do' ? 'Console labs' : 'More tickets'));
       }
       sheet.append(row);
+      // Each lab that lights this branch's Do tier, with its own result.
+      if (tier === 'do') {
+        for (const lab of labsForBranch(b.id)) {
+          const res = record.labs?.[lab.id];
+          const lrow = el('div', `sk-lab${res ? ` is-${res.state}` : ''}`);
+          const words = el('div', 'sk-tier-text');
+          words.append(el('b', null, lab.title));
+          words.append(el('span', null, res ? (res.state === 'mastered' ? 'Passed clean' : 'Passed with help') : `${lab.goals.length} goals on ${lab.devices.length} ${lab.devices.length === 1 ? 'router' : 'routers'}`));
+          lrow.append(words, btn('sk-go sk-go-small', res ? 'Run again' : 'Start lab', () => openLab(lab, b)));
+          sheet.append(lrow);
+        }
+      }
     }
     root.append(scrim, sheet);
   }
 
   function draw() {
     root.textContent = '';
+    if (ui.view === 'lab' && ui.labEl) { root.classList.add('is-lab'); root.append(ui.labEl); return; }
+    root.classList.remove('is-lab');
     const p = progress();
     const fresh = takeNew(p);
     if (ui.view === 'tree' && ui.treeId) drawTree(p, fresh);

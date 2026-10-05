@@ -123,3 +123,17 @@ test('a branch is complete only when every tier the app can test is mastered', (
   assert.equal(branchStatus(branchById('t2-vlans'), { ...ctx, completedRuns: runs }).complete, true);
   assert.equal(readiness(branchById('t2-vlans'), { 't2-vlans': branchStatus(branchById('t2-vlans'), { ...ctx, completedRuns: runs }) }), 'done');
 });
+
+test('Do lights from labs: clean is mastered, helped is practiced, every lab needed', async () => {
+  const { recordLab } = await import('../../src/solo/tree/progress.js');
+  const b = branchById('t3-static');
+  let rec = recordLab(emptyRecord(), 'static-basic', { assisted: true }, NOW);
+  assert.equal(tierState(b, 'do', { record: rec, now: NOW }).state, 'practiced');
+  rec = recordLab(rec, 'static-basic', { assisted: false }, NOW);
+  assert.equal(tierState(b, 'do', { record: rec, now: NOW }).state, 'practiced', 'the floating lab is still to do');
+  rec = recordLab(rec, 'static-floating', { assisted: false }, NOW);
+  assert.equal(tierState(b, 'do', { record: rec, now: NOW }).state, 'mastered');
+  rec = recordLab(rec, 'static-floating', { assisted: true }, NOW + DAY);
+  assert.equal(tierState(b, 'do', { record: rec, now: NOW + DAY }).state, 'mastered', 'a later helped run keeps the clean pass');
+  assert.equal(tierState(branchById('t2-vlans'), 'do', { record: rec, now: NOW }).state, 'soon');
+});

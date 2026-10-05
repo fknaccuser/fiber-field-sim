@@ -188,3 +188,74 @@
 .home-skillmap, .home-skillmap:hover, .home-skillmap:focus { background: var(--sk-bg); color: var(--sk-ink); }
 
 .skillmap .sk-scrim, .skillmap .sk-scrim:hover, .skillmap .sk-scrim:focus, .skillmap .sk-scrim:active { background: rgb(0 0 0 / 0.6); border: 0; border-radius: 0; box-shadow: none; }
+
+/* ==========================================================================
+   Do labs: the work order and checklist beside a console on each router.
+   ========================================================================== */
+.skillmap.is-lab { max-width: 1180px; }
+.lab-body { display: grid; gap: 14px; }
+@media (min-width: 900px) {
+  .lab-body { grid-template-columns: minmax(300px, 380px) 1fr; align-items: start; }
+  .lab-brief { position: sticky; top: 12px; max-height: calc(100dvh - 24px); overflow: auto; }
+}
+.lab-restart { margin-left: auto; }
+.lab-brief { display: grid; gap: 12px; }
+.lab-order { background: var(--sk-panel); border: 1px solid var(--sk-line); border-left: 3px solid var(--sk-light); border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; }
+.lab-story { margin: 0; font-size: 15px; line-height: 1.45; color: var(--sk-ink); }
+.lab-topo { margin: 0; font: 12px/1.5 var(--font-mono); color: var(--sk-ink-2); }
+
+.lab-goals { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.lab-goal {
+  display: grid; grid-template-columns: 22px 1fr; gap: 4px 10px; align-items: start;
+  background: var(--sk-panel); border: 1px solid var(--sk-line); border-radius: 10px; padding: 10px 12px;
+  color: var(--sk-ink-2); font-size: 14px; line-height: 1.4;
+}
+.lab-goal.is-next { border-color: var(--sk-light); color: var(--sk-ink); box-shadow: 0 0 0 1px rgb(242 193 46 / 0.25); }
+.lab-goal.is-done { color: var(--sk-ink-3); }
+.lab-goal.is-done .lab-goal-text { text-decoration: line-through; text-decoration-color: var(--sk-ink-3); }
+.lab-check { width: 18px; height: 18px; margin-top: 1px; border-radius: 50%; border: 2px solid var(--sk-glass); }
+.lab-goal.is-next .lab-check { border-color: var(--sk-light); }
+.lab-goal.is-done .lab-check { border-color: var(--sk-ok); background: var(--sk-ok); box-shadow: 0 0 8px rgb(79 209 139 / 0.6); animation: sk-pop 0.5s ease-out; }
+.lab-ask { grid-column: 2; display: flex; gap: 6px; margin-top: 4px; }
+.lab-ask-input { flex: 1; min-width: 0; min-height: 40px; font: 16px var(--font-mono); background: var(--sk-bg); color: var(--sk-ink); border: 1px solid var(--sk-line); border-radius: 8px; padding: 0 10px; }
+.lab-ask-input.is-wrong { border-color: var(--sk-warn); animation: lab-shake 0.3s; }
+@keyframes lab-shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.lab-ask-go { min-height: 40px; background: var(--sk-panel-2); color: var(--sk-ink); border: 1px solid var(--sk-line); border-radius: 8px; padding: 0 12px; font-weight: 600; }
+
+.lab-help { display: grid; gap: 8px; }
+.lab-help-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.lab-help-note { font-size: 12.5px; color: var(--sk-ink-3); }
+.lab-help-btn { min-height: 36px; background: transparent; color: var(--sk-light); border: 1px solid rgb(242 193 46 / 0.5); border-radius: 999px; padding: 0 14px; font-weight: 600; white-space: nowrap; }
+.lab-hint { margin: 0; font-size: 14px; line-height: 1.45; color: var(--sk-ink); background: rgb(240 140 58 / 0.1); border-left: 3px solid var(--sk-warn); padding: 8px 10px; border-radius: 6px; }
+.lab-show { margin: 0; font: 13px/1.5 var(--font-mono); color: var(--sk-light); background: var(--sk-bg); border: 1px dashed rgb(242 193 46 / 0.4); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; }
+
+.lab-console { background: #06090b; border: 1px solid var(--sk-line); border-radius: 12px; overflow: hidden; display: grid; }
+.lab-tabs { display: flex; gap: 2px; background: var(--sk-panel); border-bottom: 1px solid var(--sk-line); padding: 6px 6px 0; }
+.lab-tab { background: transparent; color: var(--sk-ink-3); border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; min-height: 36px; padding: 0 14px; font: 600 13px var(--font-mono); }
+.lab-tab.is-on { background: #06090b; color: var(--sk-light); border-color: var(--sk-line); }
+.lab-screen {
+  margin: 0; padding: 10px 12px; height: 46dvh; overflow: auto; white-space: pre-wrap; word-break: break-word;
+  font: 12.5px/1.45 var(--font-mono); color: #cfe3d6; background: #06090b; outline: none;
+}
+@media (min-width: 900px) { .lab-screen { height: 58vh; font-size: 13px; } }
+.lab-input { display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--sk-line); padding: 6px 12px; background: #06090b; }
+.lab-prompt { font: 600 13px var(--font-mono); color: var(--sk-light); white-space: nowrap; }
+.lab-command { flex: 1; min-width: 0; min-height: 40px; background: transparent; border: 0; color: #f2f7f3; font: 16px var(--font-mono); caret-color: var(--sk-light); outline: none; }
+.lab-keys { display: flex; gap: 6px; padding: 0 12px 10px; background: #06090b; }
+.lab-key { min-height: 36px; min-width: 44px; background: var(--sk-panel-2); color: var(--sk-ink-2); border: 1px solid var(--sk-line); border-radius: 8px; font: 600 13px var(--font-mono); }
+@media (hover: hover) and (min-width: 900px) { .lab-keys { display: none; } }
+
+.lab-done { margin-top: 14px; background: var(--sk-panel); border: 1px solid var(--sk-line); border-radius: 12px; padding: 16px; display: grid; gap: 8px; }
+.lab-done.is-clean { border-left: 4px solid var(--sk-ok); box-shadow: 0 0 24px rgb(79 209 139 / 0.15); }
+.lab-done.is-helped { border-left: 4px solid var(--sk-warn); }
+.lab-done h2 { margin: 0; font: 700 22px var(--font-display); }
+.lab-done p { margin: 0; color: var(--sk-ink-2); }
+.lab-done-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.sk-lab { display: flex; align-items: center; gap: 12px; margin-left: 42px; background: var(--sk-bg); border: 1px dashed var(--sk-line); border-radius: 10px; padding: 8px 10px; }
+.sk-lab.is-mastered { border-style: solid; border-color: rgb(79 209 139 / 0.5); }
+.sk-lab.is-practiced { border-style: solid; border-color: rgb(240 140 58 / 0.5); }
+.skillmap .lab-tab:hover, .skillmap .lab-key:hover, .skillmap .lab-ask-go:hover, .skillmap .lab-help-btn:hover { background: var(--sk-panel-2); color: var(--sk-ink); }
+.skillmap .lab-tab.is-on:hover { background: #06090b; color: var(--sk-light); }
+.lab-done[hidden] { display: none; }
+.skillmap .lab-restart::before { content: none; }

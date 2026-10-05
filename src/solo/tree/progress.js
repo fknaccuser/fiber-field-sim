@@ -9,6 +9,7 @@
 import { CCNA_MAP, ALL_BRANCHES, TIERS } from './ccna.js';
 import { CCNA_BANK } from '../study/questions.js';
 import { inBlueprint, sampleExam } from '../study/bank.js';
+import { labsForBranch } from '../labs/catalog.js';
 
 const DAY = 86_400_000;
 // A light starts dimming after two weeks untouched and is dark after six.
@@ -22,13 +23,14 @@ export const FINAL_SIZE = 50;
 export const EXAM_PASS = 0.85;
 
 export function emptyRecord() {
-  return { know: {}, exams: {}, final: null, seen: {} };
+  return { know: {}, labs: {}, exams: {}, final: null, seen: {} };
 }
 
 export function normalizeRecord(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
   return {
     know: r.know && typeof r.know === 'object' ? r.know : {},
+    labs: r.labs && typeof r.labs === 'object' ? r.labs : {},
     exams: r.exams && typeof r.exams === 'object' ? r.exams : {},
     final: r.final && typeof r.final === 'object' ? r.final : null,
     seen: r.seen && typeof r.seen === 'object' ? r.seen : {},
@@ -99,7 +101,14 @@ export function tierState(branch, tier, { record = emptyRecord(), completedRuns 
     if (clean) lit = { state: 'mastered', at: clean.completedAt, source: 'ticket' };
     else if (helped) lit = { state: 'practiced', at: helped.completedAt, source: 'ticket' };
   } else if (tier === 'do') {
-    return { state: 'soon', fresh: 0, at: null, source: null };
+    // Do is lit by the branch's labs: mastered once every one is passed
+    // without help, practiced once any is finished at all.
+    const labs = labsForBranch(branch.id);
+    if (!labs.length) return { state: 'soon', fresh: 0, at: null, source: null };
+    const results = labs.map(l => record.labs?.[l.id]).filter(Boolean);
+    const times = results.map(r => r.at).sort();
+    if (results.length === labs.length && results.every(r => r.state === 'mastered')) lit = { state: 'mastered', at: times[0], source: 'lab' };
+    else if (results.length) lit = { state: 'practiced', at: times[times.length - 1], source: 'lab' };
   }
   if (!lit) return { state: 'off', fresh: 0, at: null, source: null };
   const fresh = freshness(lit.at, now);
@@ -261,4 +270,14 @@ export function newlyLit(progress, record) {
 export function markSeen(record, keys) {
   if (!keys.length) return record;
   return { ...record, seen: { ...record.seen, ...Object.fromEntries(keys.map(k => [k, true])) } };
+}
+
+// A finished lab: clean is mastered, any hint or "show me" is practice. A
+// later run with help never dims a fresh clean pass.
+export function recordLab(record, labId, { assisted }, now = Date.now()) {
+  const at = new Date(now).toISOString();
+  const prior = record.labs?.[labId];
+  const state = assisted ? 'practiced' : 'mastered';
+  if (prior?.state === 'mastered' && state === 'practiced' && freshness(prior.at, now) > 0) return record;
+  return { ...record, labs: { ...(record.labs ?? {}), [labId]: { state, at } } };
 }

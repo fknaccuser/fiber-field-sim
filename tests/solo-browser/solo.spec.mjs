@@ -364,3 +364,34 @@ test.describe('Skill map', () => {
     expect(saved).toBeTruthy();
   });
 });
+
+test.describe('Do labs', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('a static routing lab ticks its checklist from typed commands and lights Do', async ({ page }) => {
+    await enableApp(page);
+    await page.click('.home-skillmap');
+    await page.click('.sk-node[data-tree="t3"]');
+    await page.locator('.sk-branch-row', { hasText: 'Static routing' }).click();
+    await page.locator('.sk-lab', { hasText: 'Static routes end to end' }).locator('.sk-go').click();
+    await expect(page.locator('.lab-goal')).toHaveCount(4);
+
+    const type = async (line) => { await page.fill('.lab-command', line); await page.press('.lab-command', 'Enter'); };
+    for (const l of ['en', 'conf t', 'ip route 192.168.3.0 255.255.255.0 10.0.12.2']) await type(l);
+    await expect(page.locator('.lab-goal[data-goal="r1"]')).toHaveClass(/is-done/);
+    await expect(page.locator('.lab-screen')).toContainText('R1(config)#ip route 192.168.3.0');
+
+    await page.click('.lab-tab[data-device="R3"]');
+    for (const l of ['en', 'conf t', 'ip route 0.0.0.0 0.0.0.0 10.0.23.2']) await type(l);
+    await page.click('.lab-tab[data-device="R2"]');
+    for (const l of ['en', 'conf t', 'ip route 192.168.1.0 255.255.255.0 10.0.12.1', 'ip route 192.168.3.0 255.255.255.0 10.0.23.3']) await type(l);
+    await page.click('.lab-tab[data-device="R1"]');
+    await type('do ping 192.168.3.1 source 192.168.1.1');
+    await expect(page.locator('.lab-screen')).toContainText('!!!!!');
+
+    await expect(page.locator('.lab-done')).toBeVisible();
+    await expect(page.locator('.lab-done h2')).toContainText('Do is lit');
+    await page.click('.lab-done .sk-go');
+    await expect(page.locator('.sk-sheet .sk-lab', { hasText: 'Static routes end to end' })).toContainText('Passed clean');
+  });
+});
