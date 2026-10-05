@@ -1,6 +1,7 @@
 import { createIssueLibrary } from './issue-library.js';
 import { createExamPrep, prepSnapshot } from './study/hub.js';
 import { createThemeToggle } from './backlight.js';
+import { createSkillMap, skillMapSnapshot, renderConstellation } from './tree/screen.js';
 import { guidedFix, guidedVerify, guidedNote, plainResult } from './guide-steps.js';
 import { checkBlank, walkthroughFor } from './walkthrough.js';
 import {
@@ -108,6 +109,7 @@ let updateServiceWorkerFn = null;
 let builderScreen = null;
 let libraryScreen = null;
 let examPrepScreen = null;
+let skillMapScreen = null;
 
 function render() {
   const focusedCommand = document.activeElement?.matches('.terminal-input') ? { name: document.activeElement.getAttribute('aria-label'), value: document.activeElement.value, start: document.activeElement.selectionStart, end: document.activeElement.selectionEnd } : null;
@@ -119,6 +121,7 @@ function render() {
   if (builderScreen) { root.appendChild(builderScreen); return; }
   if (libraryScreen) { root.appendChild(libraryScreen); return; }
   if (examPrepScreen) { root.appendChild(examPrepScreen); return; }
+  if (skillMapScreen) { root.appendChild(skillMapScreen); return; }
   if (state.screen === 'opening') {
     root.appendChild(renderOpening());
   } else if (state.screen === 'initializing') {
@@ -142,6 +145,9 @@ function render() {
         onOpenCareer: openCareer,
         onStartAssignment: startAssignment,
         onOpenCollection: () => openExamPrep('collection'),
+        onOpenSkillMap: openSkillMap,
+        skillMap: skillMapSnapshot(state.profile?.completedRuns ?? []),
+        renderConstellation,
         prepSnapshot: prepSnapshot(state.profile?.completedRuns ?? []),
         themeToggle: createThemeToggle(),
         recommendation: recommendMission(state.profile),
@@ -404,6 +410,27 @@ function openStudyScreen() {
 // does, so it never touches the mission state machine. It reads completed
 // runs from the profile to decide what the trainee has earned, and hands a
 // case code back when a concept sends them into the Field.
+// The skill map keeps its own view (which tree is open) while a check or exam
+// runs in the exam prep screens, then takes the score back and redraws.
+function openSkillMap() {
+  skillMapScreen = createSkillMap({
+    getCompletedRuns: () => state.profile?.completedRuns ?? [],
+    onExit: () => { skillMapScreen = null; render(); },
+    onLaunch: (code) => { skillMapScreen = null; startCode(code); },
+    onQuiz: (quiz) => {
+      examPrepScreen = createExamPrep({
+        quiz,
+        getCompletedRuns: () => state.profile?.completedRuns ?? [],
+        onExit: () => { examPrepScreen?.destroy?.(); examPrepScreen = null; skillMapScreen?.refresh?.(); render(); window.scrollTo?.(0, 0); },
+      });
+      render();
+      window.scrollTo?.(0, 0);
+    },
+  });
+  render();
+  window.scrollTo?.(0, 0);
+}
+
 function openExamPrep(initialScreen = 'home') {
   const close = () => { examPrepScreen?.destroy?.(); examPrepScreen = null; };
   examPrepScreen = createExamPrep({

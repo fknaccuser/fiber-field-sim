@@ -331,3 +331,36 @@ test.describe('Determinism and storage across separate browser contexts', () => 
     await context.close();
   });
 });
+
+test.describe('Skill map', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('opens from home, zooms into a tree, and a know check lights or records the branch', async ({ page }) => {
+    await enableApp(page);
+    await page.click('.home-skillmap');
+    await expect(page.locator('.sk-constellation .sk-node')).toHaveCount(7);
+    await page.click('.sk-node[data-tree="t1"]');
+    await expect(page.locator('.sk-title h1')).toHaveText('Network Fundamentals');
+
+    const row = page.locator('.sk-branch-row', { hasText: 'IPv4 and subnetting' });
+    await row.click();
+    await expect(page.locator('.sk-sheet h2')).toHaveText('IPv4 and subnetting');
+    await page.click('.sk-tier.is-off .sk-go >> nth=0');
+
+    // The check runs in the exam prep question screens; answer every question.
+    while (await page.locator('.ep-choices, .ep-pairs, .ep-order').count()) {
+      // Pick choices in order until Check unlocks (multi-select needs more than one).
+      const choices = page.locator('.ep-choices button');
+      for (let i = 0; i < await choices.count() && await page.locator('.ep-go:has-text("Check")').isDisabled(); i += 1) await choices.nth(i).click();
+      await page.click('.ep-go:has-text("Check")');
+      await page.click('.ep-go:has-text("Next"), .ep-go:has-text("Finish")');
+    }
+    await expect(page.locator('.ep-header h1')).toContainText('of 5');
+    await page.click('.ep-go:has-text("Back to the map")');
+
+    // Back on the same tree, with the branch panel still open.
+    await expect(page.locator('.sk-sheet h2')).toHaveText('IPv4 and subnetting');
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('field-skill-tree-v1')));
+    expect(saved).toBeTruthy();
+  });
+});

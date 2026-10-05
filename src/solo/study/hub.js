@@ -73,7 +73,10 @@ export function prepSnapshot(completedRuns = [], now = Date.now()) {
   };
 }
 
-export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScreen = 'home' } = {}) {
+// quiz: { deck, title, label, onFinish({ right, total }) } runs one set of
+// questions for another screen (the skill tree's checks and exams) and hands
+// the score back, using the same question screens as everything else here.
+export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScreen = 'home', quiz = null } = {}) {
   const root = el('main', 'exam-prep');
   const saved = loadSaved();
   let storageError = '';
@@ -282,7 +285,7 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
   function drawQuestion() {
     const q = ui.deck[ui.at];
     if (!q) { go('home'); return; }
-    root.append(el('p', 'ep-crumbs', `${ui.exam ? 'Mock exam' : 'Quiz'} · ${ui.at + 1} of ${ui.deck.length} · ${q.domain}${q.v2 === 'v2only' ? ' · v2.0 only' : ''}`));
+    root.append(el('p', 'ep-crumbs', `${quiz?.label ?? (ui.exam ? 'Mock exam' : 'Quiz')} · ${ui.at + 1} of ${ui.deck.length} · ${q.domain}${q.v2 === 'v2only' ? ' · v2.0 only' : ''}`));
     const card = el('section', 'ep-card');
     if (q.scenario) card.append(el('p', 'ep-scenario', q.scenario));
     card.append(el('p', 'ep-prompt', q.prompt));
@@ -310,7 +313,7 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
       }));
     }
     root.append(card);
-    root.append(btn('ep-quit', 'Back to exam prep', () => go('home')));
+    root.append(quiz ? btn('ep-quit', 'Stop and go back to the map', exit) : btn('ep-quit', 'Back to exam prep', () => go('home')));
   }
 
   function drawChoices(card, q) {
@@ -376,6 +379,13 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
   }
 
   function drawDone() {
+    if (quiz) {
+      if (!ui.reported) { ui.reported = true; quiz.onFinish?.({ right: ui.right, total: ui.deck.length }); }
+      const pct = ui.deck.length ? Math.round((100 * ui.right) / ui.deck.length) : 0;
+      root.append(header(`${ui.right} of ${ui.deck.length}`, quiz.result?.({ right: ui.right, total: ui.deck.length, pct }) ?? `${pct}%`));
+      root.append(btn('ep-go', 'Back to the map', exit));
+      return;
+    }
     const pct = ui.deck.length ? Math.round((100 * ui.right) / ui.deck.length) : 0;
     root.append(header(`${ui.right} of ${ui.deck.length}`, `${pct}% ${ui.exam ? 'on a weighted mock' : 'on this quiz'}. Cisco does not publish a pass mark; around 80 percent is the usual working target.`));
     if (ui.exam && ui.shortfalls.length) {
@@ -515,7 +525,9 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
 
   function draw() {
     root.textContent = '';
-    const back = ui.screen === 'home'
+    const back = quiz
+      ? btn('screen-back btn-quiet', 'Map', exit)
+      : ui.screen === 'home'
       ? btn('screen-back btn-quiet', 'Home', exit)
       : btn('screen-back btn-quiet', 'Exam prep', () => go('home'));
     root.append(back);
@@ -523,7 +535,7 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
     (screens[ui.screen] ?? drawHome)();
   }
 
-  draw();
+  if (quiz?.deck?.length) begin(quiz.deck, false); else draw();
   root.destroy = stopTicker;
   return root;
 }

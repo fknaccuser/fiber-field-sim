@@ -9,7 +9,6 @@ import { currentGuidedStep, PLAIN_TEST_LABELS, testCommand } from './guide-steps
 import { mountSpotlight } from './spotlight.js';
 import { attachMentor, explainDevice, explainPort, explainConcept } from './mentor.js';
 import { careerProgress } from './career.js';
-import { renderPatchPanel } from './patch-panel.js';
 import { conceptsForRecipes } from './study/concepts.js';
 
 const canvasViews = new Map();
@@ -178,7 +177,6 @@ export function renderHome(state, actions = {}) {
   const container = h('div', 'home-screen');
   const career = careerProgress(state.profile);
   const snapshot = actions.prepSnapshot ?? { mastery: [], cardsDue: 0, typeDue: 0, started: false };
-  const earned = snapshot.mastery.filter(r => r.state === 'earned').length;
 
   // ---- top bar ----
   const bar = h('header', 'home-bar');
@@ -263,15 +261,16 @@ export function renderHome(state, actions = {}) {
   doors.append(door('home-study-button', 'Study', due ? `${due} reviews due` : (snapshot.started ? 'Nothing due' : 'Quiz, drills, cards'), () => actions.onOpenStudy?.()));
   side.append(doors);
 
-  // The collection is the third door: the whole panel opens it.
-  const collection = btn('home-collection home-collection-button', '', () => actions.onOpenCollection?.());
-  const head = h('span', 'home-collection-head');
-  head.append(h('span', 'door-name', 'Collection'));
-  head.append(h('span', 'door-status', `${earned} of ${snapshot.mastery.length || 8} earned`));
-  collection.append(head);
-  if (snapshot.mastery.length) collection.append(renderPatchPanel(snapshot.mastery, { compact: true }));
-  collection.append(h('span', 'home-collection-legend', 'Green is earned in the Field. Orange is practiced.'));
-  side.append(collection);
+  // The skill map is the third door: a small copy of the map opens the big one.
+  const map = actions.skillMap;
+  const mapDoor = btn('home-skillmap home-collection-button', '', () => actions.onOpenSkillMap?.());
+  if (map?.progress && actions.renderConstellation) mapDoor.append(actions.renderConstellation(map.progress, { labels: false }));
+  const mapText = h('span', 'home-skillmap-text');
+  mapText.append(h('span', 'door-name', 'Skill map'));
+  mapText.append(h('span', 'door-status', map?.progress ? `${map.progress.lights} of ${map.progress.possible} lights on` : 'Seven trees'));
+  if (map?.newCount) mapText.append(h('span', 'home-skillmap-new', `${map.newCount} new ${map.newCount === 1 ? 'light' : 'lights'}`));
+  mapDoor.append(mapText);
+  side.append(mapDoor);
 
   const tools = h('div', 'home-tools');
   tools.append(btn('home-progress-button btn-quiet', 'Progress', () => actions.onOpenProgress?.()));

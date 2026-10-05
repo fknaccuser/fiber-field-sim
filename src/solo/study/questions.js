@@ -6,7 +6,9 @@
 // Coverage is checked in tests against the domain weights, so a thin domain
 // fails the suite rather than quietly producing a misweighted mock exam.
 
-export const CCNA_BANK = [
+import { TREE_QUESTIONS } from './questions-tree.js';
+
+const CORE_BANK = [
   {
     id: "nf-001", domain: "NF", v2: "same", format: "single",
     scenario: "Carving a /24 into subnets for a new branch.",
@@ -1255,3 +1257,7 @@ export const CCNA_BANK = [
     explain: "Ordinary queries go over UDP 53 because they are small and fast. When an answer is too large, the server sets a truncation flag and the client retries over TCP 53, and zone transfers always use TCP. A rule permitting only UDP therefore produces failures that look random, hitting only the names with large responses.",
   },
 ];
+
+// The skill tree's questions join the main bank, so quizzes and mock exams
+// draw on them too.
+export const CCNA_BANK = [...CORE_BANK, ...TREE_QUESTIONS];

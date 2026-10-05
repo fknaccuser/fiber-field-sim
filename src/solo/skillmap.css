@@ -1,0 +1,190 @@
+/* ==========================================================================
+   Skill map: the seven trees as a lit fiber network.
+   Always the night palette, in both backlight modes: the map is a dark board
+   with light on it, the way a fiber shows its fault with a visual locator.
+   ========================================================================== */
+.skillmap, .home-skillmap {
+  --sk-bg: #0a0d10;
+  --sk-panel: #11161b;
+  --sk-panel-2: #172028;
+  --sk-glass: #22303a;
+  --sk-line: #2a3943;
+  --sk-ink: #e9eeec;
+  --sk-ink-2: #9aa8b1;
+  --sk-ink-3: #66757e;
+  --sk-light: #f2c12e;
+  --sk-ok: #4fd18b;
+  --sk-warn: #f08c3a;
+}
+
+.skillmap {
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 50% 38%, rgb(242 193 46 / 0.06), transparent 55%),
+    radial-gradient(rgb(255 255 255 / 0.05) 1px, transparent 1.2px) 0 0 / 22px 22px,
+    var(--sk-bg);
+  color: var(--sk-ink);
+  padding: max(12px, env(safe-area-inset-top)) 16px 32px;
+  box-sizing: border-box;
+  max-width: 760px;
+  margin: 0 auto;
+}
+@media (min-width: 761px) { body:has(.skillmap) { background: var(--sk-bg, #0a0d10); } }
+
+.sk-top { display: flex; align-items: center; gap: 12px; padding: 4px 0 12px; }
+.sk-back {
+  background: transparent; color: var(--sk-ink-2); border: 1px solid var(--sk-line);
+  border-radius: 999px; min-height: 40px; padding: 0 14px; font: 600 14px/1 var(--font-body);
+}
+.sk-back::before { content: '\2039\00a0'; }
+.sk-title { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.sk-kicker { font: 600 11px/1.2 var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--sk-light); }
+.sk-title h1 { margin: 0; font: 700 24px/1.1 var(--font-display); letter-spacing: 0.02em; color: var(--sk-ink); }
+.sk-tally { font: 600 12px/1 var(--font-mono); color: var(--sk-ink-3); white-space: nowrap; }
+.sk-tally b { font-size: 22px; color: var(--sk-light); }
+.sk-hint, .sk-blurb { margin: 4px 0 16px; color: var(--sk-ink-2); font-size: 14px; line-height: 1.45; }
+.sk-error { color: var(--sk-warn); font-size: 14px; }
+
+/* ---------- constellation ---------- */
+.sk-stage { margin: 0 -8px; }
+.sk-constellation { display: block; width: 100%; height: auto; max-height: 72dvh; overflow: visible; }
+.sk-orbit { fill: none; stroke: var(--sk-line); stroke-width: 1; stroke-dasharray: 2 6; opacity: 0.7; }
+.sk-orbit-inner { opacity: 0.35; }
+.sk-strand { fill: none; stroke: var(--sk-glass); stroke-width: 3; stroke-linecap: round; }
+.sk-strand-lit { fill: none; stroke: var(--sk-light); stroke-width: 1.6; stroke-linecap: round; filter: drop-shadow(0 0 3px rgb(242 193 46 / 0.7)); }
+/* A packet of light runs out along every strand that has any lights on it. */
+.sk-pulse {
+  fill: none; stroke: #fff6d6; stroke-width: 2.6; stroke-linecap: round;
+  stroke-dasharray: 6 100; stroke-dashoffset: 106;
+  filter: drop-shadow(0 0 4px var(--sk-light));
+  animation: sk-run 4.2s linear infinite;
+}
+.sk-pulse.is-burst { stroke-width: 4; stroke-dasharray: 18 100; animation: sk-run 1.1s ease-out 3, sk-run 4.2s linear 3.3s infinite; }
+@keyframes sk-run { from { stroke-dashoffset: 106; } to { stroke-dashoffset: -6; } }
+
+.sk-node { cursor: default; }
+.sk-node[role='button'] { cursor: pointer; }
+.sk-node[role='button']:focus-visible { outline: none; }
+.sk-node[role='button']:focus-visible .sk-core { stroke: var(--sk-light); stroke-width: 2.5; }
+.sk-core { fill: var(--sk-panel); stroke: var(--sk-line); stroke-width: 1.5; transition: fill 0.2s; }
+@media (hover: hover) { .sk-node[role='button']:hover .sk-core { fill: var(--sk-panel-2); stroke: var(--sk-light); } }
+.sk-ring-track { fill: none; stroke: var(--sk-glass); stroke-width: 3; }
+.sk-ring { fill: none; stroke: var(--sk-ok); stroke-width: 3; stroke-linecap: round; filter: drop-shadow(0 0 3px rgb(79 209 139 / 0.6)); }
+.sk-crown { fill: none; stroke: var(--sk-light); stroke-width: 1.5; stroke-dasharray: 3 3; filter: drop-shadow(0 0 6px var(--sk-light)); animation: sk-spin 30s linear infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes sk-spin { to { transform: rotate(360deg); } }
+.sk-num { fill: var(--sk-ink); font: 700 15px var(--font-mono); }
+.sk-sub { fill: var(--sk-ink-3); font: 600 7px var(--font-mono); letter-spacing: 0.18em; }
+.sk-label { fill: var(--sk-ink); font: 600 10px var(--font-mono); letter-spacing: 0.12em; }
+.sk-count { fill: var(--sk-ink-3); font: 600 9.5px var(--font-mono); }
+.sk-node.is-complete .sk-core { stroke: var(--sk-ok); }
+
+/* ---------- final and tree exam rows ---------- */
+.sk-final {
+  margin-top: 18px; display: flex; align-items: center; gap: 12px;
+  background: var(--sk-panel); border: 1px solid var(--sk-line); border-left: 3px solid var(--sk-light);
+  border-radius: 12px; padding: 12px 14px;
+}
+.sk-final.is-passed { border-left-color: var(--sk-ok); }
+.sk-final-text { flex: 1; display: grid; gap: 3px; }
+.sk-final-text b { font: 700 16px var(--font-display); letter-spacing: 0.03em; }
+.sk-final-text span { color: var(--sk-ink-2); font-size: 13px; line-height: 1.4; }
+.sk-go {
+  background: var(--sk-light); color: #1d1700; border: 0; border-radius: 10px;
+  min-height: 44px; padding: 0 16px; font: 700 15px var(--font-body); white-space: nowrap;
+}
+.sk-go-small { min-height: 38px; padding: 0 12px; font-size: 14px; }
+
+/* ---------- a tree: a spine of branches ---------- */
+.sk-spine { list-style: none; margin: 0; padding: 0 0 0 14px; position: relative; display: grid; gap: 10px; }
+.sk-spine::before {
+  content: ''; position: absolute; left: 21px; top: 12px; bottom: 12px; width: 2px;
+  background: linear-gradient(var(--sk-light), var(--sk-glass) 70%);
+  box-shadow: 0 0 6px rgb(242 193 46 / 0.35);
+}
+.sk-branch-row {
+  width: 100%; display: flex; align-items: center; gap: 12px; text-align: left;
+  background: var(--sk-panel); border: 1px solid var(--sk-line); border-radius: 12px;
+  padding: 10px 12px 10px 0; color: var(--sk-ink); min-height: 60px; position: relative;
+}
+.sk-branch-row:focus-visible { outline: 2px solid var(--sk-light); outline-offset: 2px; }
+@media (hover: hover) { .sk-branch-row:hover { border-color: var(--sk-ink-3); } }
+.sk-port {
+  flex: none; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%;
+  background: var(--sk-bg); border: 2px solid var(--sk-glass); position: relative; z-index: 1;
+}
+.sk-branch.is-ready .sk-port { border-color: var(--sk-light); box-shadow: 0 0 0 0 rgb(242 193 46 / 0.6); animation: sk-ready 2.4s ease-out infinite; }
+.sk-branch.is-done .sk-port { border-color: var(--sk-ok); background: var(--sk-ok); box-shadow: 0 0 8px var(--sk-ok); }
+@keyframes sk-ready { 0% { box-shadow: 0 0 0 0 rgb(242 193 46 / 0.55); } 70% { box-shadow: 0 0 0 9px rgb(242 193 46 / 0); } 100% { box-shadow: 0 0 0 0 rgb(242 193 46 / 0); } }
+.sk-branch.is-hard .sk-branch-name { color: var(--sk-ink-2); }
+.sk-branch-body { flex: 1; min-width: 0; display: grid; gap: 7px; }
+.sk-branch-name { font: 600 16px/1.2 var(--font-body); }
+.sk-leds { display: flex; gap: 6px; }
+.sk-led {
+  width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center;
+  font: 700 11px var(--font-mono); color: var(--sk-ink-3);
+  background: var(--sk-bg); border: 1px solid var(--sk-line);
+}
+.sk-led.is-mastered { background: var(--sk-ok); border-color: var(--sk-ok); color: #052514; box-shadow: 0 0 10px rgb(79 209 139 / 0.55); }
+.sk-led.is-practiced { background: var(--sk-warn); border-color: var(--sk-warn); color: #2b1300; box-shadow: 0 0 8px rgb(240 140 58 / 0.45); }
+.sk-led.is-faded { border-color: var(--sk-ok); color: var(--sk-ok); opacity: 0.55; }
+.sk-led.is-soon { border-style: dashed; opacity: 0.45; }
+.sk-led.is-new { animation: sk-pop 0.7s ease-out 2; }
+@keyframes sk-pop { 0% { transform: scale(0.6); } 55% { transform: scale(1.25); } 100% { transform: scale(1); } }
+.sk-tag { font: 700 10px var(--font-mono); letter-spacing: 0.12em; color: var(--sk-ink-3); }
+.sk-branch.is-ready .sk-tag { color: var(--sk-light); }
+.sk-branch.is-done .sk-tag { color: var(--sk-ok); }
+
+/* ---------- a branch: the panel ---------- */
+.sk-scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.55); border: 0; z-index: 50; }
+.sk-sheet {
+  position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); z-index: 51;
+  width: min(560px, 100vw); max-height: 82dvh; overflow: auto; box-sizing: border-box;
+  background: var(--sk-panel); color: var(--sk-ink);
+  border: 1px solid var(--sk-line); border-bottom: 0; border-top: 3px solid var(--sk-light);
+  border-radius: 16px 16px 0 0; padding: 16px 16px max(20px, env(safe-area-inset-bottom));
+  display: grid; gap: 12px; animation: sk-up 0.22s ease-out;
+}
+@keyframes sk-up { from { transform: translate(-50%, 24px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+.sk-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sk-sheet-head h2 { margin: 0; font: 700 22px/1.15 var(--font-display); }
+.sk-close { background: transparent; border: 1px solid var(--sk-line); color: var(--sk-ink-2); border-radius: 999px; min-height: 36px; padding: 0 12px; }
+.sk-topics { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.sk-topics li { font-size: 13px; color: var(--sk-ink-2); background: var(--sk-bg); border: 1px solid var(--sk-line); border-radius: 999px; padding: 4px 10px; }
+.sk-needs { margin: 0; font-size: 14px; color: var(--sk-ink-2); border-left: 3px solid var(--sk-warn); padding-left: 10px; }
+.sk-tier { display: flex; align-items: center; gap: 12px; background: var(--sk-bg); border: 1px solid var(--sk-line); border-radius: 12px; padding: 10px 12px; }
+.sk-tier .sk-led { width: 30px; height: 30px; font-size: 13px; }
+.sk-tier-text { flex: 1; display: grid; gap: 2px; }
+.sk-tier-text b { font-size: 15px; }
+.sk-tier-text span { font-size: 13px; color: var(--sk-ink-2); }
+.sk-soon { font: 600 11px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--sk-ink-3); }
+
+/* ---------- home: the map's door ---------- */
+.home-skillmap {
+  display: grid; grid-template-columns: 112px 1fr; align-items: center; gap: 12px; width: 100%;
+  text-align: left; background: var(--sk-bg); color: var(--sk-ink);
+  border: 1px solid var(--sk-line); border-radius: var(--r-lg, 14px); padding: 10px 14px 10px 6px;
+}
+.home-skillmap .sk-constellation { width: 112px; max-height: none; }
+.home-skillmap-text { display: grid; gap: 4px; }
+.home-skillmap .door-name { color: var(--sk-ink); }
+.home-skillmap .door-status { color: var(--sk-ink-2); }
+.home-skillmap-new { color: var(--sk-light); font: 600 12px var(--font-mono); }
+@media (hover: hover) { .home-skillmap:hover { border-color: var(--sk-light); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-pulse, .sk-crown, .sk-branch.is-ready .sk-port, .sk-led.is-new, .sk-sheet { animation: none; }
+  .sk-pulse { opacity: 0; }
+}
+
+/* The app's base button and heading styles follow the backlight mode; the map
+   is always dark, so its own controls restate their colors. */
+.skillmap h1, .skillmap h2, .skillmap b { color: var(--sk-ink); }
+.skillmap .sk-branch-row, .skillmap .sk-branch-row:hover, .skillmap .sk-branch-row:focus, .skillmap .sk-branch-row:active {
+  background: var(--sk-panel); color: var(--sk-ink);
+}
+@media (hover: hover) { .skillmap .sk-branch-row:hover { background: var(--sk-panel-2); border-color: var(--sk-ink-3); } }
+.skillmap .sk-back:hover, .skillmap .sk-close:hover { background: var(--sk-panel-2); color: var(--sk-ink); }
+.skillmap .sk-go:hover { background: #ffd34d; color: #1d1700; }
+.home-skillmap, .home-skillmap:hover, .home-skillmap:focus { background: var(--sk-bg); color: var(--sk-ink); }
+
+.skillmap .sk-scrim, .skillmap .sk-scrim:hover, .skillmap .sk-scrim:focus, .skillmap .sk-scrim:active { background: rgb(0 0 0 / 0.6); border: 0; border-radius: 0; box-shadow: none; }
