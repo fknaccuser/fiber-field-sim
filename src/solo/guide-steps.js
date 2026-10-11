@@ -1,8 +1,9 @@
 // The spotlight guide: the first tickets, broken into one small instruction
 // at a time, in plain words, from "what's wrong" all the way to closing the
-// ticket. walkthrough.js still owns the fault-specific fill-in blanks; this
-// module turns a mission into the ordered list of spotlight steps and works
-// out which one is current.
+// ticket. Guided tickets are choices, not typing: think (which area does the
+// failed test point at), fix (pick the action, with plausible traps), and a
+// teach-back (pick the cause) before closing. This module turns a mission
+// into the ordered list of spotlight steps and works out which one is current.
 //
 // Pure: no DOM. A step is "done" either because the mission's own events show
 // the work was done, or (for the read-only steps) because the trainee tapped
@@ -81,89 +82,219 @@ export const PLAIN_TEST_LABELS = {
 };
 
 // Per fault: where to look, what the trainee is told they are seeing, the
-// plain question for the blank, and the change that answer makes.
+// fix choices, and the change the right choice makes.
+// Each fault also carries: area (where a tech should look first), cause (the
+// one-line story for the teach-back), and choices for the fix: the right
+// action plus plausible traps, each with why it is wrong.
+const C = (text, value, why = null) => ({ text, value, ok: !why, why });
+
 const FAULTS = {
   P1: (m) => ({
+    area: 'physical',
+    choices: [
+      C(`Plug the cable back into ${accessPortOf(m).port?.label}`, 'plug'),
+      C(`Run no shutdown on ${accessPortOf(m).port?.label}`, 'noshut', 'The port is not switched off; nothing is plugged into it. No command can fix a loose cable.'),
+      C('Plug it into Gi0/2 instead', 'other', 'Gi0/2 belongs to the other office\'s VLAN. The customer would land in the wrong room.'),
+      C('Give the computer a new IP address', 'ip', 'Addresses do not matter until there is a link. Fix the lowest broken thing first.'),
+    ],
     look: { target: { kind: 'cable', id: accessPortOf(m).link?.id }, tab: 'network',
       title: 'See the dashed line?',
       body: 'It\'s the customer\'s cable, unplugged from the switch.' },
-    ask: `Type ${accessPortOf(m).port?.label ?? 'Gi0/1'}, the switch port it belongs in.`,
     term: 'Techs call this reseating the cable.',
     fix: () => [{ type: 'setLinkConnected', linkId: accessPortOf(m).link.id, connected: true }],
     note: `Reconnected the customer's cable to switch port ${accessPortOf(m).port?.label ?? 'Gi0/1'}.`,
   }),
   P2: (m) => ({
+    area: 'physical',
+    choices: [
+      C(`Turn ${accessPortOf(m).port?.label} on with no shutdown`, 'up'),
+      C('Reseat the customer\'s cable', 'reseat', 'The cable is plugged in. The port itself is switched off, and reseating will not turn it on.'),
+      C(`Run shutdown on ${accessPortOf(m).port?.label}`, 'shut', 'shutdown is what turned it off. The "no" in no shutdown is what turns it back on.'),
+      C('Move the port to another VLAN', 'vlan', 'A port that is shut down passes nothing in any VLAN. Turn it on first.'),
+    ],
     select: { id: accessPortOf(m).port?.deviceId, title: 'Tap the switch', body: 'The box the customer\'s cable plugs into.' },
     look: { target: { kind: 'row', label: `Port ${accessPortOf(m).port?.label}` }, tab: 'device',
       title: 'This port is switched off',
       body: `Port ${accessPortOf(m).port?.label}, the customer's port, says "administratively down".` },
-    ask: 'Type up to turn the port back on.',
     term: 'On a Cisco switch the command is no shutdown.',
     fix: () => [{ type: 'setPortAdmin', portId: accessPortOf(m).port.id, adminUp: true }],
     note: `Turned switch port ${accessPortOf(m).port?.label} back on (no shutdown).`,
   }),
   I1: (m) => ({
+    area: 'addressing',
+    choices: [
+      C(`Set the address to ${prefixOf(m)}.50`, `${prefixOf(m)}.50`),
+      C(`Set the address to ${prefixOf(m)}.1`, `${prefixOf(m)}.1`, `${prefixOf(m)}.1 is the router. Two devices on one address break both of them.`),
+      C(`Set the address to ${prefixOf(m)}.255`, `${prefixOf(m)}.255`, `In a /24, .255 is the broadcast address. No device can use it.`),
+      C(`Keep ${device(m, m.targetClientId)?.ip} and change the gateway`, 'gateway', 'The gateway is fine. The computer\'s own address is outside the office subnet, so it cannot reach any gateway.'),
+    ],
     look: { target: { kind: 'row', label: 'IP address' }, tab: 'device',
       title: 'The address is in the wrong place',
       body: `Everyone in this office starts with ${prefixOf(m)}. This computer doesn't.` },
-    ask: `Type a new address, like ${prefixOf(m)}.50`,
     term: `Techs say it belongs in the ${prefixOf(m)}.0/24 subnet.`,
     fix: (value) => [{ type: 'setClientAddress', deviceId: m.targetClientId, ip: String(value).trim(), prefix: m.requirements.targetPrefix }],
     note: `Moved the customer's computer to an address in ${prefixOf(m)}.0/24.`,
   }),
   I2: (m) => ({
+    area: 'addressing',
+    choices: [
+      C(`Set the gateway to ${prefixOf(m)}.1`, `${prefixOf(m)}.1`),
+      C(`Set the gateway to ${device(m, m.targetClientId)?.ip}`, 'self', 'That is the computer\'s own address. The gateway has to be the router, the door out.'),
+      C(`Set the gateway to ${serverAddress(m)}`, 'server', 'The server is on another subnet and is not a router. The gateway must be the router on your own subnet.'),
+      C('Give the computer a new IP address', 'ip', `Its address is fine; it is in ${prefixOf(m)}.0/24. Only the door out is wrong.`),
+    ],
     look: { target: { kind: 'row', label: 'Gateway' }, tab: 'device',
       title: 'The door out points nowhere',
       body: `The gateway is the door out of the office. ${device(m, m.targetClientId)?.gateway} leads nowhere.` },
-    ask: `Type the router's address: ${prefixOf(m)}.1`,
     term: 'Techs call this the default gateway.',
     fix: (value) => [{ type: 'setClientGateway', deviceId: m.targetClientId, gateway: String(value).trim() }],
     note: `Set the customer's default gateway to ${prefixOf(m)}.1.`,
   }),
   V1: (m) => ({
+    area: 'vlan',
+    choices: [
+      C(`Put ${accessPortOf(m).port?.label} in VLAN ${m.requirements.targetVlan}`, String(m.requirements.targetVlan)),
+      C(`Put ${accessPortOf(m).port?.label} in VLAN ${m.requirements.protectedVlan}`, 'protected', `VLAN ${m.requirements.protectedVlan} is the other office's room. That is the problem, not the fix.`),
+      C(`Put ${accessPortOf(m).port?.label} in VLAN 1`, 'one', `VLAN 1 is the default. The customer's office lives in VLAN ${m.requirements.targetVlan}.`),
+      C('Reseat the customer\'s cable', 'reseat', 'The link is up. Traffic reaches the switch and lands in the wrong VLAN.'),
+    ],
     select: { id: accessPortOf(m).port?.deviceId, title: 'Tap the switch', body: 'The box the customer\'s cable plugs into.' },
     look: { target: { kind: 'row', label: `Port ${accessPortOf(m).port?.label}` }, tab: 'device',
       title: 'The port is in the wrong VLAN',
       body: `A VLAN is a separate room on the switch. This port is in VLAN ${accessPortOf(m).port?.accessVlan}; the customer belongs in ${m.requirements.targetVlan}.` },
-    ask: `Type ${m.requirements.targetVlan}, the customer's VLAN.`,
     term: 'Techs call this the access VLAN.',
     fix: (value) => [{ type: 'setAccessVlan', portId: accessPortOf(m).port.id, vlanId: Number(String(value).trim()) }],
     note: `Put switch port ${accessPortOf(m).port?.label} back in VLAN ${m.requirements.targetVlan}.`,
   }),
   V2: (m) => ({
+    area: 'vlan',
+    choices: [
+      C(`Allow VLANs ${m.requirements.targetVlan} and ${m.requirements.protectedVlan} on the trunk`, `${m.requirements.targetVlan},${m.requirements.protectedVlan}`),
+      C(`Allow only VLAN ${m.requirements.targetVlan} on the trunk`, 'target', `That fixes the customer and breaks the other office: VLAN ${m.requirements.protectedVlan} would be dropped.`),
+      C('Allow every VLAN (1-4094) on the trunk', 'all', 'It would work, but it carries every VLAN everywhere. Allow only the VLANs that need to cross.'),
+      C(`Move the customer's port to VLAN ${m.requirements.protectedVlan}`, 'move', `Their address is in the VLAN ${m.requirements.targetVlan} subnet. In another VLAN it would not work.`),
+    ],
     select: { id: accessPortOf(m).port?.deviceId, title: 'Tap the switch', body: 'The box the customer\'s cable plugs into.' },
     look: { target: { kind: 'row', label: `Port ${trunkPortOf(m)?.label}` }, tab: 'device',
       title: 'The link between switches is missing a VLAN',
       body: `${trunkPortOf(m)?.label} is the trunk, the cable that carries VLANs between switches. VLAN ${m.requirements.targetVlan} is missing.` },
-    ask: `Type both offices' VLANs: ${m.requirements.targetVlan},${m.requirements.protectedVlan}`,
     term: 'Techs call this the trunk allowed VLAN list.',
     fix: (value) => [{ type: 'setTrunkAllowedVlans', portId: trunkPortOf(m).id, vlans: String(value).split(/[,\s]+/).map(Number).filter(Number.isInteger) }],
     note: `Added VLAN ${m.requirements.targetVlan} back to the trunk on ${trunkPortOf(m)?.label}.`,
   }),
   D1: (m) => ({
+    area: 'dns',
+    choices: [
+      C(`Set DNS to ${serverAddress(m)}`, serverAddress(m)),
+      C(`Set DNS to ${prefixOf(m)}.1, the router`, 'router', `This router does not answer name lookups. The office DNS server is ${serverAddress(m)}.`),
+      C('Set DNS to 8.8.8.8', 'public', 'That is a public DNS server. It does not know this office\'s internal website names.'),
+      C('Change the default gateway', 'gateway', 'The computer reaches the router and the server. Only the name helper is wrong.'),
+    ],
     look: { target: { kind: 'row', label: 'DNS' }, tab: 'device',
       title: 'The name helper is wrong',
       body: `DNS looks up website names. This computer asks ${device(m, m.targetClientId)?.dns}, and nobody answers.` },
-    ask: `Type the DNS server's address: ${serverAddress(m)}`,
     term: 'Techs call this the DNS resolver.',
     fix: (value) => [{ type: 'setClientDns', deviceId: m.targetClientId, dns: String(value).trim() }],
     note: `Pointed the customer's DNS at ${serverAddress(m)}.`,
   }),
   D2: (m) => ({
+    area: 'dns',
+    choices: [
+      C(`Point ${PORTAL} at ${serverAddress(m)}`, serverAddress(m)),
+      C(`Point ${PORTAL} at ${prefixOf(m)}.1`, 'router', 'The router does not host the website. The server does.'),
+      C('Change the customer\'s DNS setting', 'client', 'The lookup works and gets an answer. The answer itself is wrong, so the fix is the record on the server.'),
+      C('Restart the server', 'restart', 'A restart loads the same wrong record again.'),
+    ],
     select: { id: m.requirements.portalServerId, title: 'Tap the server', body: 'It holds the website and the list of names.' },
     look: { target: { kind: 'heading' }, tab: 'device',
       title: 'The website name points to the wrong place',
       body: `Its name list sends the website to the wrong address.` },
-    ask: `Type this server's address: ${serverAddress(m)}`,
     term: 'Techs call this fixing the DNS A record.',
     fix: (value) => [{ type: 'setDnsRecord', serverId: m.requirements.portalServerId, name: PORTAL, address: String(value).trim() }],
     note: `Corrected the ${PORTAL} DNS record to ${serverAddress(m)}.`,
   }),
 };
 
+// The think question: from the failed test, which part of the network to
+// open first. Each wrong area says why the test rules it out.
+const AREAS = {
+  physical: 'The cable and the switch port',
+  addressing: 'The computer\'s address and gateway',
+  vlan: 'The VLANs on the switch',
+  dns: 'The name lookup (DNS)',
+};
+const RULED_OUT = {
+  physical: {
+    addressing: 'Addresses only matter once the computer is connected. The test says it is not.',
+    vlan: 'VLANs sort traffic that reaches the switch. Nothing is reaching it yet.',
+    dns: 'A name lookup needs a working connection first. Start at the lowest broken layer.',
+  },
+  addressing: {
+    physical: 'A dead cable or port would say "not connected". This test got further than that.',
+    vlan: 'Possible, but the test says the computer cannot reach its own router. Check its own settings first: they are one tap away.',
+    dns: 'The computer cannot reach the router, so it cannot reach any DNS server either. Fix the path first.',
+  },
+  vlan: {
+    physical: 'A dead cable or port would say "not connected". This traffic reaches the switch.',
+    addressing: 'The test says the traffic lands in the wrong VLAN. That is a switch setting, not the computer\'s.',
+    dns: 'Name lookups ride on the network path, and the path breaks at the switch.',
+  },
+  dns: {
+    physical: 'The computer reaches the router and the server, so the cable and port work.',
+    addressing: 'The computer reaches the router and the server by address, so its addressing works.',
+    vlan: 'Traffic gets across the switches to the server, so the VLANs work.',
+  },
+};
+
+// A fixed shuffle per mission, so the right answer is not always first and a
+// re-render never reorders the buttons under a finger.
+function shuffled(list, key) {
+  let h = 2166136261;
+  for (const ch of String(key)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    const j = (h >>> 0) % (i + 1);
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function thinkChoices(fault, key) {
+  return shuffled(Object.entries(AREAS).map(([area, text]) => (area === fault.area
+    ? C(text, area) : C(text, area, RULED_OUT[fault.area][area]))), `${key}:think`);
+}
+
+// The teach-back: the cause in one line, against three other faults' causes.
+// One decoy comes from the same area, so the pick has to be exact.
+const CAUSES = {
+  P1: 'The customer\'s cable was unplugged from the switch.',
+  P2: 'The switch port was turned off (administratively down).',
+  I1: 'The computer had an address from the wrong subnet.',
+  I2: 'The computer\'s default gateway pointed at nothing.',
+  V1: 'The switch port was in the wrong VLAN.',
+  V2: 'The trunk was not carrying the customer\'s VLAN.',
+  D1: 'The computer asked a DNS server that does not exist.',
+  D2: 'The DNS record pointed the website name at the wrong address.',
+};
+const TWIN = { P1: 'P2', P2: 'P1', I1: 'I2', I2: 'I1', V1: 'V2', V2: 'V1', D1: 'D2', D2: 'D1' };
+const OTHERS = { P: ['I1', 'D1'], I: ['P1', 'V1'], V: ['I2', 'D2'], D: ['P2', 'V2'] };
+
+function teachChoices(recipeId, fault, key) {
+  const why = `Not this one. Look back at what you fixed: ${fault.note}`;
+  const decoys = [TWIN[recipeId], ...OTHERS[recipeId[0]]];
+  return shuffled([C(CAUSES[recipeId], recipeId), ...decoys.map((id) => C(CAUSES[id], id, why))], `${key}:teach`);
+}
+
 function faultFor(mission) {
   const recipeId = walkthroughRecipeId(mission);
   return recipeId ? FAULTS[recipeId](mission) : null;
+}
+
+// The fix as a pick: the fault's choices in a fixed order for this mission.
+export function fixChoicesFor(mission) {
+  const fault = faultFor(mission);
+  return fault ? shuffled(fault.choices, `${mission.caseCode ?? mission.id}:fix`) : [];
 }
 
 export function fixActionsFor(mission, value) {
@@ -207,7 +338,6 @@ export function guidedSteps(mission) {
   const walkthrough = walkthroughFor(mission);
   const fault = faultFor(mission);
   if (!walkthrough || !fault) return [];
-  const blank = walkthrough.steps[3].blank;
   const events = mission.events ?? [];
   const inspected = (id) => events.some((e) => e.kind === 'inspection' && e.deviceId === id);
   const repaired = () => isRecipeRepaired(mission, walkthrough.recipeId);
@@ -235,26 +365,40 @@ export function guidedSteps(mission) {
       term: `Techs run this as: curl http://${PORTAL}`,
       done: () => Boolean(baseline) },
   ];
+  // Think before touching anything: the failed test points at one area.
+  if (failed) {
+    steps.push({ id: 'think', ack: true, target: { kind: 'feedback' }, tab: 'device',
+      news: resultNews,
+      title: 'Where would you look first?',
+      body: 'Pick the part of the network that result points at.',
+      choices: thinkChoices(fault, mission.caseCode ?? mission.id) });
+  }
   if (pickFault) {
     steps.push({ id: 'pick-fault-device', target: { kind: 'device', id: fault.select.id }, tab: 'network',
-      news: resultNews,
+      news: failed ? { ok: true, text: 'Right area.' } : resultNews,
       title: fault.select.title, body: fault.select.body,
       done: () => events.some((e) => e.kind === 'inspection' && e.deviceId === fault.select.id && e.index > (baseline?.index ?? -1)) });
   }
   steps.push(
     { id: 'fix', target: fault.look.target, tab: fault.look.tab,
       device: fault.select?.id ?? mission.targetClientId,
-      news: pickFault ? { ok: true, text: 'Found it.' } : resultNews,
+      news: pickFault ? { ok: true, text: 'Found it.' } : failed ? { ok: true, text: 'Right area.' } : resultNews,
       title: fault.look.title, body: fault.look.body,
-      blank: { ...blank, prompt: fault.ask }, term: fault.term,
+      ask: 'What is the fix?',
+      choices: shuffled(fault.choices, `${mission.caseCode ?? mission.id}:fix`), term: fault.term,
       done: repaired },
     { id: 'verify', finish: 'verify',
       news: { ok: true, text: 'Fixed. Your change is in.' },
       title: 'Check that it works',
       body: 'One tap tries the website from both offices.',
       done: () => verifiedNow(mission, mission.targetClientId, 'openPortal') && verifiedNow(mission, mission.protectedClientId, 'checkProtected') },
-    { id: 'close', finish: 'close',
+    { id: 'teach', ack: true,
       news: { ok: true, text: 'Both offices can open the website.' },
+      title: 'Before you close it: what was wrong?',
+      body: 'Pick the line you would tell the customer.',
+      choices: teachChoices(walkthrough.recipeId, fault, mission.caseCode ?? mission.id) },
+    { id: 'close', finish: 'close',
+      news: { ok: true, text: 'That is the story. Now write it down.' },
       title: 'Close the ticket',
       body: 'Here is a note for the customer. Change it or keep it.',
       done: () => mission.status === 'completed' },
@@ -297,7 +441,7 @@ export function guidedVerify(state) {
   return { ...next, mission: { ...next.mission, selectedFindingIds: [...cited], completionNote: note } };
 }
 
-// Applies the trainee's answer to the blank as the change it describes.
+// Applies the picked fix (its value) as the change it describes.
 export function guidedFix(state, value) {
   const actions = fixActionsFor(state.mission, value);
   const { deviceId } = actions[0] ?? {};

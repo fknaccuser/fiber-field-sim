@@ -18,6 +18,7 @@ import {
 import { codeForRecipe } from '../study/hub.js';
 import { labsForBranch } from '../labs/catalog.js';
 import { createLabScreen } from '../labs/screen.js';
+import { suggestedStage, STAGE_LABEL } from '../labs/coach.js';
 
 export const STORAGE_KEY = 'field-skill-tree-v1';
 const SVG = 'http://www.w3.org/2000/svg';
@@ -185,11 +186,15 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz } = 
 
   function go(view, extra = {}) { Object.assign(ui, { view, ...extra }); draw(); }
 
-  function openLab(lab, branch) {
+  function openLab(lab, branch, stage = null) {
+    const suggested = suggestedStage(record.labs?.[lab.id]);
     ui.labEl = createLabScreen({
       lab,
       branchName: branch.name,
-      onFinish: ({ assisted }) => { record = recordLab(record, lab.id, { assisted }); save(); },
+      stage: stage ?? suggested,
+      suggested,
+      onFinish: (result) => { record = recordLab(record, lab.id, result); save(); },
+      onRestart: (next) => openLab(lab, branch, next),
       onExit: () => { ui.labEl = null; ui.view = 'tree'; draw(); window.scrollTo?.(0, 0); },
     });
     ui.view = 'lab';
@@ -340,8 +345,10 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz } = 
           const lrow = el('div', `sk-lab${res ? ` is-${res.state}` : ''}`);
           const words = el('div', 'sk-tier-text');
           words.append(el('b', null, lab.title));
-          words.append(el('span', null, res ? (res.state === 'mastered' ? 'Passed clean' : 'Passed with help') : `${lab.goals.length} goals on ${lab.devices.length} ${lab.devices.length === 1 ? 'router' : 'routers'}`));
-          lrow.append(words, btn('sk-go sk-go-small', res ? 'Run again' : 'Start lab', () => openLab(lab, b)));
+          const nextStage = suggestedStage(res);
+          const done = res?.stages ? Object.keys(res.stages).map(k => STAGE_LABEL[k]).join(', ') : '';
+          words.append(el('span', null, res ? (res.state === 'mastered' ? 'Passed clean, typed' : `Done: ${done}`) : `${lab.goals.length} goals on ${lab.devices.length} ${lab.devices.length === 1 ? 'router' : 'routers'}`));
+          lrow.append(words, btn('sk-go sk-go-small', res?.state === 'mastered' ? 'Run again' : `Start · ${STAGE_LABEL[nextStage]}`, () => openLab(lab, b)));
           sheet.append(lrow);
         }
       }

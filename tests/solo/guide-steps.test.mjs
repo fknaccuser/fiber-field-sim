@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateCase } from '../../src/solo/generate.js';
 import { parameters } from '../../src/solo/seed.js';
-import { walkthroughFor, checkBlank } from '../../src/solo/walkthrough.js';
 import { guidedSteps, currentGuidedStep, guidedFix, guidedVerify, plainResult } from '../../src/solo/guide-steps.js';
 import { isRecipeRepaired, selectDevice, recordTestEvent } from '../../src/solo/app.js';
 import { evaluateCompletion } from '../../src/solo/grade.js';
@@ -25,42 +24,81 @@ function stateFor(mission) {
   return { mission, selectedDeviceId: null, recentDevices: [], error: null, terminalSessions: {} };
 }
 
-test('every fault walks from the complaint to a passing completion', () => {
+const pickRight = (step) => {
+  const right = step.choices.filter((c) => c.ok);
+  assert.equal(right.length, 1, `${step.id} needs exactly one right choice`);
+  for (const c of step.choices.filter((x) => !x.ok)) assert.ok(c.why && c.why.length > 20, `${step.id} trap "${c.text}" needs a why`);
+  return right[0];
+};
+
+test('every fault walks from the complaint to a passing completion by picking', () => {
   for (const recipeId of RECIPES) {
     let state = stateFor(caseFor(recipeId));
     const acks = new Set();
-    const at = () => currentGuidedStep(state.mission, acks)?.step.id;
-    assert.equal(at(), 'pick-client', recipeId);
+    const at = () => currentGuidedStep(state.mission, acks)?.step;
+    assert.equal(at().id, 'pick-client', recipeId);
     state = selectDevice(state, state.mission.targetClientId);
-    assert.equal(at(), 'try-site', recipeId);
+    assert.equal(at().id, 'try-site', recipeId);
     state = recordTestEvent(state, 'openPortal', state.mission.targetClientId, runMissionTest(state.mission, 'openPortal', state.mission.targetClientId));
-    const steps = guidedSteps(state.mission);
-    assert.ok(steps.every((s) => !s.ack), `${recipeId} has a read-only step`);
-    const pick = steps.find((s) => s.id === 'pick-fault-device');
+
+    const think = at();
+    assert.equal(think.id, 'think', recipeId);
+    assert.equal(think.news.ok, false, `${recipeId} should report the failed test`);
+    assert.equal(think.choices.length, 4, recipeId);
+    pickRight(think);
+    acks.add('think');
+
+    const pick = guidedSteps(state.mission).find((s) => s.id === 'pick-fault-device');
     if (pick) {
-      assert.equal(at(), 'pick-fault-device', recipeId);
-      assert.equal(pick.news.ok, false, `${recipeId} should report the failed test`);
+      assert.equal(at().id, 'pick-fault-device', recipeId);
       state = selectDevice(state, pick.target.id);
     }
-    assert.equal(at(), 'fix', recipeId);
-    if (!pick) assert.equal(steps.find((s) => s.id === 'fix').news.ok, false, `${recipeId} should report the failed test`);
-    const { answer } = walkthroughFor(state.mission).steps[3].blank;
-    assert.equal(checkBlank(state.mission, answer).ok, true, recipeId);
-    const fixed = guidedFix(state, answer);
+    const fix = at();
+    assert.equal(fix.id, 'fix', recipeId);
+    assert.equal(fix.choices.length, 4, recipeId);
+    const fixed = guidedFix(state, pickRight(fix).value);
     assert.equal(fixed.result.ok, true, `${recipeId}: ${fixed.result.message}`);
     state = fixed.state;
     assert.equal(isRecipeRepaired(state.mission, recipeId), true, recipeId);
-    assert.equal(at(), 'verify', recipeId);
+    assert.equal(at().id, 'verify', recipeId);
     state = guidedVerify(state);
-    assert.equal(at(), 'close', recipeId);
+
+    const teach = at();
+    assert.equal(teach.id, 'teach', recipeId);
+    assert.equal(pickRight(teach).value, recipeId, recipeId);
+    acks.add('teach');
+    assert.equal(at().id, 'close', recipeId);
     const completion = evaluateCompletion(state.mission);
     assert.equal(completion.passed, true, `${recipeId}: ${completion.checks.filter((c) => !c.passed).map((c) => c.message).join(' | ')}`);
   }
 });
 
-test('a first ticket is five steps, each one an action', () => {
-  const state = stateFor(caseFor('P1'));
-  assert.deepEqual(guidedSteps(state.mission).map((s) => s.id), ['pick-client', 'try-site', 'fix', 'verify', 'close']);
+test('the think question points at the right area for each fault', () => {
+  const area = { P: 'physical', I: 'addressing', V: 'vlan', D: 'dns' };
+  for (const recipeId of RECIPES) {
+    let state = stateFor(caseFor(recipeId));
+    state = recordTestEvent(state, 'openPortal', state.mission.targetClientId, runMissionTest(state.mission, 'openPortal', state.mission.targetClientId));
+    const think = guidedSteps(state.mission).find((s) => s.id === 'think');
+    assert.equal(think.choices.find((c) => c.ok).value, area[recipeId[0]], recipeId);
+  }
+});
+
+test('the choice order is fixed per ticket and the right answer is not always first', () => {
+  const firsts = new Set();
+  for (const recipeId of RECIPES) {
+    const mission = caseFor(recipeId);
+    const a = guidedSteps(mission).find((s) => s.id === 'fix').choices.map((c) => c.text);
+    const b = guidedSteps(mission).find((s) => s.id === 'fix').choices.map((c) => c.text);
+    assert.deepEqual(a, b, recipeId);
+    firsts.add(guidedSteps(mission).find((s) => s.id === 'fix').choices[0].ok);
+  }
+  assert.equal(firsts.size, 2, 'the right fix should not always sit in the same place');
+});
+
+test('a first ticket is seven steps: act, think, fix, check, explain, close', () => {
+  let state = stateFor(caseFor('P1'));
+  state = recordTestEvent(state, 'openPortal', state.mission.targetClientId, runMissionTest(state.mission, 'openPortal', state.mission.targetClientId));
+  assert.deepEqual(guidedSteps(state.mission).map((s) => s.id), ['pick-client', 'try-site', 'think', 'fix', 'verify', 'teach', 'close']);
 });
 
 test('every result code has a plain explanation and unknown ones fall back', () => {

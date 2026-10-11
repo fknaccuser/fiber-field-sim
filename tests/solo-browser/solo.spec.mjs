@@ -48,16 +48,25 @@ test.describe('The Field Solo', () => {
     await expect(card).toHaveAttribute('data-step', 'try-site');
     await expect(page.locator('.spot-news')).toContainText("Opened the customer's computer");
     await page.click('.device-tests button[data-test="openPortal"]');
-    await expect(card).toHaveAttribute('data-step', 'fix');
+    // Think first: the failed test points at one area. A trap explains itself.
+    await expect(card).toHaveAttribute('data-step', 'think');
     await expect(page.locator('.spot-news')).toContainText('not connected');
-    await page.fill('.spot-input', 'Gi0/9');
-    await page.click('.spot-go');
-    await expect(page.locator('.spot-feedback')).toContainText('Not quite');
-    await page.fill('.spot-input', 'Gi0/1');
-    await page.click('.spot-go');
+    await page.click('.spot-choice:has-text("The name lookup (DNS)")');
+    await expect(page.locator('.spot-feedback')).toContainText('lowest broken layer');
+    await expect(page.locator('.spot-choice:has-text("The name lookup (DNS)")')).toBeDisabled();
+    await page.click('.spot-choice:has-text("The cable and the switch port")');
+
+    // The fix is a pick too, with plausible traps.
+    await expect(card).toHaveAttribute('data-step', 'fix');
+    await page.click('.spot-choice:has-text("Plug it into Gi0/2 instead")');
+    await expect(page.locator('.spot-feedback')).toContainText('other office');
+    await page.click('.spot-choice:has-text("Plug the cable back into Gi0/1")');
 
     await expect(card).toHaveAttribute('data-step', 'verify');
     await page.click('.spot-go');
+    // Teach-back before closing: pick the cause.
+    await expect(card).toHaveAttribute('data-step', 'teach');
+    await page.click('.spot-choice:has-text("unplugged from the switch")');
     await expect(card).toHaveAttribute('data-step', 'close');
     await expect(page.locator('.spot-note')).toHaveValue(/Gi0\/1/);
     await page.click('.spot-go');
@@ -375,6 +384,10 @@ test.describe('Do labs', () => {
     await page.locator('.sk-branch-row', { hasText: 'Static routing' }).click();
     await page.locator('.sk-lab', { hasText: 'Static routes end to end' }).locator('.sk-go').click();
     await expect(page.locator('.lab-goal')).toHaveCount(4);
+    // A first run opens Guided; Typed is one tap away, nothing is locked.
+    await expect(page.locator('.lab-stage.is-on')).toContainText('Guided');
+    await page.click('.lab-stage:has-text("Typed")');
+    await expect(page.locator('.lab-stage.is-on')).toContainText('Typed');
 
     const type = async (line) => { await page.fill('.lab-command', line); await page.press('.lab-command', 'Enter'); };
     for (const l of ['en', 'conf t', 'ip route 192.168.3.0 255.255.255.0 10.0.12.2']) await type(l);
@@ -393,5 +406,28 @@ test.describe('Do labs', () => {
     await expect(page.locator('.lab-done h2')).toContainText('Do is lit');
     await page.click('.lab-done .sk-go');
     await expect(page.locator('.sk-sheet .sk-lab', { hasText: 'Static routes end to end' })).toContainText('Passed clean');
+  });
+
+  test('a guided lab is played by picking answers and tiles, then offers Assisted', async ({ page }) => {
+    await enableApp(page);
+    await page.click('.home-skillmap');
+    await page.click('.sk-node[data-tree="t0"]');
+    await page.locator('.sk-branch-row', { hasText: 'Navigate' }).click();
+    await page.locator('.sk-lab', { hasText: 'First boot' }).locator('.sk-go').click();
+    await expect(page.locator('.lab-stage.is-on')).toContainText('Guided');
+    await expect(page.locator('.lab-command')).toBeHidden();
+
+    // Pick the first live option each time; a wrong one greys out with its why.
+    let sawWhy = false;
+    for (let i = 0; i < 400 && !(await page.locator('.lab-done').isVisible()); i += 1) {
+      const live = page.locator('.lab-coach .lab-choice:not(:disabled), .lab-coach .lab-bank .lab-tile:not(:disabled)').first();
+      await live.click();
+      if (!sawWhy && await page.locator('.lab-why').count()) sawWhy = true;
+    }
+    expect(sawWhy).toBe(true);
+    await expect(page.locator('.lab-done h2')).toContainText('Guided run complete');
+    await expect(page.locator('.lab-goal.is-done')).toHaveCount(await page.locator('.lab-goal').count());
+    await page.click('.lab-done .sk-go:has-text("Start Assisted")');
+    await expect(page.locator('.lab-stage.is-on')).toContainText('Assisted');
   });
 });

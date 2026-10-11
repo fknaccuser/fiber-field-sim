@@ -1678,44 +1678,36 @@ function renderSpotCard(state, spot, actions, guide) {
   if (step.body) card.append(h('p', 'spot-body', step.body));
   const actionsRow = h('div', 'spot-actions');
 
-  if (step.ack) {
+  if (step.ack && !step.choices) {
     actionsRow.append(btn('btn-primary spot-go', step.button ?? 'Next', () => actions.onGuideAck?.(step.id)));
   }
 
   // The fault is on a device that is not open: one tap opens it.
-  if (step.blank && step.device && state.selectedDeviceId !== step.device && step.tab === 'device') {
+  if (step.choices && step.device && state.selectedDeviceId !== step.device && step.tab === 'device') {
     actionsRow.prepend(btn('spot-show', 'Show me', () => actions.onSelectDevice?.(step.device)));
   }
 
-  if (step.blank) {
-    const form = h('form', 'spot-blank');
-    const label = h('label', 'spot-ask', step.blank.prompt);
-    const input = h('input', 'spot-input mono');
-    input.type = 'text';
-    input.autocomplete = 'off';
-    input.autocapitalize = 'off';
-    input.spellcheck = false;
-    input.value = guide.draft ?? '';
-    input.setAttribute('aria-label', step.blank.prompt);
-    label.append(input);
-    form.append(label);
-    const feedback = guide.feedback;
-    if (feedback?.text) {
-      const line = h('p', `spot-feedback${feedback.ok ? ' is-ok' : ' is-wrong'}`, feedback.text);
-      line.setAttribute('role', 'status');
-      form.append(line);
+  // Guided steps are picks, not typing. A wrong pick stays greyed out with
+  // why it is wrong, so every miss teaches something.
+  if (step.choices) {
+    const mine = guide.feedback?.stepId === step.id ? guide.feedback : null;
+    const box = h('div', 'spot-choices');
+    box.setAttribute('role', 'group');
+    if (step.ask) box.append(h('p', 'spot-ask', step.ask));
+    step.choices.forEach((choice, index) => {
+      const wrong = mine?.picked?.includes(index);
+      const pick = btn(`spot-choice${wrong ? ' is-wrong' : ''}`, choice.text, () => actions.onGuideChoice?.(step.id, index));
+      if (wrong) pick.disabled = true;
+      box.append(pick);
+    });
+    if (mine?.text) {
+      const why = h('p', 'spot-feedback is-wrong', mine.text);
+      why.setAttribute('role', 'status');
+      box.append(why);
+      // Keep the why in sight on a short screen; the card scrolls, the page does not.
+      requestAnimationFrame(() => { if (why.isConnected) why.scrollIntoView({ block: 'nearest' }); });
     }
-    const go = btn('btn-primary spot-go', 'Fix it');
-    go.type = 'submit';
-    form.addEventListener('submit', (event) => { event.preventDefault(); actions.onGuideFix?.(input.value); });
-    const row = h('div', 'spot-actions');
-    if (feedback?.wrong) row.append(btn('spot-answer', 'Show me the answer', () => actions.onGuideShowAnswer?.()));
-    row.append(go);
-    form.append(row);
-    card.append(form);
-    // Focus straight away only with a physical keyboard; on a phone that would
-    // throw the on-screen keyboard over the thing being explained.
-    if (window.matchMedia?.('(hover: hover)').matches) requestAnimationFrame(() => { if (input.isConnected && !input.value) input.focus({ preventScroll: true }); });
+    card.append(box);
   }
 
   if (step.finish === 'verify') {
@@ -1732,6 +1724,7 @@ function renderSpotCard(state, spot, actions, guide) {
     checks.append(h('li', null, 'The customer\'s computer opens the website'));
     checks.append(h('li', null, 'The other office still works'));
     card.append(checks);
+    if (guide.wrong > 2) card.append(h('p', 'spot-practice', `${guide.wrong} wrong picks on this ticket, so it counts as practice. Run another to make it clean.`));
     const label = h('label', 'spot-note-label', 'Note for the customer');
     const note = h('textarea', 'spot-note');
     note.rows = 3;

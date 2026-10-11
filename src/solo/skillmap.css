@@ -258,4 +258,48 @@
 .skillmap .lab-tab:hover, .skillmap .lab-key:hover, .skillmap .lab-ask-go:hover, .skillmap .lab-help-btn:hover { background: var(--sk-panel-2); color: var(--sk-ink); }
 .skillmap .lab-tab.is-on:hover { background: #06090b; color: var(--sk-light); }
 .lab-done[hidden] { display: none; }
+.lab-input[hidden], .lab-keys[hidden], .lab-help[hidden] { display: none; }
 .skillmap .lab-restart::before { content: none; }
+
+/* ---------- guided and assisted labs ---------- */
+.lab-stages { display: inline-flex; gap: 4px; background: var(--sk-panel); border: 1px solid var(--sk-line); border-radius: 999px; padding: 3px; margin: 0 0 12px; }
+.lab-stage { min-height: 34px; padding: 0 14px; border-radius: 999px; border: 0; background: transparent; color: var(--sk-ink-2); font: 600 13px var(--font-body); }
+.lab-stage.is-on { background: var(--sk-light); color: #1d1700; }
+.lab-stage-dot { font: 600 10px var(--font-mono); color: var(--sk-light); text-transform: uppercase; letter-spacing: 0.08em; }
+.skillmap .lab-stage:hover { background: var(--sk-panel-2); color: var(--sk-ink); }
+.skillmap .lab-stage.is-on:hover { background: var(--sk-light); color: #1d1700; }
+.lab.is-guided .lab-screen, .lab.is-assisted .lab-screen { height: 30dvh; }
+@media (min-width: 900px) { .lab.is-guided .lab-screen, .lab.is-assisted .lab-screen { height: 38vh; } }
+
+.lab-coach { border-top: 1px solid var(--sk-line); background: var(--sk-panel); padding: 14px; display: grid; gap: 12px; }
+.lab-coach-head { display: grid; gap: 4px; }
+.lab-kicker { font: 600 11px var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--sk-light); }
+.lab-coach-title { margin: 0; font: 600 17px/1.35 var(--font-body); color: var(--sk-ink); }
+.lab-q { margin: 0; font-size: 16px; line-height: 1.45; color: var(--sk-ink); }
+.lab-mcq { display: grid; gap: 10px; }
+.lab-choices { display: grid; gap: 8px; }
+.lab-choice {
+  text-align: left; min-height: 48px; padding: 10px 14px; border-radius: 10px;
+  background: var(--sk-bg); color: var(--sk-ink); border: 1px solid var(--sk-line); font: 15px/1.35 var(--font-body);
+}
+@media (hover: hover) { .skillmap .lab-choice:hover { border-color: var(--sk-light); background: var(--sk-bg); color: var(--sk-ink); } }
+.lab-choice.is-wrong { border-color: var(--sk-warn); color: var(--sk-ink-2); text-decoration: line-through; animation: lab-shake 0.3s; }
+.lab-note { margin: 0; display: flex; gap: 8px; font-size: 14px; line-height: 1.4; color: var(--sk-ink); background: rgb(79 209 139 / 0.12); border-left: 3px solid var(--sk-ok); padding: 8px 10px; border-radius: 6px; }
+.lab-note::before { content: '\2713'; color: var(--sk-ok); font-weight: 700; }
+.lab-why { margin: 0; font-size: 14px; line-height: 1.45; color: var(--sk-ink); background: rgb(240 140 58 / 0.12); border-left: 3px solid var(--sk-warn); padding: 8px 10px; border-radius: 6px; }
+
+.lab-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 44px; padding: 8px 10px; background: #06090b; border: 1px solid var(--sk-line); border-radius: 10px; font: 14px var(--font-mono); }
+.lab-line-prompt { color: var(--sk-light); font-weight: 600; }
+.lab-slot { display: inline-block; width: 10px; height: 18px; background: var(--sk-light); animation: lab-blink 1s steps(1) infinite; }
+@keyframes lab-blink { 50% { opacity: 0; } }
+.lab-bank { display: flex; flex-wrap: wrap; gap: 8px; }
+.lab-tile {
+  min-height: 44px; padding: 0 14px; border-radius: 8px; font: 600 14px var(--font-mono);
+  background: var(--sk-panel-2); color: var(--sk-ink); border: 1px solid var(--sk-line); box-shadow: 0 2px 0 rgb(0 0 0 / 0.35);
+}
+@media (hover: hover) { .skillmap .lab-tile:hover { border-color: var(--sk-light); background: var(--sk-panel-2); color: var(--sk-ink); } }
+.lab-tile.is-placed { min-height: 30px; padding: 0 8px; background: rgb(242 193 46 / 0.14); border-color: rgb(242 193 46 / 0.5); color: #f6e7b8; box-shadow: none; }
+.lab-tile.is-wrong { border-color: var(--sk-warn); color: var(--sk-warn); animation: lab-shake 0.3s; }
+.lab-undo { justify-self: start; min-height: 34px; background: transparent; color: var(--sk-ink-2); border: 1px solid var(--sk-line); border-radius: 999px; padding: 0 12px; font-size: 13px; }
+.lab-tip { margin: 0; font-size: 12.5px; color: var(--sk-ink-3); }
+@media (prefers-reduced-motion: reduce) { .lab-slot { animation: none; } .lab-choice.is-wrong, .lab-tile.is-wrong { animation: none; } }

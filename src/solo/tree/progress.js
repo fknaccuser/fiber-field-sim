@@ -272,12 +272,16 @@ export function markSeen(record, keys) {
   return { ...record, seen: { ...record.seen, ...Object.fromEntries(keys.map(k => [k, true])) } };
 }
 
-// A finished lab: clean is mastered, any hint or "show me" is practice. A
+// A finished lab. Only a typed run with no help lights Do as mastered;
+// guided and assisted runs count as practice and move you up a stage. A
 // later run with help never dims a fresh clean pass.
-export function recordLab(record, labId, { assisted }, now = Date.now()) {
+export function recordLab(record, labId, { assisted = false, stage = 'typed', wrong = 0 } = {}, now = Date.now()) {
   const at = new Date(now).toISOString();
-  const prior = record.labs?.[labId];
-  const state = assisted ? 'practiced' : 'mastered';
-  if (prior?.state === 'mastered' && state === 'practiced' && freshness(prior.at, now) > 0) return record;
-  return { ...record, labs: { ...(record.labs ?? {}), [labId]: { state, at } } };
+  const prior = record.labs?.[labId] ?? null;
+  const clean = !assisted && wrong <= 2;
+  const stages = { ...(prior?.stages ?? {}), [stage]: { at, clean: clean || Boolean(prior?.stages?.[stage]?.clean) } };
+  let state = stage === 'typed' && !assisted ? 'mastered' : 'practiced';
+  let when = at;
+  if (prior?.state === 'mastered' && state === 'practiced' && freshness(prior.at, now) > 0) { state = 'mastered'; when = prior.at; }
+  return { ...record, labs: { ...(record.labs ?? {}), [labId]: { state, at: when, stages } } };
 }

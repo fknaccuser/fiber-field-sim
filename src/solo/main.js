@@ -2,8 +2,7 @@ import { createIssueLibrary } from './issue-library.js';
 import { createExamPrep, prepSnapshot } from './study/hub.js';
 import { createThemeToggle } from './backlight.js';
 import { createSkillMap, skillMapSnapshot, renderConstellation } from './tree/screen.js';
-import { guidedFix, guidedVerify, guidedNote, plainResult } from './guide-steps.js';
-import { checkBlank, walkthroughFor } from './walkthrough.js';
+import { guidedFix, guidedVerify, guidedNote, plainResult, currentGuidedStep } from './guide-steps.js';
 import {
   createInitialState,
   submitOpeningCommand,
@@ -73,7 +72,7 @@ const guideTabStep = new Map();
 const guideHidden = new Set();
 let guideFeedback = null;
 let debriefSimple = false;
-let guideDraft = null;
+const guideWrong = new Map();
 
 const INIT_LINES = ['Initializing local session.', 'Preparing The Field.', 'Ready.'];
 const INIT_LINE_DELAY_MS = 200;
@@ -228,8 +227,7 @@ function render() {
           onAutoTab: autoTab,
           onGuideAck: guideAck,
           onGuideHide: guideHide,
-          onGuideFix: guideFixAction,
-          onGuideShowAnswer: guideShowAnswer,
+          onGuideChoice: guideChoice,
           onGuideVerify: guideVerifyAction,
           onGuideClose: guideClose,
         },
@@ -753,7 +751,7 @@ function guideFor(mission) {
     hidden: guideHidden.has(id),
     tabStep: guideTabStep.get(id),
     feedback: mine ? guideFeedback : null,
-    draft: mine ? guideDraft : null,
+    wrong: guideWrong.get(id) ?? 0,
   };
 }
 
@@ -765,7 +763,6 @@ function autoTab(stepId, tab) {
 
 function clearGuideFeedback() {
   guideFeedback = null;
-  guideDraft = null;
 }
 
 function guideAck(stepId) {
@@ -779,34 +776,42 @@ function guideHide(hidden) {
   render();
 }
 
-function guideFixAction(value) {
-  const missionId = state.mission.id;
-  const check = checkBlank(state.mission, value);
-  if (!check.ok) {
-    guideFeedback = { missionId, ok: false, wrong: true, text: 'Not quite. Compare it with the example above and try again, or tap "Show me the answer".' };
-    guideDraft = value;
+// A pick on a guided choice card (think, fix or teach-back). A wrong pick
+// stays on the card, greyed, with why it is wrong. More than two wrong picks
+// on one ticket count it as practice, the same line the labs draw.
+function guideChoice(stepId, index) {
+  const mission = state.mission;
+  const guide = guideFor(mission);
+  const current = currentGuidedStep(mission, guide.acks)?.step;
+  if (!current || current.id !== stepId) return;
+  const choice = current.choices?.[index];
+  if (!choice) return;
+  if (!choice.ok) {
+    const same = guideFeedback?.missionId === mission.id && guideFeedback.stepId === stepId;
+    const picked = same ? guideFeedback.picked : [];
+    if (picked.includes(index)) return;
+    const wrong = (guideWrong.get(mission.id) ?? 0) + 1;
+    guideWrong.set(mission.id, wrong);
+    if (wrong === 3) { state = requestHint(state); persistMission(); }
+    guideFeedback = { missionId: mission.id, stepId, picked: [...picked, index], text: choice.why };
     render();
     return;
   }
-  const { state: nextState, result } = guidedFix(state, value);
-  if (!result.ok) {
-    guideFeedback = { missionId, ok: false, wrong: true, text: result.message || 'That change did not go in. Try again.' };
-    guideDraft = value;
+  if (stepId === 'fix') {
+    const { state: nextState, result } = guidedFix(state, choice.value);
+    if (!result.ok) {
+      guideFeedback = { missionId: mission.id, stepId, picked: [], text: result.message || 'That change did not go in. Try again.' };
+      render();
+      return;
+    }
+    state = { ...nextState, error: null };
+    clearGuideFeedback();
     render();
+    persistMission();
     return;
   }
-  state = { ...nextState, error: null };
+  guide.acks.add(stepId);
   clearGuideFeedback();
-  render();
-  persistMission();
-}
-
-function guideShowAnswer() {
-  // Being shown the answer is help, so the ticket counts as practice.
-  state = requestHint(state);
-  persistMission();
-  guideDraft = walkthroughFor(state.mission)?.steps?.[3]?.blank?.answer ?? '';
-  guideFeedback = { missionId: state.mission.id, ok: true, wrong: false, text: 'Here is the answer. Tap Fix it.' };
   render();
 }
 

@@ -830,3 +830,8 @@ export function complete(session, line) {
   if (hits.length !== 1) return line;
   return `${line.slice(0, line.length - last.text.length)}${hits[0]} `;
 }
+
+// "g0/1", "gi 0/1", "Loopback0" -> the full interface name, or null.
+export function normalizeInterface(text) {
+  return readInterface(tokenize(String(text ?? '')), 0)?.name ?? null;
+}
