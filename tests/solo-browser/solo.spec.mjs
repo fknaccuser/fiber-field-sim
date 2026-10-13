@@ -497,4 +497,23 @@ test.describe('Map home', () => {
     await expect(page.locator('.sk-title h1')).toHaveText('Network Access');
     await expect(page.locator('.sk-dock-next')).toContainText('Open ticket');
   });
+
+  test('the console drill shows painted router output with a legend', async ({ page }) => {
+    await enableMap(page);
+    await page.click('.sk-dock-btn.is-exam');
+    await page.click('.ep-go:has-text("Console drill")');
+    await expect(page.locator('.ep-crumbs')).toContainText('Console drill');
+    // Not every console question has an exhibit; step until one does.
+    for (let i = 0; i < 15 && !(await page.locator('.ep-exhibit').count()); i += 1) {
+      await page.locator('.ep-choices button').first().click();
+      const check = page.locator('.ep-go:has-text("Check")');
+      if (await check.isDisabled()) await page.locator('.ep-choices button').nth(1).click();
+      await check.click();
+      await page.click('.ep-go:has-text("Next"), .ep-go:has-text("Finish")');
+    }
+    await expect(page.locator('.ep-exhibit.is-marked')).toBeVisible();
+    await expect(page.locator('.ep-exhibit .ep-mark').first()).toBeVisible();
+    await expect(page.locator('.ep-legend .ep-legend-item').first()).toBeVisible();
+  });
 });
+

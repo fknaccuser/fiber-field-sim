@@ -162,9 +162,9 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
     }
   }
 
-  function quiz(deck, { title, label, result, onFinish }) {
+  function quiz(deck, { title, label, result, onFinish, highlight = false }) {
     if (!deck.length) return;
-    onQuiz?.({ deck, title, label, result, onFinish: (score) => { onFinish(score); save(); } });
+    onQuiz?.({ deck, title, label, result, highlight, onFinish: (score) => { onFinish(score); save(); } });
   }
 
   function startKnowCheck(branchId) {
@@ -172,6 +172,7 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
     const deck = knowCheckDeck(branchId);
     quiz(deck, {
       label: `Know check · ${branch.name}`,
+      highlight: true,
       result: ({ right, total }) => (right / total >= 0.8 ? `Know is lit for ${branch.name}.` : right >= 2 ? `Counts as practice. ${Math.ceil(total * 0.8)} of ${total} lights it.` : `Not yet. ${Math.ceil(total * 0.8)} of ${total} lights it; the explanations are the study material.`),
       onFinish: (score) => { record = recordKnowCheck(record, branchId, score); },
     });

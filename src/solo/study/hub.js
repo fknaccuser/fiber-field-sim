@@ -18,10 +18,14 @@ import { masteryOf, collectionSummary, studyAfterTicket } from './mastery.js';
 import { TIERS, tierById, generate, isCorrect as drillCorrect, emptySession, record, averageSeconds, shouldShowWork } from '../drills/subnet.js';
 import { parameters } from '../seed.js';
 import { renderPatchPanel } from '../patch-panel.js';
+import { renderExhibit } from './exhibit.js';
 
 export const STORAGE_KEY = 'field-exam-prep-v1';
 
-const CARD_IDS = CCNA_BANK.filter(q => q.format === 'single').map(q => q.id);
+// Flashcards show only the prompt, so questions that need an exhibit stay out.
+const CARD_IDS = CCNA_BANK.filter(q => q.format === 'single' && !q.exhibit).map(q => q.id);
+const CONSOLE_POOL = CCNA_BANK.filter(q => q.console);
+const CONSOLE_DRILL_SIZE = 15;
 const TYPE_IDS = RECALL_DECK.map(c => c.id);
 
 // A case code whose only fault is the given recipe, so a concept can send
@@ -85,7 +89,7 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
   const ui = {
     screen: ['home', 'collection', 'drill'].includes(initialScreen) ? initialScreen : 'home',
     domains: new Set(DOMAINS.map(d => d.id)),
-    deck: [], at: 0, pick: [], shown: null, graded: null, right: 0, exam: false, shortfalls: [],
+    deck: [], at: 0, pick: [], shown: null, graded: null, right: 0, exam: false, shortfalls: [], drillLabel: null,
     recallKind: null, queue: [], recallAt: 0, recallRight: 0, flipped: false, typed: null,
     drill: emptySession('warm'), drillQ: null, drillLast: null, drillLeft: 0, drillStart: 0,
   };
@@ -105,8 +109,8 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
   function exit() { stopTicker(); onExit?.(); }
 
   // ---------- quiz and mock exam ----------
-  function begin(deck, exam, shortfalls = []) {
-    Object.assign(ui, { deck, exam, shortfalls, at: 0, right: 0, screen: 'quiz' });
+  function begin(deck, exam, shortfalls = [], drillLabel = null) {
+    Object.assign(ui, { deck, exam, shortfalls, drillLabel, at: 0, right: 0, screen: 'quiz' });
     loadQuestion();
   }
   function loadQuestion() {
@@ -214,6 +218,13 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
     const now = Date.now();
     root.append(el('p', 'ep-label', 'Drills and recall'));
     const more = el('div', 'ep-actions');
+    const consolePool = filter(CONSOLE_POOL, { blueprint: saved.blueprint });
+    const consoleGo = btn('ep-go', `Console drill · ${consolePool.length} questions`, () => {
+      const order = presentation({ choices: consolePool }).choiceOrder.map(i => consolePool[i]);
+      begin(order.slice(0, CONSOLE_DRILL_SIZE), false, [], 'Console drill');
+    });
+    consoleGo.disabled = !consolePool.length;
+    more.append(consoleGo);
     more.append(btn('ep-go ghost', 'Subnet drill', () => { ui.drill = emptySession(ui.drill.tierId); ui.drillQ = null; go('drill'); }));
     more.append(btn('ep-go ghost', `Flashcards · ${dueCards(CARD_IDS, saved.cards, now).length} due`, () => startRecall('cards')));
     more.append(btn('ep-go ghost', `Type-it · ${dueCards(TYPE_IDS, saved.typeit, now).length} due`, () => startRecall('typeit')));
@@ -285,9 +296,15 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
   function drawQuestion() {
     const q = ui.deck[ui.at];
     if (!q) { go('home'); return; }
-    root.append(el('p', 'ep-crumbs', `${quiz?.label ?? (ui.exam ? 'Mock exam' : 'Quiz')} · ${ui.at + 1} of ${ui.deck.length} · ${q.domain}${q.v2 === 'v2only' ? ' · v2.0 only' : ''}`));
+    root.append(el('p', 'ep-crumbs', `${quiz?.label ?? ui.drillLabel ?? (ui.exam ? 'Mock exam' : 'Quiz')} · ${ui.at + 1} of ${ui.deck.length} · ${q.domain}${q.v2 === 'v2only' ? ' · v2.0 only' : ''}`));
     const card = el('section', 'ep-card');
     if (q.scenario) card.append(el('p', 'ep-scenario', q.scenario));
+    if (q.exhibit) {
+      // Learning runs (Know checks, quizzes, the console drill) paint the
+      // output; exams show it plain, as the real exam does, until answered.
+      const learning = quiz ? quiz.highlight !== false : !ui.exam;
+      card.append(renderExhibit(q.exhibit, { highlight: learning || Boolean(ui.graded), hint: 'Colors and a legend appear once you answer.' }));
+    }
     card.append(el('p', 'ep-prompt', q.prompt));
 
     if (q.format === 'match') drawMatch(card, q);

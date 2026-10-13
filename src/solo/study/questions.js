@@ -7,6 +7,7 @@
 // fails the suite rather than quietly producing a misweighted mock exam.
 
 import { TREE_QUESTIONS } from './questions-tree.js';
+import { BANK_EXPANSION } from './bank/index.js';
 
 const CORE_BANK = [
   {
@@ -1260,4 +1261,4 @@ const CORE_BANK = [
 
 // The skill tree's questions join the main bank, so quizzes and mock exams
 // draw on them too.
-export const CCNA_BANK = [...CORE_BANK, ...TREE_QUESTIONS];
+export const CCNA_BANK = [...CORE_BANK, ...TREE_QUESTIONS, ...BANK_EXPANSION];

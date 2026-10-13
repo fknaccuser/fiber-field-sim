@@ -410,3 +410,19 @@ p { line-height: 1.6; }
 .exam-prep .ep-mini { background: var(--accent); color: var(--on-accent); border: 0; border-radius: 999px; font: inherit; font-size: 12px; font-weight: 600; padding: 6px 12px; cursor: pointer; }
 .exam-prep .ep-mini.ghost { background: transparent; border: 1px solid var(--ep-line); color: var(--field-text); font-weight: 400; }
 @media (prefers-reduced-motion: reduce) { .exam-prep .ep-bar { transition: none; } }
+
+/* Console exhibits: router output in a terminal box, painted to teach reading. */
+.exam-prep .ep-exhibit { margin: 0 0 12px; border: 1px solid #22303a; border-radius: 10px; background: #06090b; overflow: hidden; }
+.exam-prep .ep-exhibit-text {
+  margin: 0; padding: 12px 14px; overflow-x: auto; color: #c9d4cf;
+  font: 12.5px/1.55 var(--font-mono, ui-monospace, monospace); white-space: pre; tab-size: 4;
+}
+.exam-prep .ep-mark {
+  color: var(--mk); background: color-mix(in srgb, var(--mk) 16%, transparent);
+  border-bottom: 2px solid var(--mk); border-radius: 2px; padding: 0 1px;
+}
+.exam-prep .ep-mark.k-cmd { font-weight: 700; }
+.exam-prep .ep-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 14px; border-top: 1px solid #22303a; background: #0b1014; color: #c9d4cf; font-size: 12.5px; }
+.exam-prep .ep-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.exam-prep .ep-swatch { width: 12px; height: 12px; border-radius: 3px; background: var(--mk); flex: none; }
+.exam-prep .ep-legend-hint { padding: 8px 14px; border-top: 1px solid #22303a; color: #7d8a91; font-size: 12px; background: #0b1014; }

@@ -3,6 +3,8 @@
 // Pure and DOM-free. Shuffling goes through an injected random source so a
 // test can pin an exact draw, the same way the subnet drill does.
 
+import { markRanges, KINDS } from './exhibit.js';
+
 // CCNA 200-301 v1.1 domains with Cisco's published weights. The weights are
 // load-bearing: a mock exam samples to them, so IP Connectivity supplies a
 // quarter of the paper and Automation a tenth.
@@ -157,7 +159,13 @@ export function problems(bank) {
     if (!q.explain) note(q, 'no explanation');
     else if (q.explain.length < 120) note(q, `explanation is only ${q.explain.length} characters`);
 
-    const key = `${q.scenario ?? ''}||${q.prompt}`;
+    if (q.exhibit) {
+      if (!q.exhibit.text) note(q, 'exhibit has no text');
+      for (const [needle, kind] of q.exhibit.marks ?? []) if (!KINDS[kind]) note(q, `unknown mark kind ${kind} for ${needle}`);
+      for (const needle of markRanges(q.exhibit).missing) note(q, `mark "${needle}" is not in the exhibit`);
+    }
+
+    const key = `${q.scenario ?? ''}||${q.prompt}||${q.exhibit?.text ?? ''}`;
     if (seenText.has(key)) note(q, 'duplicate scenario and prompt');
     seenText.add(key);
 
