@@ -496,7 +496,7 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
           words.append(el('b', null, lab.title));
           const nextStage = suggestedStage(res);
           const done = res?.stages ? Object.keys(res.stages).map(k => STAGE_LABEL[k]).join(', ') : '';
-          words.append(el('span', null, res ? (res.state === 'mastered' ? 'Passed clean, typed' : `Done: ${done}`) : `${lab.goals.length} goals on ${lab.devices.length} ${lab.devices.length === 1 ? 'router' : 'routers'}`));
+          words.append(el('span', null, res ? (res.state === 'mastered' ? 'Passed clean, typed' : `Done: ${done}`) : `${lab.goals.length} goals on ${lab.devices.length} ${lab.devices.length === 1 ? 'device' : 'devices'}`));
           lrow.append(words, btn('sk-go sk-go-small', res?.state === 'mastered' ? 'Run again' : `Start · ${STAGE_LABEL[nextStage]}`, () => openLab(lab, b)));
           sheet.append(lrow);
         }

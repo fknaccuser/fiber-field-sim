@@ -8,6 +8,17 @@
 // OSPF router ID in use, who won a DR election) are stored.
 
 import { parseIp, formatIp, maskToLen, lenToMask, network, inSubnet, wildcardMatch } from './ip4.js';
+import {
+  computeL2, enforce, nativeMismatches, physState, makeSwitchport, macFrom, OUI, keyOf,
+  isSub, isSvi, isPo, isLoop, parentOf,
+} from './switching.js';
+
+// The derived layer 2 state of each world, rebuilt by refresh().
+const L2 = new WeakMap();
+export function l2Of(world) {
+  if (!L2.has(world)) L2.set(world, computeL2(world));
+  return L2.get(world);
+}
 
 export const AD = { connected: 0, static: 1, ospf: 110 };
 
@@ -36,14 +47,52 @@ export function makeDevice(id, interfaceNames) {
     statics: [],
     ospf: null,
   };
-  return { id, config, startup: null, rsaBits: null, ospfRid: null };
+  return { id, kind: 'router', ports: [...interfaceNames], config, startup: null, rsaBits: null, ospfRid: null };
+}
+
+export const SWITCH_PORTS = [
+  ...Array.from({ length: 24 }, (_, k) => `FastEthernet0/${k + 1}`),
+  'GigabitEthernet0/1', 'GigabitEthernet0/2',
+];
+
+function switchConfig(ports) {
+  const config = makeDevice('x', []).config;
+  config.hostname = 'Switch';
+  config.interfaces = Object.fromEntries(ports.map(n => [n, makeInterface(n, { shutdown: false, sw: makeSwitchport(), cdp: true })]));
+  config.interfaces.Vlan1 = makeInterface('Vlan1');
+  config.vlans = { 1: { name: 'default' } };
+  config.defaultGateway = null;
+  config.stp = { mode: 'pvst', prio: {}, bpduguardDefault: false, portfastDefault: false };
+  config.cdp = true;
+  config.lldp = false;
+  return config;
+}
+
+// A Catalyst-style access switch: 24 FastEthernet ports, 2 Gigabit uplinks.
+export function makeSwitch(id, { ports = SWITCH_PORTS, mac = null } = {}) {
+  return { id, kind: 'switch', ports: [...ports], mac: mac ?? macFrom(`bridge|${id}`, OUI.switch), config: switchConfig(ports), startup: null, rsaBits: null, ospfRid: null, err: {} };
+}
+
+// A PC: one NIC, an address, a gateway.
+export function makePc(id, { ip = null, mask = null, gateway = null, mac = null } = {}) {
+  const config = makeDevice('x', []).config;
+  config.hostname = id;
+  config.interfaces = { FastEthernet0: makeInterface('FastEthernet0', { shutdown: false, ip: ip === null ? null : parseIp(ip), mask: mask === null ? null : parseIp(mask) }) };
+  config.gateway = gateway === null ? null : parseIp(gateway);
+  config.dns = null;
+  return { id, kind: 'pc', ports: ['FastEthernet0'], mac: mac ?? macFrom(`pc|${id}`, OUI.pc), config, startup: null, rsaBits: null, ospfRid: null };
+}
+
+export function blankConfig(dev) {
+  if (dev.kind === 'switch') return switchConfig(dev.ports);
+  return makeDevice(dev.id, dev.ports).config;
 }
 
 // links: { id, ends: [[deviceId, interfaceName], ...], segment?: true }
 // A two-ended link without segment is a cable; a segment is a switch, and a
 // one-ended segment is a LAN with hosts the lab does not model.
 export function makeWorld(devices, links) {
-  const world = { devices: Object.fromEntries(devices.map(d => [d.id, d])), links, elections: {} };
+  const world = { devices: Object.fromEntries(devices.map(d => [d.id, d])), links, elections: {}, notices: {}, learned: {} };
   refresh(world);
   return world;
 }
@@ -52,21 +101,22 @@ export const clone = (value) => JSON.parse(JSON.stringify(value));
 
 // ---------- interface state ----------
 
-function linkOf(world, deviceId, ifName) {
-  return world.links.find(l => l.ends.some(([d, i]) => d === deviceId && i === ifName)) ?? null;
-}
-
 export function interfaceState(world, deviceId, ifName) {
   const intf = world.devices[deviceId]?.config.interfaces[ifName];
   if (!intf) return { status: 'deleted', protocol: 'down', up: false };
   if (intf.shutdown) return { status: 'administratively down', protocol: 'down', up: false };
-  if (ifName.startsWith('Loopback')) return { status: 'up', protocol: 'up', up: true };
-  const link = linkOf(world, deviceId, ifName);
-  if (!link) return { status: 'down', protocol: 'down', up: false };
-  if (link.segment) return { status: 'up', protocol: 'up', up: true };
-  const other = link.ends.find(([d, i]) => !(d === deviceId && i === ifName));
-  const peer = other && world.devices[other[0]]?.config.interfaces[other[1]];
-  return peer && !peer.shutdown ? { status: 'up', protocol: 'up', up: true } : { status: 'down', protocol: 'down', up: false };
+  if (isLoop(ifName)) return { status: 'up', protocol: 'up', up: true };
+  if (isSub(ifName)) return interfaceState(world, deviceId, parentOf(ifName));
+  if (isSvi(ifName)) {
+    const up = Boolean(l2Of(world).sviUp[keyOf(deviceId, ifName)]);
+    return { status: up ? 'up' : 'down', protocol: up ? 'up' : 'down', up };
+  }
+  if (isPo(ifName)) {
+    const L = l2Of(world).lp[deviceId]?.find(x => x.name === ifName);
+    const up = Boolean(L?.up);
+    return { status: up ? 'up' : 'down', protocol: up ? 'up' : 'down', up };
+  }
+  return physState(world, deviceId, ifName);
 }
 
 function upInterfaces(world, deviceId) {
@@ -116,7 +166,12 @@ export const ospfCost = (intf) => intf.ospf.cost ?? 1;
 const isPassive = (dev, ifName) => (dev.config.ospf?.passive ?? []).includes(ifName);
 const netType = (intf) => intf.ospf.networkType ?? (intf.name.startsWith('Loopback') ? 'loopback' : 'broadcast');
 
-// Every OSPF speaker on a link, ready to form adjacencies there.
+// The broadcast domains: a cable, a shared segment, or everything one VLAN
+// reaches through the switches.
+const domains = (world) => l2Of(world).domains;
+const domainOf = (world, deviceId, ifName) => domains(world).find(dm => dm.ends.some(([d, i]) => d === deviceId && i === ifName)) ?? null;
+
+// Every OSPF speaker in a broadcast domain, ready to form adjacencies there.
 function ospfMembers(world, link) {
   return link.ends
     .filter(([d, i]) => world.devices[d] && ospfEnabled(world, d, i) && !isPassive(world.devices[d], i) && world.devices[d].ospfRid !== null)
@@ -142,7 +197,9 @@ function elect(members) {
 }
 
 function runElections(world) {
-  for (const link of world.links) {
+  const live = new Set();
+  for (const link of domains(world)) {
+    live.add(link.id);
     const members = ministers(world, link);
     if (members.length === 0) { delete world.elections[link.id]; continue; }
     const eligible = new Set(members.filter(m => m.priority > 0).map(m => m.device));
@@ -159,6 +216,7 @@ function runElections(world) {
     }
     world.elections[link.id] = e;
   }
+  for (const id of Object.keys(world.elections)) if (!live.has(id)) delete world.elections[id];
 }
 
 function ministers(world, link) {
@@ -168,7 +226,7 @@ function ministers(world, link) {
 // neighbors(world, deviceId) -> [{ rid, priority, state, role, address, intf }]
 export function neighbors(world, deviceId) {
   const out = [];
-  for (const link of world.links) {
+  for (const link of domains(world)) {
     const members = ospfMembers(world, link);
     const me = members.find(m => m.device === deviceId);
     if (!me) continue;
@@ -189,12 +247,13 @@ export function neighbors(world, deviceId) {
 }
 
 export function ospfRole(world, deviceId, ifName) {
-  const link = linkOf(world, deviceId, ifName);
   const dev = world.devices[deviceId];
   const intf = dev.config.interfaces[ifName];
-  if (!link || !ospfEnabled(world, deviceId, ifName)) return null;
-  if (netType(intf) === 'point-to-point') return 'P2P';
+  if (!ospfEnabled(world, deviceId, ifName)) return null;
   if (netType(intf) === 'loopback') return 'LOOP';
+  const link = domainOf(world, deviceId, ifName);
+  if (!link) return null;
+  if (netType(intf) === 'point-to-point') return 'P2P';
   const e = world.elections[link.id];
   // Alone on its segment (or passive), a router is DR of nobody but itself.
   if (!e) return 'DR';
@@ -207,7 +266,7 @@ function ospfRoutes(world, deviceId) {
   if (!world.devices[deviceId].ospfRid) return [];
   const adj = {};
   for (const id of Object.keys(world.devices)) {
-    adj[id] = neighbors(world, id).map(n => ({ to: n.device, cost: ospfCost(world.devices[id].config.interfaces[n.intf]), intf: n.intf }));
+    adj[id] = neighbors(world, id).map(n => ({ to: n.device, cost: ospfCost(world.devices[id].config.interfaces[n.intf]), intf: n.intf, nh: n.address }));
   }
   const dist = { [deviceId]: 0 };
   const first = { [deviceId]: [] };
@@ -220,7 +279,7 @@ function ospfRoutes(world, deviceId) {
     for (const e of adj[u] ?? []) {
       const d = dist[u] + e.cost;
       const hop = u === deviceId
-        ? [{ intf: e.intf, nh: world.devices[e.to].config.interfaces[linkPeerIf(world, deviceId, e.intf, e.to)]?.ip ?? null }]
+        ? [{ intf: e.intf, nh: e.nh ?? null }]
         : first[u];
       if (dist[e.to] === undefined || d < dist[e.to]) { dist[e.to] = d; first[e.to] = [...hop]; }
       else if (d === dist[e.to]) {
@@ -247,12 +306,6 @@ function ospfRoutes(world, deviceId) {
     }
   }
   return [...best.values()].map(r => ({ type: 'ospf', net: r.net, len: r.len, ad: AD.ospf, metric: r.metric, hops: r.hops.map(h => ({ nh: h.nh, intf: h.intf })) }));
-}
-
-function linkPeerIf(world, deviceId, ifName, peerDevice) {
-  const link = linkOf(world, deviceId, ifName);
-  const end = link?.ends.find(([d]) => d === peerDevice);
-  return end ? end[1] : null;
 }
 
 // ---------- the routing table ----------
@@ -293,7 +346,21 @@ function staticRoutes(world, deviceId, base) {
   return out;
 }
 
+// A PC, or a switch that does not route, sends everything off its subnet to
+// its default gateway.
+function hostRoutes(world, deviceId) {
+  const dev = world.devices[deviceId];
+  const connected = connectedRoutes(world, deviceId);
+  const gw = dev.kind === 'pc' ? dev.config.gateway : dev.config.defaultGateway;
+  const via = gw !== null && gw !== undefined ? lookupIn(connected, gw) : null;
+  const def = via ? [{ type: 'static', net: 0, len: 0, ad: 1, metric: 0, hops: [{ nh: gw, intf: via.hops[0].intf }] }] : [];
+  return [...connected, ...def].sort((a, b) => (a.net - b.net) || (a.len - b.len));
+}
+
+export const isHost = (world, deviceId) => ['pc', 'switch'].includes(world.devices[deviceId]?.kind);
+
 export function routingTable(world, deviceId) {
+  if (isHost(world, deviceId)) return hostRoutes(world, deviceId);
   const connected = connectedRoutes(world, deviceId);
   const ospf = ospfRoutes(world, deviceId);
   const base = [...connected, ...ospf];
@@ -313,34 +380,60 @@ export const lookup = (world, deviceId, ip) => lookupIn(routingTable(world, devi
 
 // ---------- forwarding ----------
 
-function ownerOf(world, ip, link = null) {
-  for (const [id, dev] of Object.entries(world.devices)) {
-    for (const intf of Object.values(dev.config.interfaces)) {
-      if (intf.ip !== ip || !interfaceState(world, id, intf.name).up) continue;
-      if (link && !link.ends.some(([d, i]) => d === id && i === intf.name)) continue;
-      return { device: id, intf: intf.name };
-    }
+// Who answers ARP for this address among the interfaces that hear the
+// sender: the next hop has to be in the same broadcast domain.
+function ownerIn(world, ip, fromDevice, fromIntf) {
+  const reach = l2Of(world).reach[keyOf(fromDevice, fromIntf)];
+  if (!reach) return null;
+  for (const k of reach.ends) {
+    const [id, name] = k.split('|');
+    if (id === fromDevice && name === fromIntf) continue;
+    const intf = world.devices[id]?.config.interfaces[name];
+    if (intf?.ip === ip && interfaceState(world, id, name).up) return { device: id, intf: name };
   }
   return null;
 }
 
-// Follow the packet hop by hop. Returns the device that owns dst, or null.
-function deliver(world, fromDevice, dst) {
+// Every interface that put a frame on the wire is learned by the switches
+// that frame crossed: that is what fills a MAC address table.
+function heard(world, deviceId, ifName) {
+  const reach = l2Of(world).reach[keyOf(deviceId, ifName)];
+  world.learned ??= {};
+  for (const sw of Object.keys(reach?.via ?? {})) {
+    world.learned[sw] ??= {};
+    world.learned[sw][keyOf(deviceId, ifName)] = true;
+  }
+}
+
+// Follow the packet hop by hop. Returns the device that owns dst, or null;
+// trail collects the address of each hop that forwarded it.
+function deliver(world, fromDevice, dst, trail = null) {
   let at = fromDevice;
   for (let hop = 0; hop < 16; hop += 1) {
     const dev = world.devices[at];
     if (Object.values(dev.config.interfaces).some(i => i.ip === dst && interfaceState(world, at, i.name).up)) return at;
+    // Hosts do not forward other people's packets.
+    if (at !== fromDevice && isHost(world, at)) return null;
     const route = lookup(world, at, dst);
     if (!route) return null;
     const h = route.hops[0];
-    const link = h.intf ? linkOf(world, at, h.intf) : null;
-    if (!link) return null;
+    if (!h.intf || !interfaceState(world, at, h.intf).up) return null;
     const target = route.type === 'connected' || route.type === 'local' || !h.nh ? dst : h.nh;
-    const owner = ownerOf(world, target, link);
+    heard(world, at, h.intf);
+    const owner = ownerIn(world, target, at, h.intf);
     if (!owner) return null;
+    heard(world, owner.device, owner.intf);
+    if (trail && owner.device !== fromDevice) trail.push({ device: owner.device, ip: world.devices[owner.device].config.interfaces[owner.intf].ip });
     at = owner.device;
   }
   return null;
+}
+
+// tracert / traceroute: the address of each hop on the way there.
+export function trace(world, deviceId, dst) {
+  const trail = [];
+  const there = deliver(world, deviceId, dst, trail);
+  return { ok: Boolean(there), hops: trail };
 }
 
 // ping: there and back. source defaults to the exit interface's address.
@@ -366,9 +459,33 @@ export function ping(world, deviceId, dst, source = null) {
 // ---------- after every change ----------
 
 export function refresh(world) {
+  world.notices ??= {};
+  world.mismatch ??= {};
+  let l2 = computeL2(world);
+  // BPDU Guard and port security can shut ports, which changes the topology.
+  for (let pass = 0; pass < 4; pass += 1) {
+    const shut = enforce(world, l2);
+    if (!shut.length) break;
+    for (const [d, ...lines] of shut) (world.notices[d] ??= []).push(...lines);
+    l2 = computeL2(world);
+  }
+  L2.set(world, l2);
+  const now = {};
+  for (const m of nativeMismatches(world, l2)) {
+    now[m.key] = true;
+    if (!world.mismatch[m.key]) (world.notices[m.device] ??= []).push(m.text);
+  }
+  world.mismatch = now;
   settleRouterIds(world);
   runElections(world);
   return world;
+}
+
+// The log lines a device has queued since its console last printed.
+export function takeNotices(world, deviceId) {
+  const out = world.notices?.[deviceId] ?? [];
+  if (world.notices) world.notices[deviceId] = [];
+  return out;
 }
 
 // clear ip ospf process: a new router ID can take effect, and the elections
@@ -378,7 +495,7 @@ export function clearOspf(world, deviceId) {
   dev.ospfRid = null;
   // The restarted router gives up any role it held; the BDR steps up and the
   // others elect a new BDR, which may be the restarted router itself.
-  for (const link of world.links) {
+  for (const link of domains(world)) {
     const e = world.elections[link.id];
     if (!e || !link.ends.some(([d]) => d === deviceId)) continue;
     if (e.dr === deviceId) world.elections[link.id] = { dr: e.bdr, bdr: null };
@@ -407,11 +524,15 @@ export function unsaved(world, deviceId) {
 
 export function reload(world, deviceId) {
   const dev = world.devices[deviceId];
-  const blank = makeDevice(deviceId, Object.keys(dev.config.interfaces)).config;
-  dev.config = dev.startup ? clone(dev.startup) : blank;
+  const vlans = dev.config.vlans;
+  dev.config = dev.startup ? clone(dev.startup) : blankConfig(dev);
+  // VLANs live in vlan.dat, not the startup configuration: they survive.
+  if (vlans) dev.config.vlans = clone(vlans);
   dev.ospfRid = null;
   dev.rsaBits = dev.startup ? dev.rsaBits : null;
-  for (const link of world.links) {
+  if (dev.err) dev.err = {};
+  if (world.learned) delete world.learned[deviceId];
+  for (const link of domains(world)) {
     if (link.ends.some(([d]) => d === deviceId)) delete world.elections[link.id];
   }
   refresh(world);

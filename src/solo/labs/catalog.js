@@ -9,6 +9,7 @@
 import { makeDevice, makeWorld, routingTable, neighbors, interfaceState, ospfEnabled, freshElections, save } from './world.js';
 import { createSession, execute } from './ios.js';
 import { parseIp, formatIp } from './ip4.js';
+import { SWITCH_LABS } from './catalog-switch.js';
 
 const G3 = ['GigabitEthernet0/0', 'GigabitEthernet0/1', 'GigabitEthernet0/2'];
 
@@ -337,6 +338,8 @@ export const LABS = [
     ],
   },
 ];
+
+LABS.push(...SWITCH_LABS);
 
 export const labById = (id) => LABS.find(l => l.id === id) ?? null;
 export const labsForBranch = (branchId) => LABS.filter(l => l.lights.includes(branchId));

@@ -194,6 +194,7 @@
    ========================================================================== */
 .skillmap.is-lab { max-width: 1180px; }
 .lab-body { display: grid; gap: 14px; }
+.lab-body > * { min-width: 0; }
 @media (min-width: 900px) {
   .lab-body { grid-template-columns: minmax(300px, 380px) 1fr; align-items: start; }
   .lab-brief { position: sticky; top: 12px; max-height: calc(100dvh - 24px); overflow: auto; }
@@ -229,14 +230,17 @@
 .lab-hint { margin: 0; font-size: 14px; line-height: 1.45; color: var(--sk-ink); background: rgb(240 140 58 / 0.1); border-left: 3px solid var(--sk-warn); padding: 8px 10px; border-radius: 6px; }
 .lab-show { margin: 0; font: 13px/1.5 var(--font-mono); color: var(--sk-light); background: var(--sk-bg); border: 1px dashed rgb(242 193 46 / 0.4); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; }
 
-.lab-console { background: #06090b; border: 1px solid var(--sk-line); border-radius: 12px; overflow: hidden; display: grid; }
-.lab-tabs { display: flex; gap: 2px; background: var(--sk-panel); border-bottom: 1px solid var(--sk-line); padding: 6px 6px 0; }
+.lab-console { background: #06090b; border: 1px solid var(--sk-line); border-radius: 12px; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.lab-tabs { display: flex; gap: 2px; background: var(--sk-panel); border-bottom: 1px solid var(--sk-line); padding: 6px 6px 0; overflow-x: auto; scrollbar-width: none; }
+.lab-tab { flex: none; }
 .lab-tab { background: transparent; color: var(--sk-ink-3); border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; min-height: 36px; padding: 0 14px; font: 600 13px var(--font-mono); }
 .lab-tab.is-on { background: #06090b; color: var(--sk-light); border-color: var(--sk-line); }
 .lab-screen {
-  margin: 0; padding: 10px 12px; height: 46dvh; overflow: auto; white-space: pre-wrap; word-break: break-word;
-  font: 12.5px/1.45 var(--font-mono); color: #cfe3d6; background: #06090b; outline: none;
+  margin: 0; padding: 10px 12px; height: 46dvh; overflow: auto; white-space: pre; min-width: 0;
+  font: 11.5px/1.45 var(--font-mono); color: #cfe3d6; background: #06090b; outline: none;
 }
+/* IOS output is laid out in columns; wrapping it breaks the columns, so the
+   console scrolls sideways instead, like a terminal app. */
 @media (min-width: 900px) { .lab-screen { height: 58vh; font-size: 13px; } }
 .lab-input { display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--sk-line); padding: 6px 12px; background: #06090b; }
 .lab-prompt { font: 600 13px var(--font-mono); color: var(--sk-light); white-space: nowrap; }

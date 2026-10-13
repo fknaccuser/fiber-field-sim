@@ -44,7 +44,10 @@ export function createLabScreen({ lab, branchName, stage = 'typed', suggested = 
 
   const resetLogs = () => {
     for (const d of lab.devices) {
-      logs[d] = `\n${run.world.devices[d].config.hostname} con0 is now available\n\nPress RETURN to get started.\n\n`;
+      const dv = run.world.devices[d];
+      logs[d] = dv.kind === 'pc'
+        ? `Command Prompt on ${d}\nType ipconfig, ping or tracert.\n\n`
+        : `\n${dv.config.hostname} con0 is now available\n\nPress RETURN to get started.\n\n`;
       histories[d] = { list: [], at: 0 };
     }
   };
@@ -168,7 +171,8 @@ export function createLabScreen({ lab, branchName, stage = 'typed', suggested = 
   function drawConsole() {
     tabs.textContent = '';
     for (const d of lab.devices) {
-      const t = btn(`lab-tab${d === current ? ' is-on' : ''}`, run.world.devices[d].config.hostname === 'Router' ? d : run.world.devices[d].config.hostname, () => { current = d; drawConsole(); input.focus({ preventScroll: true }); });
+      const host = run.world.devices[d].config.hostname;
+      const t = btn(`lab-tab${d === current ? ' is-on' : ''}`, ['Router', 'Switch'].includes(host) ? d : host, () => { current = d; drawConsole(); input.focus({ preventScroll: true }); });
       t.setAttribute('role', 'tab');
       t.setAttribute('aria-selected', String(d === current));
       t.dataset.device = d;
@@ -179,6 +183,7 @@ export function createLabScreen({ lab, branchName, stage = 'typed', suggested = 
     if (lines.length > 600) logs[current] = lines.slice(-600).join('\n');
     screen.textContent = logs[current];
     screen.scrollTop = screen.scrollHeight;
+    screen.scrollLeft = 0;
     const s = session();
     promptLabel.textContent = prompt(s);
     input.type = s.pending?.secret ? 'password' : 'text';

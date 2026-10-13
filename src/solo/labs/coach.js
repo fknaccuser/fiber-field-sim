@@ -9,7 +9,7 @@ export const STAGES = ['guided', 'assisted', 'typed'];
 export const STAGE_LABEL = { guided: 'Guided', assisted: 'Assisted', typed: 'Typed' };
 export const ENTER = 'Enter';
 
-const CONFIG_MODES = ['config', 'if', 'router', 'line'];
+const CONFIG_MODES = ['config', 'if', 'router', 'line', 'vlan'];
 const EXEC_WORDS = ['show', 'ping', 'copy', 'clear', 'reload', 'write'];
 
 // A mode step the router is already in is skipped, so the guide never asks

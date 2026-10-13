@@ -116,8 +116,11 @@ test('new lights are reported once, then remembered', () => {
   assert.deepEqual(newlyLit(mapProgress({ record: rec, now: NOW }), rec), []);
 });
 
-test('a branch is complete only when every tier the app can test is mastered', () => {
-  const ctx = { record: recordKnowCheck(emptyRecord(), 't2-vlans', { right: 5, total: 5 }, NOW), now: NOW };
+test('a branch is complete only when every tier the app can test is mastered', async () => {
+  const { recordLab } = await import('../../src/solo/tree/progress.js');
+  const known = recordKnowCheck(emptyRecord(), 't2-vlans', { right: 5, total: 5 }, NOW);
+  assert.equal(branchStatus(branchById('t2-vlans'), { record: known, now: NOW }).complete, false, 'its do and fix tiers are still off');
+  const ctx = { record: recordLab(known, 'sw-vlans', { assisted: false }, NOW), now: NOW };
   assert.equal(branchStatus(branchById('t2-vlans'), ctx).complete, false, 'its fix tier is still off');
   const runs = [{ mode: 'repair', recipes: ['V1'], assisted: false, completedAt: new Date(NOW).toISOString() }];
   assert.equal(branchStatus(branchById('t2-vlans'), { ...ctx, completedRuns: runs }).complete, true);
@@ -135,7 +138,8 @@ test('Do lights from labs: clean is mastered, helped is practiced, every lab nee
   assert.equal(tierState(b, 'do', { record: rec, now: NOW }).state, 'mastered');
   rec = recordLab(rec, 'static-floating', { assisted: true }, NOW + DAY);
   assert.equal(tierState(b, 'do', { record: rec, now: NOW + DAY }).state, 'mastered', 'a later helped run keeps the clean pass');
-  assert.equal(tierState(branchById('t2-vlans'), 'do', { record: rec, now: NOW }).state, 'soon');
+  assert.equal(tierState(branchById('t2-vlans'), 'do', { record: rec, now: NOW }).state, 'off');
+  assert.equal(tierState(branchById('t4-nat'), 'do', { record: rec, now: NOW }).state, 'soon');
 });
 
 test('next step walks the map: Know first, faded lights before new ones', async () => {

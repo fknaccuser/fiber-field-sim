@@ -11,34 +11,43 @@
 // "interface g0/1" works from inside another interface.
 
 import {
-  interfaceState, routingTable, neighbors, ospfEnabled, ospfRole, ospfCost, ping as pingWorld,
-  refresh, clearOspf, save, unsaved, reload, makeInterface,
+  interfaceState, routingTable, neighbors, ospfEnabled, ospfRole, ospfCost, ping as pingWorld, trace as traceWorld,
+  refresh, clearOspf, save, unsaved, reload, makeInterface, l2Of, takeNotices,
 } from './world.js';
 import { parseIp, formatIp, maskToLen, lenToMask, network, isIp, isMask, classfulLen } from './ip4.js';
+import { makeSwitchport, parseVlanList, formatVlanList, isSub, isSvi, isPo, parentOf } from './switching.js';
+import {
+  showVlanBrief, showInterfacesStatus, showInterfacesTrunk, showSwitchport, showInterface, showMacTable, showSpanningTree,
+  showEtherchannelSummary, showPortSecurity, showPortSecurityInterface, showCdpNeighbors, showCdpDetail, showLldpNeighbors, showHostRoute,
+} from './show-l2.js';
 
 // ---------- interface names ----------
 
 const IF_TYPES = [
-  { full: 'GigabitEthernet', short: 'Gi', re: /^g(i(g(a(b(i(t(e(t(h(e(r(n(e(t)?)?)?)?)?)?)?)?)?)?)?)?)?)?$/i },
-  { full: 'Loopback', short: 'Lo', re: /^l(o(o(p(b(a(c(k)?)?)?)?)?)?)?$/i },
+  { full: 'GigabitEthernet', short: 'Gi', re: /^g(i(g(a(b(i(t(e(t(h(e(r(n(e(t)?)?)?)?)?)?)?)?)?)?)?)?)?)?$/i, num: /^\d+\/\d+(\.\d+)?$/ },
+  { full: 'FastEthernet', short: 'Fa', re: /^f(a(s(t(e(t(h(e(r(n(e(t)?)?)?)?)?)?)?)?)?)?)?$/i, num: /^\d+\/\d+(\.\d+)?$/ },
+  { full: 'Loopback', short: 'Lo', re: /^l(o(o(p(b(a(c(k)?)?)?)?)?)?)?$/i, num: /^\d+$/ },
+  { full: 'Vlan', short: 'Vlan', re: /^v(l(a(n)?)?)?$/i, num: /^\d+$/ },
+  { full: 'Port-channel', short: 'Po', re: /^po(r(t(-(c(h(a(n(n(e(l)?)?)?)?)?)?)?)?)?)?$/i, num: /^\d+$/ },
 ];
 
-// Accepts "g0/0", "gi 0/0", "GigabitEthernet0/0", "lo0", "loopback 0".
+// Accepts "g0/0", "gi 0/0", "GigabitEthernet0/0", "f0/1", "g0/0.10",
+// "lo0", "loopback 0", "vlan 10", "po1".
 function readInterface(tokens, i) {
   const one = tokens[i]?.text ?? '';
-  const m = /^([a-z]+)([\d/]*)$/i.exec(one);
+  const m = /^([a-z][a-z-]*?)([\d/.]*)$/i.exec(one);
   if (!m) return null;
   const type = IF_TYPES.find(t => t.re.test(m[1]));
   if (!type) return null;
   let num = m[2];
   let used = 1;
-  if (!num && tokens[i + 1] && /^[\d/]+$/.test(tokens[i + 1].text)) { num = tokens[i + 1].text; used = 2; }
-  if (!num) return null;
-  if (type.full === 'Loopback' ? !/^\d+$/.test(num) : !/^\d+\/\d+$/.test(num)) return null;
+  if (!num && tokens[i + 1] && /^[\d/.]+$/.test(tokens[i + 1].text)) { num = tokens[i + 1].text; used = 2; }
+  if (!num || !type.num.test(num)) return null;
   return { name: `${type.full}${num}`, used };
 }
 
-export const shortIf = (name) => name.replace('GigabitEthernet', 'Gi').replace('Loopback', 'Lo');
+export const shortIf = (name) => name.replace('GigabitEthernet', 'Gi').replace('FastEthernet', 'Fa').replace('Loopback', 'Lo').replace('Port-channel', 'Po');
+
 
 // ---------- grammar ----------
 
@@ -154,8 +163,32 @@ function fakeHash(text) {
   return `$9$${out.slice(0, 14)}$${out.slice(14)}`;
 }
 
+// The order IOS lists interfaces in: Loopback and Port-channel first, then
+// the physical ports, then SVIs.
+const IF_ORDER = (n) => (n.startsWith('Loopback') ? 0 : n.startsWith('Port') ? 1 : n.startsWith('Fast') ? 2 : n.startsWith('Gig') ? 3 : 4);
+const ifSort = (a, b) => IF_ORDER(a) - IF_ORDER(b) || a.localeCompare(b, undefined, { numeric: true });
+
+function switchportLines(sw) {
+  const L = [];
+  if (sw.encap) L.push(' switchport trunk encapsulation dot1q');
+  if (sw.native !== 1) L.push(` switchport trunk native vlan ${sw.native}`);
+  if (sw.allowed !== null) L.push(` switchport trunk allowed vlan ${formatVlanList(sw.allowed)}`);
+  if (sw.access !== 1) L.push(` switchport access vlan ${sw.access}`);
+  if (sw.mode !== 'dynamic auto') L.push(` switchport mode ${sw.mode}`);
+  if (sw.nonegotiate) L.push(' switchport nonegotiate');
+  if (sw.voice !== null) L.push(` switchport voice vlan ${sw.voice}`);
+  const p = sw.psec;
+  if (p.max !== 1) L.push(` switchport port-security maximum ${p.max}`);
+  if (p.violation !== 'shutdown') L.push(` switchport port-security violation ${p.violation}`);
+  if (p.sticky) L.push(' switchport port-security mac-address sticky');
+  for (const m of p.macs) L.push(m.sticky ? ` switchport port-security mac-address sticky ${m.mac}` : ` switchport port-security mac-address ${m.mac}`);
+  if (p.on) L.push(' switchport port-security');
+  return L;
+}
+
 export function runningConfig(dev) {
   const c = dev.config;
+  const isSwitch = dev.kind === 'switch';
   const L = ['!', `hostname ${c.hostname}`, '!'];
   if (c.enableSecret) L.push(`enable secret 9 ${fakeHash(c.enableSecret)}`);
   if (c.enablePassword) L.push(c.servicePasswordEncryption ? `enable password 7 ${fakeHash(c.enablePassword).slice(3, 15)}` : `enable password ${c.enablePassword}`);
@@ -164,19 +197,42 @@ export function runningConfig(dev) {
   if (Object.keys(c.users).length) L.push('!');
   if (c.domain) L.push(`ip domain name ${c.domain}`, '!');
   if (c.servicePasswordEncryption) L.push('service password-encryption', '!');
-  const names = Object.keys(c.interfaces).sort((a, b) => (a.startsWith('Loopback') ? -1 : 0) - (b.startsWith('Loopback') ? -1 : 0) || a.localeCompare(b, undefined, { numeric: true }));
+  if (isSwitch) {
+    L.push(`spanning-tree mode ${c.stp.mode}`);
+    if (c.stp.portfastDefault) L.push('spanning-tree portfast default');
+    if (c.stp.bpduguardDefault) L.push('spanning-tree portfast bpduguard default');
+    L.push('spanning-tree extend system-id');
+    for (const [v, p] of Object.entries(c.stp.prio).sort((a, b) => a[0] - b[0])) L.push(`spanning-tree vlan ${v} priority ${p}`);
+    L.push('!');
+  }
+  if (c.cdp === false) L.push('no cdp run', '!');
+  if (c.lldp) L.push('lldp run', '!');
+  const names = Object.keys(c.interfaces).sort(ifSort);
   for (const n of names) {
     const i = c.interfaces[n];
     L.push(`interface ${n}`);
     if (i.description) L.push(` description ${i.description}`);
+    if (i.sw) {
+      L.push(...switchportLines(i.sw));
+      if (i.shutdown) L.push(' shutdown');
+      if (i.cdp === false) L.push(' no cdp enable');
+      if (i.sw.channel) L.push(` channel-group ${i.sw.channel.group} mode ${i.sw.channel.mode}`);
+      if (i.sw.portfast) L.push(' spanning-tree portfast');
+      if (i.sw.bpduguard) L.push(` spanning-tree bpduguard ${i.sw.bpduguard}`);
+      L.push('!');
+      continue;
+    }
+    if (i.encap) L.push(` encapsulation dot1Q ${i.encap.vlan}${i.encap.native ? ' native' : ''}`);
     L.push(i.ip !== null ? ` ip address ${formatIp(i.ip)} ${formatIp(i.mask)}` : ' no ip address');
     if (i.ospf.networkType) L.push(` ip ospf network ${i.ospf.networkType}`);
     if (i.ospf.priority !== 1) L.push(` ip ospf priority ${i.ospf.priority}`);
     if (i.ospf.cost !== null) L.push(` ip ospf cost ${i.ospf.cost}`);
     if (i.ospf.pid !== null) L.push(` ip ospf ${i.ospf.pid} area ${i.ospf.area}`);
+    if (i.cdp === false) L.push(' no cdp enable');
     if (i.shutdown) L.push(' shutdown');
     L.push('!');
   }
+  if (isSwitch && c.defaultGateway !== null && c.defaultGateway !== undefined) L.push(`ip default-gateway ${formatIp(c.defaultGateway)}`, '!');
   if (c.ospf) {
     L.push(`router ospf ${c.ospf.pid}`);
     if (c.ospf.routerId) L.push(` router-id ${formatIp(c.ospf.routerId)}`);
@@ -188,7 +244,9 @@ export function runningConfig(dev) {
   if (c.sshVersion) L.push(`ip ssh version ${c.sshVersion}`);
   if (c.statics.length || c.sshVersion) L.push('!');
   if (c.banner) L.push(`banner motd ^C${c.banner}^C`, '!');
-  for (const [key, label] of [['con', 'line con 0'], ['vty', 'line vty 0 4']]) {
+  const blocks = [['con', 'line con 0'], ['vty', 'line vty 0 4']];
+  if (isSwitch) blocks.push(['vty', 'line vty 5 15']);
+  for (const [key, label] of blocks) {
     const l = c.lines[key];
     L.push(label);
     if (l.execTimeout !== null) L.push(` exec-timeout ${l.execTimeout}`);
@@ -261,7 +319,7 @@ function showIpRoute(world, deviceId, filter = null) {
 function showIpIntBrief(world, deviceId) {
   const dev = world.devices[deviceId];
   const out = [`${pad('Interface', 23)}${pad('IP-Address', 16)}${pad('OK?', 4)}${pad('Method', 7)}${pad('Status', 22)}Protocol`];
-  const names = Object.keys(dev.config.interfaces).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const names = Object.keys(dev.config.interfaces).sort(dev.kind === 'switch' ? ifSort : (a, b) => a.localeCompare(b, undefined, { numeric: true }));
   for (const n of names) {
     const i = dev.config.interfaces[n];
     const st = interfaceState(world, deviceId, n);
@@ -348,18 +406,58 @@ const PING = cmd(['ping', W('dst', 'ip'), W('opt', 'rest', { opt: true })], ({ d
   return { out: r.text };
 }, { key: 'ping' });
 
+const TRACEROUTE = cmd(['traceroute', W('dst', 'ip')], ({ dst }, s) => {
+  const r = traceWorld(s.world, s.deviceId, parseIp(dst));
+  const hops = r.hops.map(h => h.ip);
+  if (r.ok && hops[hops.length - 1] !== parseIp(dst)) hops.push(parseIp(dst));
+  const lines = hops.map((ip, k) => `  ${k + 1} ${formatIp(ip)} 0 msec 0 msec 0 msec`);
+  if (!r.ok) lines.push(`  ${hops.length + 1}  *  *  * `);
+  s.events.push({ kind: 'trace', dst: parseIp(dst), ok: r.ok });
+  return { out: `Type escape sequence to abort.\nTracing the route to ${dst}\nVRF info: (vrf in name/id, vrf out name/id)\n${lines.join('\n')}` };
+}, { key: 'traceroute' });
+
+const intfArg = (s, name) => (s.dev.config.interfaces[name] ? null : invalidAt(s, s.line.search(/\S+\s*$/)));
+
+// Show commands every IOS device has.
+const SHOW_COMMON = [
+  cmd(['show', 'ip', 'interface', 'brief'], (_, s) => ({ out: showIpIntBrief(s.world, s.deviceId) }), { key: 'show ip interface brief' }),
+  cmd(['show', 'ip', 'ssh'], (_, s) => ({ out: showIpSsh(s.dev) }), { key: 'show ip ssh' }),
+  cmd(['show', 'cdp', 'neighbors', ALT('detail', ['detail'], { opt: true })], ({ detail }, s) => ({ out: detail ? showCdpDetail(s.world, s.deviceId) : showCdpNeighbors(s.world, s.deviceId) }), { key: 'show cdp neighbors' }),
+  cmd(['show', 'lldp', 'neighbors'], (_, s) => ({ out: showLldpNeighbors(s.world, s.deviceId) }), { key: 'show lldp neighbors' }),
+  cmd(['show', 'interfaces', W('name', 'intf')], ({ name }, s) => ({ out: intfArg(s, name) ?? showInterface(s.world, s.deviceId, name) }), { key: 'show interfaces' }),
+];
+
 const SHOW = [
   cmd(['show', 'ip', 'route', ALT('filter', ['connected', 'static', 'ospf'], { opt: true })], ({ filter }, s) => ({ out: showIpRoute(s.world, s.deviceId, filter ?? null) }), { key: 'show ip route' }),
-  cmd(['show', 'ip', 'interface', 'brief'], (_, s) => ({ out: showIpIntBrief(s.world, s.deviceId) }), { key: 'show ip interface brief' }),
   cmd(['show', 'ip', 'ospf', 'neighbor'], (_, s) => ({ out: showOspfNeighbor(s.world, s.deviceId) }), { key: 'show ip ospf neighbor' }),
   cmd(['show', 'ip', 'ospf', 'interface', 'brief'], (_, s) => ({ out: showOspfIntBrief(s.world, s.deviceId) }), { key: 'show ip ospf interface brief' }),
   cmd(['show', 'ip', 'protocols'], (_, s) => ({ out: showIpProtocols(s.world, s.deviceId) }), { key: 'show ip protocols' }),
-  cmd(['show', 'ip', 'ssh'], (_, s) => ({ out: showIpSsh(s.dev) }), { key: 'show ip ssh' }),
+  ...SHOW_COMMON,
+];
+
+const SHOW_SWITCH = [
+  cmd(['show', 'ip', 'route'], (_, s) => ({ out: showHostRoute(s.world, s.deviceId) }), { key: 'show ip route' }),
+  cmd(['show', 'vlan', ALT('brief', ['brief'], { opt: true })], ({ brief }, s) => ({ out: showVlanBrief(s.world, s.deviceId, !brief) }), { key: 'show vlan brief' }),
+  cmd(['show', 'interfaces', 'status'], (_, s) => ({ out: showInterfacesStatus(s.world, s.deviceId) }), { key: 'show interfaces status' }),
+  cmd(['show', 'interfaces', 'trunk'], (_, s) => ({ out: showInterfacesTrunk(s.world, s.deviceId) }), { key: 'show interfaces trunk' }),
+  cmd(['show', 'interfaces', W('name', 'intf'), 'switchport'], ({ name }, s) => ({ out: intfArg(s, name) ?? showSwitchport(s.world, s.deviceId, name) }), { key: 'show interfaces switchport' }),
+  cmd(['show', 'mac', 'address-table', ALT('dyn', ['dynamic'], { opt: true })], ({ dyn }, s) => ({ out: showMacTable(s.world, s.deviceId, Boolean(dyn)) }), { key: 'show mac address-table' }),
+  cmd(['show', 'spanning-tree', ALT('vk', ['vlan'], { opt: true }), W('v', 'num', { opt: true })], ({ vk, v }, s) => {
+    if (vk && v === undefined) return { out: '% Incomplete command.' };
+    return { out: showSpanningTree(s.world, s.deviceId, vk ? v : null) };
+  }, { key: 'show spanning-tree' }),
+  cmd(['show', 'etherchannel', 'summary'], (_, s) => ({ out: showEtherchannelSummary(s.world, s.deviceId) }), { key: 'show etherchannel summary' }),
+  cmd(['show', 'port-security', ALT('ik', ['interface'], { opt: true }), W('name', 'intf', { opt: true })], ({ ik, name }, s) => {
+    if (ik && !name) return { out: '% Incomplete command.' };
+    if (name) return { out: intfArg(s, name) ?? showPortSecurityInterface(s.world, s.deviceId, name) };
+    return { out: showPortSecurity(s.world, s.deviceId) };
+  }, { key: 'show port-security' }),
+  ...SHOW_COMMON,
 ];
 
 const PRIV_ONLY = [
   cmd(['show', 'running-config'], (_, s) => ({ out: runningConfig(s.dev) }), { key: 'show running-config' }),
-  cmd(['show', 'startup-config'], (_, s) => ({ out: s.dev.startup ? runningConfig({ config: s.dev.startup }).replace('Building configuration...\n\nCurrent configuration', 'Using') : 'startup-config is not present' }), { key: 'show startup-config' }),
+  cmd(['show', 'startup-config'], (_, s) => ({ out: s.dev.startup ? runningConfig({ ...s.dev, config: s.dev.startup }).replace('Building configuration...\n\nCurrent configuration', 'Using') : 'startup-config is not present' }), { key: 'show startup-config' }),
   cmd(['configure', ALT('where', ['terminal'], { opt: true })], ({ where }, s) => {
     const enter = () => { s.mode = 'config'; return 'Enter configuration commands, one per line.  End with CNTL/Z.'; };
     if (where) return { out: enter() };
@@ -377,7 +475,7 @@ const PRIV_ONLY = [
       reload(s.world, s.deviceId);
       s.mode = 'user';
       s.events.push({ kind: 'reload' });
-      return `\nSystem Bootstrap, Version 15.1(4)M, RELEASE SOFTWARE (fc1)\n...\nPress RETURN to get started!\n\n${s.dev.startup ? '' : '\n         --- System Configuration Dialog ---\n(skipped: lab routers start without setup mode)\n'}`;
+      return `\nSystem Bootstrap, Version 15.1(4)M, RELEASE SOFTWARE (fc1)\n...\nPress RETURN to get started!\n\n${s.dev.startup ? '' : '\n         --- System Configuration Dialog ---\n(skipped: lab devices start without setup mode)\n'}`;
     } };
     if (unsaved(s.world, s.deviceId)) {
       return { out: '', ask: { prompt: 'System configuration has been modified. Save? [yes/no]: ', answer: (a) => {
@@ -388,44 +486,65 @@ const PRIV_ONLY = [
     }
     return { out: '', ask: proceed };
   }, { key: 'reload' }),
-  cmd(['clear', 'ip', 'ospf', 'process'], (_, s) => ({ out: '', ask: { prompt: 'Reset ALL OSPF processes? [no]: ', answer: (a) => {
-    if (!a || !'yes'.startsWith(a.toLowerCase())) return '';
-    clearOspf(s.world, s.deviceId);
-    s.events.push({ kind: 'clear-ospf' });
-    return '';
-  } } }), { key: 'clear ip ospf process' }),
   cmd(['disable'], (_, s) => { s.mode = 'user'; return { out: '' }; }),
   cmd(['terminal', 'length', W('n', 'num')], () => ({ out: '' })),
 ];
 
-const USER = [
-  cmd(['enable'], (_, s) => {
-    const c = s.dev.config;
-    if (!c.enableSecret && !c.enablePassword) { s.mode = 'exec'; return { out: '' }; }
-    return { out: '', ask: { prompt: 'Password: ', secret: true, answer: (a) => {
-      if (a === (c.enableSecret ?? c.enablePassword)) { s.mode = 'exec'; return ''; }
-      return '% Bad secrets';
-    } } };
-  }, { key: 'enable' }),
-  cmd([ALT('how', ['exit', 'logout'])], (_, s) => { s.mode = 'user'; return { out: `\n${s.dev.config.hostname} con0 is now available\n\nPress RETURN to get started.` }; }),
-  PING,
-  ...SHOW,
-];
+const CLEAR_OSPF = cmd(['clear', 'ip', 'ospf', 'process'], (_, s) => ({ out: '', ask: { prompt: 'Reset ALL OSPF processes? [no]: ', answer: (a) => {
+  if (!a || !'yes'.startsWith(a.toLowerCase())) return '';
+  clearOspf(s.world, s.deviceId);
+  s.events.push({ kind: 'clear-ospf' });
+  return '';
+} } }), { key: 'clear ip ospf process' });
 
-const EXEC = [
-  ...PRIV_ONLY,
-  cmd([ALT('how', ['exit', 'logout'])], (_, s) => { s.mode = 'user'; return { out: `\n${s.dev.config.hostname} con0 is now available\n\nPress RETURN to get started.` }; }),
-  PING,
-  ...SHOW,
-];
+const CLEAR_MAC = cmd(['clear', 'mac', 'address-table', ALT('dyn', ['dynamic'], { opt: true })], (_, s) => {
+  if (s.world.learned) delete s.world.learned[s.deviceId];
+  s.events.push({ kind: 'clear-mac' });
+  return { out: '' };
+}, { key: 'clear mac address-table' });
+
+const ENABLE = cmd(['enable'], (_, s) => {
+  const c = s.dev.config;
+  if (!c.enableSecret && !c.enablePassword) { s.mode = 'exec'; return { out: '' }; }
+  return { out: '', ask: { prompt: 'Password: ', secret: true, answer: (a) => {
+    if (a === (c.enableSecret ?? c.enablePassword)) { s.mode = 'exec'; return ''; }
+    return '% Bad secrets';
+  } } };
+}, { key: 'enable' });
+const LOGOUT = cmd([ALT('how', ['exit', 'logout'])], (_, s) => { s.mode = 'user'; return { out: `\n${s.dev.config.hostname} con0 is now available\n\nPress RETURN to get started.` }; });
+
+const USER = [ENABLE, LOGOUT, PING, TRACEROUTE, ...SHOW];
+const EXEC = [...PRIV_ONLY, CLEAR_OSPF, LOGOUT, PING, TRACEROUTE, ...SHOW];
+const USER_SWITCH = [ENABLE, LOGOUT, PING, TRACEROUTE, ...SHOW_SWITCH];
+const EXEC_SWITCH = [...PRIV_ONLY, CLEAR_MAC, LOGOUT, PING, TRACEROUTE, ...SHOW_SWITCH];
 
 function invalidAt(s, col) {
   return `${' '.repeat(s.promptLength + Math.max(0, col))}^\n% Invalid input detected at '^' marker.`;
 }
 
-const END = cmd(['end'], (_, s) => { s.mode = 'exec'; s.ctx = {}; return { out: '' }; });
+const END = cmd(['end'], (_, s) => { s.mode = 'exec'; s.ctx = {}; return { out: '' }; }, { once: true });
 
-const GLOBAL = [
+// "f0/1 - 12, g0/1 - 2" -> full interface names, or null.
+function parseRange(text, dev) {
+  const out = [];
+  for (const part of text.split(',')) {
+    const m = /^\s*([a-z][a-z-]*?)\s*(\d+)\/(\d+)\s*(?:-\s*(\d+))?\s*$/i.exec(part);
+    if (!m) return null;
+    const type = IF_TYPES.find(t => t.re.test(m[1]));
+    if (!type) return null;
+    const a = Number(m[3]);
+    const b = m[4] === undefined ? a : Number(m[4]);
+    if (b < a) return null;
+    for (let k = a; k <= b; k += 1) {
+      const name = `${type.full}${m[2]}/${k}`;
+      if (!dev.config.interfaces[name]) return null;
+      if (!out.includes(name)) out.push(name);
+    }
+  }
+  return out.length ? out : null;
+}
+
+const GLOBAL_COMMON = [
   cmd(['hostname', W('name', 'word')], ({ name }, s) => {
     if (!/^[A-Za-z][A-Za-z0-9-]{0,62}$/.test(name)) return { out: '% Hostname contains one or more illegal characters.' };
     s.dev.config.hostname = name;
@@ -448,15 +567,69 @@ const GLOBAL = [
   }, { key: 'banner motd', no: (_, s) => { s.dev.config.banner = null; } }),
   cmd(['interface', W('name', 'intf')], ({ name }, s) => {
     const c = s.dev.config;
+    const sw = s.dev.kind === 'switch';
     if (!c.interfaces[name]) {
-      if (!name.startsWith('Loopback')) return { out: invalidAt(s, s.line.search(/\S+\s*$/)) };
-      c.interfaces[name] = makeInterface(name);
-      s.notices.push(`%LINEPROTO-5-UPDOWN: Line protocol on Interface ${name}, changed state to up`);
+      if (name.startsWith('Loopback')) {
+        c.interfaces[name] = makeInterface(name);
+        s.notices.push(`%LINEPROTO-5-UPDOWN: Line protocol on Interface ${name}, changed state to up`);
+      } else if (!sw && isSub(name) && c.interfaces[parentOf(name)] && !isSub(parentOf(name))) {
+        c.interfaces[name] = makeInterface(name, { shutdown: false, encap: null });
+      } else if (sw && isSvi(name) && Number(name.slice(4)) >= 1 && Number(name.slice(4)) <= 4094) {
+        // Only Vlan1 ships shut down; an SVI you create starts enabled.
+        c.interfaces[name] = makeInterface(name, { shutdown: false });
+      } else if (sw && isPo(name) && Number(name.slice(12)) >= 1 && Number(name.slice(12)) <= 48) {
+        c.interfaces[name] = makeInterface(name, { shutdown: false, sw: makeSwitchport(), cdp: true });
+      } else return { out: invalidAt(s, s.line.search(/\S+\s*$/)) };
     }
     s.mode = 'if';
     s.ctx = { intf: name };
     return { out: '' };
   }, { key: 'interface' }),
+  cmd(['interface', 'range', W('list', 'rest')], ({ list }, s) => {
+    const names = parseRange(list, s.dev);
+    if (!names) return { out: invalidAt(s, s.line.indexOf(list)) };
+    s.mode = 'if';
+    s.ctx = { intf: names[0], range: names };
+    return { out: '' };
+  }, { key: 'interface range' }),
+  cmd(['ip', ALT('kw', ['domain-name']), W('name', 'word')], ({ name }, s) => { s.dev.config.domain = name; return { out: '' }; }, { key: 'ip domain name', no: (_, s) => { s.dev.config.domain = null; }, noShape: ['ip', 'domain-name', W('name', 'word', { opt: true })] }),
+  cmd(['ip', 'domain', 'name', W('name', 'word')], ({ name }, s) => { s.dev.config.domain = name; return { out: '' }; }, { key: 'ip domain name', no: (_, s) => { s.dev.config.domain = null; }, noShape: ['ip', 'domain', 'name', W('name', 'word', { opt: true })] }),
+  cmd(['ip', 'ssh', 'version', W('v', 'num')], ({ v }, s) => {
+    if (v !== 1 && v !== 2) return { out: invalidAt(s, s.line.search(/\S+\s*$/)) };
+    s.dev.config.sshVersion = v;
+    return { out: '' };
+  }, { key: 'ip ssh version', no: (_, s) => { s.dev.config.sshVersion = null; }, noShape: ['ip', 'ssh', 'version'] }),
+  cmd(['crypto', 'key', 'generate', 'rsa', ALT('gk', ['general-keys'], { opt: true }), ALT('m', ['modulus'], { opt: true }), W('bits', 'num', { opt: true })], ({ bits }, s) => {
+    const c = s.dev.config;
+    if (c.hostname === 'Router' || c.hostname === 'Switch') return { out: `% Please define a hostname other than ${c.hostname}.` };
+    if (!c.domain) return { out: '% Please define a domain-name first.' };
+    const make = (b) => {
+      if (!(b >= 360 && b <= 4096)) return '% Key modulus must be between 360 and 4096.';
+      s.dev.rsaBits = b;
+      s.events.push({ kind: 'rsa', bits: b });
+      return `% Generating ${b} bit RSA keys, keys will be non-exportable...\n[OK] (elapsed time was 1 seconds)\n\n%SSH-5-ENABLED: SSH 1.99 has been enabled`;
+    };
+    const head = `The name for the keys will be: ${c.hostname}.${c.domain}`;
+    if (bits) return { out: `${head}\n${make(bits)}` };
+    return { out: `${head}\nChoose the size of the key modulus in the range of 360 to 4096 for your\n  General Purpose Keys. Choosing a key modulus greater than 512 may take\n  a few minutes.\n`, ask: { prompt: 'How many bits in the modulus [512]: ', answer: (a) => make(a ? Number(a) : 512) } };
+  }, { key: 'crypto key generate rsa' }),
+  cmd(['username', W('name', 'word'), W('rest', 'rest')], ({ name, rest }, s) => {
+    const m = /^(?:privilege\s+(\d+)\s+)?(secret|password)\s+(?:[05]\s+)?(.+)$/i.exec(rest);
+    if (!m) return { out: invalidAt(s, s.line.indexOf(rest)) };
+    s.dev.config.users[name] = { privilege: m[1] ? Number(m[1]) : null, [m[2].toLowerCase()]: m[3] };
+    return { out: '' };
+  }, { key: 'username', no: ({ name }, s) => { delete s.dev.config.users[name]; }, noShape: ['username', W('name', 'word'), W('rest', 'rest', { opt: true })] }),
+  cmd(['line', 'vty', W('a', 'num'), W('b', 'num', { opt: true })], (_, s) => { s.mode = 'line'; s.ctx = { line: 'vty' }; return { out: '' }; }, { key: 'line vty' }),
+  cmd(['line', 'console', W('a', 'num')], (_, s) => { s.mode = 'line'; s.ctx = { line: 'con' }; return { out: '' }; }, { key: 'line console' }),
+  cmd(['service', 'password-encryption'], (_, s) => { s.dev.config.servicePasswordEncryption = true; return { out: '' }; }, { key: 'service password-encryption', no: (_, s) => { s.dev.config.servicePasswordEncryption = false; } }),
+  cmd(['cdp', 'run'], (_, s) => { s.dev.config.cdp = true; return { out: '' }; }, { key: 'cdp run', no: (_, s) => { s.dev.config.cdp = false; } }),
+  cmd(['lldp', 'run'], (_, s) => { s.dev.config.lldp = true; return { out: '' }; }, { key: 'lldp run', no: (_, s) => { s.dev.config.lldp = false; } }),
+  END,
+  cmd(['exit'], (_, s) => { s.mode = 'exec'; return { out: '' }; }, { once: true }),
+];
+
+const GLOBAL = [
+  ...GLOBAL_COMMON,
   cmd(['ip', 'route', W('net', 'ip'), W('mask', 'mask'), W('via', 'rest')], ({ net, mask, via }, s) => {
     const parsed = parseRouteTail(via);
     if (!parsed) return { out: invalidAt(s, s.line.indexOf(via)) };
@@ -482,38 +655,50 @@ const GLOBAL = [
     s.ctx = {};
     return { out: '' };
   }, { key: 'router ospf', no: ({ pid }, s) => { if (s.dev.config.ospf?.pid === pid) s.dev.config.ospf = null; } }),
-  cmd(['ip', ALT('kw', ['domain-name']), W('name', 'word')], ({ name }, s) => { s.dev.config.domain = name; return { out: '' }; }, { key: 'ip domain name', no: (_, s) => { s.dev.config.domain = null; }, noShape: ['ip', 'domain-name', W('name', 'word', { opt: true })] }),
-  cmd(['ip', 'domain', 'name', W('name', 'word')], ({ name }, s) => { s.dev.config.domain = name; return { out: '' }; }, { key: 'ip domain name', no: (_, s) => { s.dev.config.domain = null; }, noShape: ['ip', 'domain', 'name', W('name', 'word', { opt: true })] }),
-  cmd(['ip', 'ssh', 'version', W('v', 'num')], ({ v }, s) => {
-    if (v !== 1 && v !== 2) return { out: invalidAt(s, s.line.search(/\S+\s*$/)) };
-    s.dev.config.sshVersion = v;
+];
+
+const PRIORITY_HELP = '% Bridge Priority must be in increments of 4096.\n% Allowed values are:\n  0     4096  8192  12288 16384 20480 24576 28672\n  32768 36864 40960 45056 49152 53248 57344 61440';
+
+function vlanName(v) { return `VLAN${String(v).padStart(4, '0')}`; }
+
+const GLOBAL_SWITCH = [
+  ...GLOBAL_COMMON,
+  cmd(['vlan', W('list', 'word')], ({ list }, s) => {
+    const ids = parseVlanList(list);
+    if (!ids) return { out: invalidAt(s, s.line.indexOf(list)) };
+    if (ids.some(v => v >= 1002 && v <= 1005)) return { out: `Default VLAN ${ids.find(v => v >= 1002 && v <= 1005)} may not be modified.` };
+    for (const v of ids) s.dev.config.vlans[v] ??= { name: vlanName(v) };
+    s.mode = 'vlan';
+    s.ctx = { vlans: ids };
     return { out: '' };
-  }, { key: 'ip ssh version', no: (_, s) => { s.dev.config.sshVersion = null; }, noShape: ['ip', 'ssh', 'version'] }),
-  cmd(['crypto', 'key', 'generate', 'rsa', ALT('gk', ['general-keys'], { opt: true }), ALT('m', ['modulus'], { opt: true }), W('bits', 'num', { opt: true })], ({ bits }, s) => {
-    const c = s.dev.config;
-    if (c.hostname === 'Router') return { out: '% Please define a hostname other than Router.' };
-    if (!c.domain) return { out: '% Please define a domain-name first.' };
-    const make = (b) => {
-      if (!(b >= 360 && b <= 4096)) return '% Key modulus must be between 360 and 4096.';
-      s.dev.rsaBits = b;
-      s.events.push({ kind: 'rsa', bits: b });
-      return `% Generating ${b} bit RSA keys, keys will be non-exportable...\n[OK] (elapsed time was 1 seconds)\n\n%SSH-5-ENABLED: SSH 1.99 has been enabled`;
-    };
-    const head = `The name for the keys will be: ${c.hostname}.${c.domain}`;
-    if (bits) return { out: `${head}\n${make(bits)}` };
-    return { out: `${head}\nChoose the size of the key modulus in the range of 360 to 4096 for your\n  General Purpose Keys. Choosing a key modulus greater than 512 may take\n  a few minutes.\n`, ask: { prompt: 'How many bits in the modulus [512]: ', answer: (a) => make(a ? Number(a) : 512) } };
-  }, { key: 'crypto key generate rsa' }),
-  cmd(['username', W('name', 'word'), W('rest', 'rest')], ({ name, rest }, s) => {
-    const m = /^(?:privilege\s+(\d+)\s+)?(secret|password)\s+(?:[05]\s+)?(.+)$/i.exec(rest);
-    if (!m) return { out: invalidAt(s, s.line.indexOf(rest)) };
-    s.dev.config.users[name] = { privilege: m[1] ? Number(m[1]) : null, [m[2].toLowerCase()]: m[3] };
+  }, { key: 'vlan', no: ({ list }, s) => {
+    const ids = parseVlanList(list) ?? [];
+    for (const v of ids) if (v !== 1) delete s.dev.config.vlans[v];
+    if (ids.includes(1)) s.notices.push('%Default VLAN 1 may not be deleted.');
+  } }),
+  cmd(['ip', 'default-gateway', W('gw', 'ip')], ({ gw }, s) => { s.dev.config.defaultGateway = parseIp(gw); return { out: '' }; }, { key: 'ip default-gateway', no: (_, s) => { s.dev.config.defaultGateway = null; }, noShape: ['ip', 'default-gateway', W('gw', 'ip', { opt: true })] }),
+  cmd(['spanning-tree', 'mode', ALT('m', ['pvst', 'rapid-pvst'])], ({ m }, s) => { s.dev.config.stp.mode = m; return { out: '' }; }, { key: 'spanning-tree mode', no: (_, s) => { s.dev.config.stp.mode = 'pvst'; }, noShape: ['spanning-tree', 'mode', ALT('m', ['pvst', 'rapid-pvst'], { opt: true })] }),
+  cmd(['spanning-tree', 'vlan', W('list', 'word'), 'priority', W('p', 'num')], ({ list, p }, s) => {
+    const ids = parseVlanList(list);
+    if (!ids) return { out: invalidAt(s, s.line.indexOf(list)) };
+    if (p % 4096 !== 0 || p > 61440) return { out: PRIORITY_HELP };
+    for (const v of ids) s.dev.config.stp.prio[v] = p;
     return { out: '' };
-  }, { key: 'username', no: ({ name }, s) => { delete s.dev.config.users[name]; }, noShape: ['username', W('name', 'word'), W('rest', 'rest', { opt: true })] }),
-  cmd(['line', 'vty', W('a', 'num'), W('b', 'num', { opt: true })], (_, s) => { s.mode = 'line'; s.ctx = { line: 'vty' }; return { out: '' }; }, { key: 'line vty' }),
-  cmd(['line', 'console', W('a', 'num')], (_, s) => { s.mode = 'line'; s.ctx = { line: 'con' }; return { out: '' }; }, { key: 'line console' }),
-  cmd(['service', 'password-encryption'], (_, s) => { s.dev.config.servicePasswordEncryption = true; return { out: '' }; }, { key: 'service password-encryption', no: (_, s) => { s.dev.config.servicePasswordEncryption = false; } }),
-  END,
-  cmd(['exit'], (_, s) => { s.mode = 'exec'; return { out: '' }; }),
+  }, { key: 'spanning-tree vlan priority', no: ({ list }, s) => { for (const v of parseVlanList(list) ?? []) delete s.dev.config.stp.prio[v]; }, noShape: ['spanning-tree', 'vlan', W('list', 'word'), 'priority', W('p', 'num', { opt: true })] }),
+  cmd(['spanning-tree', 'vlan', W('list', 'word'), 'root', ALT('r', ['primary', 'secondary'])], ({ list, r }, s) => {
+    const ids = parseVlanList(list);
+    if (!ids) return { out: invalidAt(s, s.line.indexOf(list)) };
+    for (const v of ids) {
+      if (r === 'secondary') { s.dev.config.stp.prio[v] = 28672; continue; }
+      const inst = l2Of(s.world).stp[s.deviceId]?.[v];
+      const rootBase = inst ? inst.root.prio - v : 32768;
+      const mine = inst && inst.rootId === s.deviceId;
+      s.dev.config.stp.prio[v] = mine ? Math.min(24576, rootBase) : rootBase > 24576 ? 24576 : Math.max(0, rootBase - 4096);
+    }
+    return { out: '' };
+  }, { key: 'spanning-tree vlan root', no: ({ list }, s) => { for (const v of parseVlanList(list) ?? []) delete s.dev.config.stp.prio[v]; }, noShape: ['spanning-tree', 'vlan', W('list', 'word'), 'root'] }),
+  cmd(['spanning-tree', 'portfast', 'default'], (_, s) => { s.dev.config.stp.portfastDefault = true; return { out: '%Warning: this command enables portfast by default on all interfaces. You\n should now disable portfast explicitly on switched ports leading to hubs,\n switches and bridges as they may create temporary bridging loops.' }; }, { key: 'spanning-tree portfast default', no: (_, s) => { s.dev.config.stp.portfastDefault = false; } }),
+  cmd(['spanning-tree', 'portfast', 'bpduguard', 'default'], (_, s) => { s.dev.config.stp.bpduguardDefault = true; return { out: '' }; }, { key: 'spanning-tree portfast bpduguard default', no: (_, s) => { s.dev.config.stp.bpduguardDefault = false; } }),
 ];
 
 function parseRouteTail(text) {
@@ -529,34 +714,213 @@ function parseRouteTail(text) {
   return { nh, intf, ad };
 }
 
-const IFACE = [
-  cmd(['ip', 'address', W('ip', 'ip'), W('mask', 'mask')], ({ ip, mask }, s) => {
-    const c = s.dev.config;
-    const intf = c.interfaces[s.ctx.intf];
-    const a = parseIp(ip), len = maskToLen(mask);
-    if (len < 31 && (a === network(a, len) || a === (network(a, len) | (~lenToMask(len) >>> 0)) >>> 0)) return { out: `Bad mask /${len} for address ${ip}` };
-    const clash = Object.values(c.interfaces).find(o => o.name !== intf.name && o.ip !== null && network(o.ip, Math.min(len, maskToLen(o.mask))) === network(a, Math.min(len, maskToLen(o.mask))));
-    if (clash) return { out: `% ${formatIp(network(a, len))} overlaps with ${clash.name}` };
-    intf.ip = a; intf.mask = parseIp(mask);
+const here = (s) => s.dev.config.interfaces[s.ctx.intf];
+
+const IFACE_COMMON = [
+  cmd(['shutdown'], (_, s) => {
+    here(s).shutdown = true;
+    // Shutting a port is half of recovering it from err-disabled.
+    if (s.dev.err) delete s.dev.err[s.ctx.intf];
     return { out: '' };
-  }, { key: 'ip address', no: (_, s) => { const i = s.dev.config.interfaces[s.ctx.intf]; i.ip = null; i.mask = null; }, noShape: ['ip', 'address', W('ip', 'ip', { opt: true }), W('mask', 'mask', { opt: true })] }),
-  cmd(['shutdown'], (_, s) => { s.dev.config.interfaces[s.ctx.intf].shutdown = true; return { out: '' }; }, { key: 'shutdown', no: (_, s) => { s.dev.config.interfaces[s.ctx.intf].shutdown = false; } }),
-  cmd(['description', W('text', 'rest')], ({ text }, s) => { s.dev.config.interfaces[s.ctx.intf].description = text; return { out: '' }; }, { key: 'description', no: (_, s) => { s.dev.config.interfaces[s.ctx.intf].description = null; }, noShape: ['description', W('text', 'rest', { opt: true })] }),
+  }, { key: 'shutdown', no: (_, s) => { here(s).shutdown = false; } }),
+  cmd(['description', W('text', 'rest')], ({ text }, s) => { here(s).description = text; return { out: '' }; }, { key: 'description', no: (_, s) => { here(s).description = null; }, noShape: ['description', W('text', 'rest', { opt: true })] }),
+  cmd(['cdp', 'enable'], (_, s) => { here(s).cdp = true; return { out: '' }; }, { key: 'cdp enable', no: (_, s) => { here(s).cdp = false; } }),
+  END,
+  cmd(['exit'], (_, s) => { s.mode = 'config'; s.ctx = {}; return { out: '' }; }, { once: true }),
+];
+
+const SUBIF_IP_ERROR = '% Configuring IP routing on a LAN subinterface is only allowed if that\nsubinterface is already configured as part of an IEEE 802.10, IEEE 802.1Q,\nor ISL vLAN.';
+
+const IP_ADDRESS = cmd(['ip', 'address', W('ip', 'ip'), W('mask', 'mask')], ({ ip, mask }, s) => {
+  const c = s.dev.config;
+  const intf = here(s);
+  if (intf.sw) return { out: invalidAt(s, s.line.search(/\baddress\b/)) };
+  if (isSub(intf.name) && !intf.encap) return { out: SUBIF_IP_ERROR };
+  const a = parseIp(ip), len = maskToLen(mask);
+  if (len < 31 && (a === network(a, len) || a === (network(a, len) | (~lenToMask(len) >>> 0)) >>> 0)) return { out: `Bad mask /${len} for address ${ip}` };
+  const clash = Object.values(c.interfaces).find(o => o.name !== intf.name && o.ip !== null && network(o.ip, Math.min(len, maskToLen(o.mask))) === network(a, Math.min(len, maskToLen(o.mask))));
+  if (clash) return { out: `% ${formatIp(network(a, len))} overlaps with ${clash.name}` };
+  intf.ip = a; intf.mask = parseIp(mask);
+  return { out: '' };
+}, { key: 'ip address', no: (_, s) => { const i = here(s); i.ip = null; i.mask = null; }, noShape: ['ip', 'address', W('ip', 'ip', { opt: true }), W('mask', 'mask', { opt: true })] });
+
+const IFACE = [
+  IP_ADDRESS,
+  cmd(['encapsulation', ALT('e', ['dot1q']), W('vlan', 'num'), ALT('native', ['native'], { opt: true })], ({ vlan, native }, s) => {
+    if (!isSub(s.ctx.intf)) return { out: invalidAt(s, 0) };
+    if (vlan < 1 || vlan > 4094) return { out: invalidAt(s, s.line.search(/\d+\s*(native)?\s*$/)) };
+    here(s).encap = { vlan, native: Boolean(native) };
+    return { out: '' };
+  }, { key: 'encapsulation dot1q', no: (_, s) => { here(s).encap = null; }, noShape: ['encapsulation', ALT('e', ['dot1q'], { opt: true }), W('vlan', 'num', { opt: true })] }),
   cmd(['ip', 'ospf', 'priority', W('n', 'num')], ({ n }, s) => {
     if (n > 255) return { out: invalidAt(s, s.line.search(/\S+\s*$/)) };
-    s.dev.config.interfaces[s.ctx.intf].ospf.priority = n;
+    here(s).ospf.priority = n;
     return { out: '' };
-  }, { key: 'ip ospf priority', no: (_, s) => { s.dev.config.interfaces[s.ctx.intf].ospf.priority = 1; }, noShape: ['ip', 'ospf', 'priority', W('n', 'num', { opt: true })] }),
-  cmd(['ip', 'ospf', 'cost', W('n', 'num')], ({ n }, s) => { s.dev.config.interfaces[s.ctx.intf].ospf.cost = n; return { out: '' }; }, { key: 'ip ospf cost', no: (_, s) => { s.dev.config.interfaces[s.ctx.intf].ospf.cost = null; }, noShape: ['ip', 'ospf', 'cost', W('n', 'num', { opt: true })] }),
-  cmd(['ip', 'ospf', 'network', ALT('type', ['point-to-point', 'broadcast'])], ({ type }, s) => { s.dev.config.interfaces[s.ctx.intf].ospf.networkType = type; return { out: '' }; }, { key: 'ip ospf network', no: (_, s) => { s.dev.config.interfaces[s.ctx.intf].ospf.networkType = null; }, noShape: ['ip', 'ospf', 'network', ALT('type', ['point-to-point', 'broadcast'], { opt: true })] }),
+  }, { key: 'ip ospf priority', no: (_, s) => { here(s).ospf.priority = 1; }, noShape: ['ip', 'ospf', 'priority', W('n', 'num', { opt: true })] }),
+  cmd(['ip', 'ospf', 'cost', W('n', 'num')], ({ n }, s) => { here(s).ospf.cost = n; return { out: '' }; }, { key: 'ip ospf cost', no: (_, s) => { here(s).ospf.cost = null; }, noShape: ['ip', 'ospf', 'cost', W('n', 'num', { opt: true })] }),
+  cmd(['ip', 'ospf', 'network', ALT('type', ['point-to-point', 'broadcast'])], ({ type }, s) => { here(s).ospf.networkType = type; return { out: '' }; }, { key: 'ip ospf network', no: (_, s) => { here(s).ospf.networkType = null; }, noShape: ['ip', 'ospf', 'network', ALT('type', ['point-to-point', 'broadcast'], { opt: true })] }),
   cmd(['ip', 'ospf', W('pid', 'num'), 'area', W('area', 'num')], ({ pid, area }, s) => {
-    const o = s.dev.config.interfaces[s.ctx.intf].ospf;
+    const o = here(s).ospf;
     o.pid = pid; o.area = area;
     if (!s.dev.config.ospf) s.dev.config.ospf = { pid, routerId: null, networks: [], passive: [] };
     return { out: '' };
-  }, { key: 'ip ospf area', no: (_, s) => { const o = s.dev.config.interfaces[s.ctx.intf].ospf; o.pid = null; o.area = null; }, noShape: ['ip', 'ospf', W('pid', 'num'), 'area', W('area', 'num', { opt: true })] }),
+  }, { key: 'ip ospf area', no: (_, s) => { const o = here(s).ospf; o.pid = null; o.area = null; }, noShape: ['ip', 'ospf', W('pid', 'num'), 'area', W('area', 'num', { opt: true })] }),
+  ...IFACE_COMMON,
+];
+
+// Settings a Port-channel pushes down to its members, as IOS does.
+const SYNCED = ['mode', 'access', 'native', 'allowed', 'nonegotiate', 'encap', 'voice'];
+function syncChannel(s) {
+  if (!isPo(s.ctx.intf)) return;
+  const po = here(s).sw;
+  const group = Number(s.ctx.intf.slice(12));
+  for (const name of s.dev.ports) {
+    const sw = s.dev.config.interfaces[name].sw;
+    if (sw?.channel?.group === group) for (const k of SYNCED) sw[k] = Array.isArray(po[k]) ? [...po[k]] : po[k];
+  }
+}
+
+// A switchport command: rejected on an SVI, synced from a Port-channel.
+function swc(words, run, extra = {}) {
+  const wrap = (fn) => (args, s) => {
+    const sw = here(s).sw;
+    if (!sw) return { out: invalidAt(s, 0) };
+    const r = fn(args, s, sw);
+    syncChannel(s);
+    return r;
+  };
+  return cmd(words, wrap(run), { ...extra, no: extra.no ? (args, s) => { const sw = here(s).sw; if (!sw) return; extra.no(args, s, sw); syncChannel(s); } : undefined });
+}
+
+const MAC_RE = /^[0-9a-f]{4}\.[0-9a-f]{4}\.[0-9a-f]{4}$/i;
+
+function needVlan(s, v) {
+  if (s.dev.config.vlans[v]) return '';
+  s.dev.config.vlans[v] = { name: vlanName(v) };
+  return `% Access VLAN does not exist. Creating vlan ${v}`;
+}
+
+function allowedEdit(sw, text) {
+  const t = text.trim().toLowerCase();
+  const all = () => Array.from({ length: 4094 }, (_, k) => k + 1);
+  if (t === 'all') return null;
+  if (t === 'none') return [];
+  const m = /^(add|remove|except)\s+(.+)$/.exec(t);
+  if (m) {
+    const list = parseVlanList(m[2]);
+    if (!list) return undefined;
+    if (m[1] === 'add') return sw.allowed === null ? null : [...new Set([...sw.allowed, ...list])].sort((a, b) => a - b);
+    if (m[1] === 'remove') return (sw.allowed ?? all()).filter(v => !list.includes(v));
+    return all().filter(v => !list.includes(v));
+  }
+  const list = parseVlanList(t);
+  return list ?? undefined;
+}
+
+const IFACE_SWITCH = [
+  IP_ADDRESS,
+  swc(['switchport', 'mode', ALT('m', ['access', 'trunk'])], ({ m }, s, sw) => { sw.mode = m; return { out: '' }; }, { key: 'switchport mode', no: (_, s, sw) => { sw.mode = 'dynamic auto'; sw.nonegotiate = false; }, noShape: ['switchport', 'mode'] }),
+  swc(['switchport', 'mode', 'dynamic', ALT('d', ['auto', 'desirable'])], ({ d }, s, sw) => {
+    if (sw.nonegotiate) return { out: `Command rejected: Conflict between 'nonegotiate' and 'dynamic' status on this interface: ${shortIf(s.ctx.intf)}.` };
+    if (sw.psec.on) return { out: `Command rejected: ${s.ctx.intf} is a secure port.` };
+    sw.mode = `dynamic ${d}`;
+    return { out: '' };
+  }, { key: 'switchport mode dynamic' }),
+  swc(['switchport', 'access', 'vlan', W('v', 'num')], ({ v }, s, sw) => {
+    if (v < 1 || v > 4094) return { out: invalidAt(s, s.line.search(/\S+\s*$/)) };
+    sw.access = v;
+    return { out: needVlan(s, v) };
+  }, { key: 'switchport access vlan', no: (_, s, sw) => { sw.access = 1; }, noShape: ['switchport', 'access', 'vlan', W('v', 'num', { opt: true })] }),
+  swc(['switchport', 'trunk', 'native', 'vlan', W('v', 'num')], ({ v }, s, sw) => {
+    if (v < 1 || v > 4094) return { out: invalidAt(s, s.line.search(/\S+\s*$/)) };
+    sw.native = v;
+    return { out: '' };
+  }, { key: 'switchport trunk native vlan', no: (_, s, sw) => { sw.native = 1; }, noShape: ['switchport', 'trunk', 'native', 'vlan', W('v', 'num', { opt: true })] }),
+  swc(['switchport', 'trunk', 'allowed', 'vlan', W('list', 'rest')], ({ list }, s, sw) => {
+    const next = allowedEdit(sw, list);
+    if (next === undefined) return { out: invalidAt(s, s.line.indexOf(list)) };
+    sw.allowed = next;
+    return { out: '' };
+  }, { key: 'switchport trunk allowed vlan', no: (_, s, sw) => { sw.allowed = null; }, noShape: ['switchport', 'trunk', 'allowed', 'vlan', W('list', 'rest', { opt: true })] }),
+  swc(['switchport', 'trunk', 'encapsulation', ALT('e', ['dot1q'])], (_, s, sw) => { sw.encap = 'dot1q'; return { out: '' }; }, { key: 'switchport trunk encapsulation', no: (_, s, sw) => { sw.encap = null; }, noShape: ['switchport', 'trunk', 'encapsulation'] }),
+  swc(['switchport', 'nonegotiate'], (_, s, sw) => {
+    if (sw.mode.startsWith('dynamic')) return { out: `Command rejected: Conflict between 'nonegotiate' and 'dynamic' status on this interface: ${shortIf(s.ctx.intf)}.` };
+    sw.nonegotiate = true;
+    return { out: '' };
+  }, { key: 'switchport nonegotiate', no: (_, s, sw) => { sw.nonegotiate = false; } }),
+  swc(['switchport', 'voice', 'vlan', W('v', 'num')], ({ v }, s, sw) => {
+    if (v < 1 || v > 4094) return { out: invalidAt(s, s.line.search(/\S+\s*$/)) };
+    sw.voice = v;
+    return { out: needVlan(s, v).replace('Access', 'Voice') };
+  }, { key: 'switchport voice vlan', no: (_, s, sw) => { sw.voice = null; }, noShape: ['switchport', 'voice', 'vlan', W('v', 'num', { opt: true })] }),
+  swc(['switchport', 'port-security'], (_, s, sw) => {
+    if (sw.mode.startsWith('dynamic')) return { out: `Command rejected: ${s.ctx.intf} is a dynamic port.` };
+    sw.psec.on = true;
+    return { out: '' };
+  }, { key: 'switchport port-security', no: (_, s, sw) => { sw.psec.on = false; if (s.dev.err?.[s.ctx.intf] === 'psecure-violation') delete s.dev.err[s.ctx.intf]; } }),
+  swc(['switchport', 'port-security', 'maximum', W('n', 'num')], ({ n }, s, sw) => {
+    if (n < 1 || n > 8192) return { out: invalidAt(s, s.line.search(/\S+\s*$/)) };
+    if (n < sw.psec.macs.length) return { out: 'Maximum is less than number of currently secured mac-addresses.' };
+    sw.psec.max = n;
+    return { out: '' };
+  }, { key: 'switchport port-security maximum', no: (_, s, sw) => { sw.psec.max = 1; }, noShape: ['switchport', 'port-security', 'maximum', W('n', 'num', { opt: true })] }),
+  swc(['switchport', 'port-security', 'violation', ALT('v', ['protect', 'restrict', 'shutdown'])], ({ v }, s, sw) => { sw.psec.violation = v; return { out: '' }; }, { key: 'switchport port-security violation', no: (_, s, sw) => { sw.psec.violation = 'shutdown'; }, noShape: ['switchport', 'port-security', 'violation', ALT('v', ['protect', 'restrict', 'shutdown'], { opt: true })] }),
+  swc(['switchport', 'port-security', 'mac-address', 'sticky', W('mac', 'word', { opt: true })], ({ mac }, s, sw) => {
+    if (mac === undefined) { sw.psec.sticky = true; return { out: '' }; }
+    if (!MAC_RE.test(mac)) return { out: invalidAt(s, s.line.indexOf(mac)) };
+    if (!sw.psec.macs.some(m => m.mac === mac.toLowerCase())) sw.psec.macs.push({ mac: mac.toLowerCase(), sticky: true });
+    sw.psec.sticky = true;
+    return { out: '' };
+  }, { key: 'switchport port-security mac-address sticky', no: (_, s, sw) => { sw.psec.sticky = false; sw.psec.macs = sw.psec.macs.filter(m => !m.sticky); }, noShape: ['switchport', 'port-security', 'mac-address', 'sticky'] }),
+  swc(['switchport', 'port-security', 'mac-address', W('mac', 'word')], ({ mac }, s, sw) => {
+    if (!MAC_RE.test(mac)) return { out: invalidAt(s, s.line.indexOf(mac)) };
+    if (sw.psec.macs.length >= sw.psec.max) return { out: `Total secure mac-addresses on interface ${s.ctx.intf} has reached maximum limit.` };
+    if (!sw.psec.macs.some(m => m.mac === mac.toLowerCase())) sw.psec.macs.push({ mac: mac.toLowerCase(), sticky: false });
+    return { out: '' };
+  }, { key: 'switchport port-security mac-address', no: ({ mac }, s, sw) => { sw.psec.macs = sw.psec.macs.filter(m => m.mac !== String(mac).toLowerCase()); } }),
+  swc(['spanning-tree', 'portfast', ALT('t', ['trunk', 'disable'], { opt: true })], ({ t }, s, sw) => {
+    if (t === 'disable') { sw.portfast = false; return { out: '' }; }
+    sw.portfast = true;
+    const warn = `%Warning: portfast should only be enabled on ports connected to a single\n host. Connecting hubs, concentrators, switches, bridges, etc... to this\n interface  when portfast is enabled, can cause temporary bridging loops.\n Use with CAUTION`;
+    const where = t === 'trunk' ? '' : `\n\n%Portfast has been configured on ${s.ctx.intf} but will only\n have effect when the interface is in a non-trunking mode.`;
+    return { out: `${warn}${where}` };
+  }, { key: 'spanning-tree portfast', no: (_, s, sw) => { sw.portfast = false; }, noShape: ['spanning-tree', 'portfast'] }),
+  swc(['spanning-tree', 'bpduguard', ALT('b', ['enable', 'disable'])], ({ b }, s, sw) => { sw.bpduguard = b; return { out: '' }; }, { key: 'spanning-tree bpduguard', no: (_, s, sw) => { sw.bpduguard = null; }, noShape: ['spanning-tree', 'bpduguard', ALT('b', ['enable', 'disable'], { opt: true })] }),
+  swc(['channel-group', W('g', 'num'), 'mode', ALT('m', ['active', 'passive', 'on', 'desirable', 'auto'])], ({ g, m }, s, sw) => {
+    if (isPo(s.ctx.intf)) return { out: invalidAt(s, 0) };
+    if (g < 1 || g > 48) return { out: invalidAt(s, s.line.indexOf(String(g))) };
+    const name = `Port-channel${g}`;
+    const c = s.dev.config;
+    let out = '';
+    const others = s.dev.ports.filter(n => n !== s.ctx.intf && c.interfaces[n].sw?.channel?.group === g);
+    const proto = (x) => channelProtocolOf(x);
+    if (others.length && proto(c.interfaces[others[0]].sw.channel.mode) !== proto(m)) {
+      return { out: `Command rejected (Channel protocol mismatch for interface ${shortIf(s.ctx.intf)} in group ${g}): the interface can not be added to the channel group` };
+    }
+    if (!c.interfaces[name]) {
+      const po = makeSwitchport();
+      for (const k of SYNCED) po[k] = Array.isArray(sw[k]) ? [...sw[k]] : sw[k];
+      c.interfaces[name] = makeInterface(name, { shutdown: false, sw: po, cdp: true });
+      out = `Creating a port-channel interface Port-channel ${g}`;
+    } else {
+      const po = c.interfaces[name].sw;
+      for (const k of SYNCED) sw[k] = Array.isArray(po[k]) ? [...po[k]] : po[k];
+    }
+    sw.channel = { group: g, mode: m };
+    return { out };
+  }, { key: 'channel-group', no: (_, s, sw) => { sw.channel = null; }, noShape: ['channel-group'] }),
+  ...IFACE_COMMON,
+];
+
+const channelProtocolOf = (m) => (['active', 'passive'].includes(m) ? 'lacp' : ['desirable', 'auto'].includes(m) ? 'pagp' : 'none');
+
+const VLAN_MODE = [
+  cmd(['name', W('name', 'word')], ({ name }, s) => {
+    for (const v of s.ctx.vlans) s.dev.config.vlans[v].name = name;
+    return { out: '' };
+  }, { key: 'vlan name', no: (_, s) => { for (const v of s.ctx.vlans) s.dev.config.vlans[v].name = vlanName(v); }, noShape: ['name'] }),
   END,
-  cmd(['exit'], (_, s) => { s.mode = 'config'; s.ctx = {}; return { out: '' }; }),
+  cmd(['exit'], (_, s) => { s.mode = 'config'; s.ctx = {}; return { out: '' }; }, { once: true }),
 ];
 
 const ROUTER = [
@@ -584,7 +948,7 @@ const ROUTER = [
     return { out: '' };
   }, { key: 'passive-interface', no: ({ name }, s) => { const o = s.dev.config.ospf; o.passive = o.passive.filter(p => p !== name); } }),
   END,
-  cmd(['exit'], (_, s) => { s.mode = 'config'; s.ctx = {}; return { out: '' }; }),
+  cmd(['exit'], (_, s) => { s.mode = 'config'; s.ctx = {}; return { out: '' }; }, { once: true }),
 ];
 
 const LINE = [
@@ -601,29 +965,83 @@ const LINE = [
   }, { key: 'transport input', no: (_, s) => { s.dev.config.lines[s.ctx.line].transport = null; }, noShape: ['transport', 'input'] }),
   cmd(['exec-timeout', W('m', 'num'), W('sec', 'num', { opt: true })], ({ m, sec }, s) => { s.dev.config.lines[s.ctx.line].execTimeout = sec ? `${m} ${sec}` : `${m}`; return { out: '' }; }, { key: 'exec-timeout' }),
   END,
-  cmd(['exit'], (_, s) => { s.mode = 'config'; s.ctx = {}; return { out: '' }; }),
+  cmd(['exit'], (_, s) => { s.mode = 'config'; s.ctx = {}; return { out: '' }; }, { once: true }),
+];
+
+// ---------- a PC's command prompt ----------
+
+const winMac = (mac) => mac.replace(/\./g, '').toUpperCase().match(/../g).join('-');
+
+function pcPing(s, dstText) {
+  const dst = parseIp(dstText);
+  const nic = s.dev.config.interfaces.FastEthernet0;
+  if (nic.ip === null) return { text: `\nPinging ${dstText} with 32 bytes of data:\n\nPING: transmit failed. General failure. \nPING: transmit failed. General failure. \nPING: transmit failed. General failure. \nPING: transmit failed. General failure. \n\nPing statistics for ${dstText}:\n    Packets: Sent = 4, Received = 0, Lost = 4 (100% loss),`, ok: false, src: null };
+  const r = pingWorld(s.world, s.deviceId, dst, null);
+  const owner = Object.values(s.world.devices).find(dv => Object.values(dv.config.interfaces).some(i => i.ip === dst));
+  const ttl = owner?.kind === 'pc' ? 128 : 255;
+  const replies = r.ok ? Array(4).fill(`Reply from ${dstText}: bytes=32 time<1ms TTL=${ttl}`) : Array(4).fill('Request timed out.');
+  const stats = `Ping statistics for ${dstText}:\n    Packets: Sent = 4, Received = ${r.ok ? 4 : 0}, Lost = ${r.ok ? 0 : 4} (${r.ok ? 0 : 100}% loss),${r.ok ? '\nApproximate round trip times in milli-seconds:\n    Minimum = 0ms, Maximum = 1ms, Average = 0ms' : ''}`;
+  return { text: `\nPinging ${dstText} with 32 bytes of data:\n\n${replies.join('\n')}\n\n${stats}`, ok: r.ok, src: nic.ip };
+}
+
+const PC = [
+  cmd(['ipconfig', ALT('all', ['/all'], { opt: true })], ({ all }, s) => {
+    const nic = s.dev.config.interfaces.FastEthernet0;
+    const v = (x) => (x === null || x === undefined ? '0.0.0.0' : formatIp(x));
+    const lines = ['', 'Ethernet adapter FastEthernet0:', '', '   Connection-specific DNS Suffix  . :'];
+    if (all) lines.push(`   Physical Address. . . . . . . . . : ${winMac(s.dev.mac)}`, '   DHCP Enabled. . . . . . . . . . . : No');
+    lines.push(`   IPv4 Address. . . . . . . . . . . : ${v(nic.ip)}`, `   Subnet Mask . . . . . . . . . . . : ${v(nic.mask)}`, `   Default Gateway . . . . . . . . . : ${s.dev.config.gateway === null ? '' : formatIp(s.dev.config.gateway)}`);
+    if (all) lines.push(`   DNS Servers . . . . . . . . . . . : ${s.dev.config.dns === null ? '' : formatIp(s.dev.config.dns)}`);
+    return { out: lines.join('\n') };
+  }, { key: 'ipconfig' }),
+  cmd(['ipconfig', W('ip', 'ip'), W('mask', 'mask'), W('gw', 'ip', { opt: true })], ({ ip, mask, gw }, s) => {
+    const nic = s.dev.config.interfaces.FastEthernet0;
+    nic.ip = parseIp(ip);
+    nic.mask = parseIp(mask);
+    if (gw !== undefined) s.dev.config.gateway = parseIp(gw);
+    return { out: '' };
+  }, { key: 'ipconfig set' }),
+  cmd(['ping', W('dst', 'ip')], ({ dst }, s) => {
+    const r = pcPing(s, dst);
+    s.events.push({ kind: 'ping', dst: parseIp(dst), src: r.src, ok: r.ok });
+    return { out: r.text };
+  }, { key: 'ping' }),
+  cmd(['tracert', W('dst', 'ip')], ({ dst }, s) => {
+    const r = traceWorld(s.world, s.deviceId, parseIp(dst));
+    const hops = r.hops.map(h => h.ip);
+    if (r.ok && hops[hops.length - 1] !== parseIp(dst)) hops.push(parseIp(dst));
+    const rows = hops.map((ip, k) => `${lpad(k + 1, 3)}   0 ms      0 ms      0 ms      ${formatIp(ip)}`);
+    if (!r.ok) rows.push(`${lpad(hops.length + 1, 3)}   *         *         *         Request timed out.`);
+    s.events.push({ kind: 'trace', dst: parseIp(dst), ok: r.ok });
+    return { out: `\nTracing route to ${dst} over a maximum of 30 hops: \n\n${rows.join('\n')}\n\nTrace complete.` };
+  }, { key: 'tracert' }),
 ];
 
 const MODES = {
-  user: { specs: USER, prompt: (h) => `${h}>` },
-  exec: { specs: EXEC, prompt: (h) => `${h}#` },
-  config: { specs: GLOBAL, prompt: (h) => `${h}(config)#` },
-  if: { specs: IFACE, prompt: (h) => `${h}(config-if)#` },
-  router: { specs: ROUTER, prompt: (h) => `${h}(config-router)#` },
-  line: { specs: LINE, prompt: (h) => `${h}(config-line)#` },
+  user: { specs: { router: USER, switch: USER_SWITCH }, prompt: (h) => `${h}>` },
+  exec: { specs: { router: EXEC, switch: EXEC_SWITCH }, prompt: (h) => `${h}#` },
+  config: { specs: { router: GLOBAL, switch: GLOBAL_SWITCH }, prompt: (h) => `${h}(config)#` },
+  if: { specs: { router: IFACE, switch: IFACE_SWITCH }, prompt: (h, s) => `${h}(config-${s?.ctx?.range ? 'if-range' : isSub(s?.ctx?.intf ?? '') ? 'subif' : 'if'})#` },
+  router: { specs: { router: ROUTER, switch: ROUTER }, prompt: (h) => `${h}(config-router)#` },
+  line: { specs: { router: LINE, switch: LINE }, prompt: (h) => `${h}(config-line)#` },
+  vlan: { specs: { router: VLAN_MODE, switch: VLAN_MODE }, prompt: (h) => `${h}(config-vlan)#` },
+  pc: { specs: { pc: PC }, prompt: () => 'C:\\>' },
 };
 
-const isConfigMode = (mode) => ['config', 'if', 'router', 'line'].includes(mode);
+const isConfigMode = (mode) => ['config', 'if', 'router', 'line', 'vlan'].includes(mode);
 
 // The "no" form of each command that has one, as its own grammar.
 function noSpecs(specs) {
-  return specs.filter(s => s.no).map(s => ({ words: ['no', ...(s.noShape ?? s.words)], run: (args, sess) => { s.no(args, sess); return { out: '' }; }, key: `no ${s.key}` }));
+  return specs.filter(s => s.no).map(s => ({ words: ['no', ...(s.noShape ?? s.words)], run: (args, sess) => { s.no(args, sess); return { out: '' }; }, key: `no ${s.key}`, once: s.once }));
 }
 
-function specsFor(mode) {
-  const base = MODES[mode].specs;
+function specsFor(mode, kind = 'router') {
+  const table = MODES[mode].specs;
+  const base = table[kind] ?? table.router ?? table.pc;
   return isConfigMode(mode) ? [...base, ...noSpecs(base)] : base;
 }
+
+const execSpecs = (kind) => (kind === 'switch' ? EXEC_SWITCH : EXEC);
 
 // ---------- sessions ----------
 
@@ -631,13 +1049,16 @@ export function createSession(world, deviceId) {
   const events = [];
   const push = events.push.bind(events);
   events.push = (...items) => push(...items.map(e => ({ ...e, seq: (world.seq = (world.seq ?? 0) + 1), device: deviceId })));
-  return { world, deviceId, mode: 'user', ctx: {}, pending: null, history: [], events, notices: [], line: '', promptLength: 0 };
+  const kind = world.devices[deviceId]?.kind ?? 'router';
+  return { world, deviceId, kind, mode: kind === 'pc' ? 'pc' : 'user', ctx: {}, pending: null, history: [], events, notices: [], line: '', promptLength: 0 };
 }
+
+const kindOfSession = (session) => session.world.devices[session.deviceId]?.kind ?? 'router';
 
 export function prompt(session) {
   if (session.pending) return session.pending.prompt;
   const dev = session.world.devices[session.deviceId];
-  return MODES[session.mode].prompt(dev.config.hostname);
+  return MODES[session.mode].prompt(dev.config.hostname, session);
 }
 
 // What the console prints for each device when its own state changes.
@@ -672,8 +1093,26 @@ function diffNotices(before, after) {
 function runOne(session, specs, tokens) {
   const p = parse(specs, tokens);
   if (p.error) return p;
+  // interface range: the command runs once on each port in the range.
+  const range = session.mode === 'if' && session.ctx?.range && !p.spec.once ? session.ctx.range : null;
+  if (range) {
+    const outs = [];
+    let result = { out: '' };
+    for (const name of range) {
+      session.ctx.intf = name;
+      const mode = session.mode;
+      result = p.spec.run(p.args, session) ?? { out: '' };
+      if (result.out && !outs.includes(result.out)) outs.push(result.out);
+      session.events.push({ kind: 'command', key: p.spec.key ?? null, mode, intf: name });
+      if (session.mode !== 'if' || session.ctx?.range !== range) break;
+    }
+    if (session.mode === 'if' && session.ctx?.range === range) session.ctx.intf = range[0];
+    return { result: { ...result, out: outs.join('\n') } };
+  }
+  const mode = session.mode;
+  const intf = session.ctx?.intf ?? null;
   const result = p.spec.run(p.args, session) ?? { out: '' };
-  session.events.push({ kind: 'command', key: p.spec.key ?? null, mode: session.mode, intf: session.ctx?.intf ?? null });
+  session.events.push({ kind: 'command', key: p.spec.key ?? null, mode, intf });
   return { result };
 }
 
@@ -693,7 +1132,8 @@ export function execute(session, rawLine) {
   const finish = (text) => {
     refresh(world);
     const after = snapshot(world, session.deviceId);
-    const notices = [...session.notices, ...diffNotices(before, after)];
+    const logs = takeNotices(world, session.deviceId);
+    const notices = dev.kind === 'pc' ? [] : [...session.notices, ...logs, ...diffNotices(before, after)];
     return [text, ...notices].filter(t => t !== '' && t !== undefined && t !== null).join('\n');
   };
 
@@ -714,7 +1154,7 @@ export function execute(session, rawLine) {
 
   // Output filters on show commands: | include, | exclude, | begin, | section.
   const pipe = /^(.*?\S)\s*\|\s*(\S+)\s+(.+)$/.exec(line);
-  if (pipe && /^(do\s+)?sh/i.test(pipe[1])) {
+  if (pipe && session.mode !== 'pc' && /^(do\s+)?sh/i.test(pipe[1])) {
     const kind = ['include', 'exclude', 'begin', 'section'].find(k => k.startsWith(pipe[2].toLowerCase()));
     if (!kind) return invalidAt(session, line.indexOf(pipe[2]));
     session.line = pipe[1];
@@ -724,13 +1164,16 @@ export function execute(session, rawLine) {
   }
 
   const tokens = tokenize(line);
-  const specs = specsFor(session.mode);
+  const kind = kindOfSession(session);
+  const specs = specsFor(session.mode, kind);
 
   // "do" runs an EXEC command from any configuration mode.
   if (isConfigMode(session.mode) && tokens[0].text.toLowerCase() === 'do' && tokens.length > 1) {
     const saved = session.mode;
+    const savedCtx = session.ctx;
     session.mode = 'exec';
-    const r = runOne(session, EXEC, tokens.slice(1));
+    const r = runOne(session, execSpecs(kind), tokens.slice(1));
+    if (session.mode === 'exec') { session.mode = saved; session.ctx = savedCtx; }
     session.mode = saved;
     if (r.error) return finish(errorText(session, r, tokens.slice(1)));
     const text = r.result.out;
@@ -740,10 +1183,10 @@ export function execute(session, rawLine) {
 
   let r = runOne(session, specs, tokens);
   // A sub-mode falls back to global configuration, leaving the sub-mode.
-  if (r.error && ['if', 'router', 'line'].includes(session.mode)) {
+  if (r.error && ['if', 'router', 'line', 'vlan'].includes(session.mode)) {
     const saved = { mode: session.mode, ctx: session.ctx };
     session.mode = 'config';
-    const g = runOne(session, specsFor('config'), tokens);
+    const g = runOne(session, specsFor('config', kind), tokens);
     if (!g.error) r = g;
     else { session.mode = saved.mode; session.ctx = saved.ctx; }
   }
@@ -804,8 +1247,9 @@ function help(session, line) {
   const body = line.slice(0, -1);
   const partial = /\S$/.test(body);
   let tokens = tokenize(body);
-  let specs = specsFor(session.mode);
-  if (isConfigMode(session.mode) && tokens[0]?.text.toLowerCase() === 'do') { specs = EXEC; tokens = tokens.slice(1); }
+  const kind = kindOfSession(session);
+  let specs = specsFor(session.mode, kind);
+  if (isConfigMode(session.mode) && tokens[0]?.text.toLowerCase() === 'do') { specs = execSpecs(kind); tokens = tokens.slice(1); }
   if (partial) {
     const last = tokens.pop().text.toLowerCase();
     const { words } = nextChoices(specs, tokens);
@@ -822,8 +1266,9 @@ function help(session, line) {
 export function complete(session, line) {
   if (/\s$/.test(line) || !line.trim()) return line;
   let tokens = tokenize(line);
-  let specs = specsFor(session.mode);
-  if (isConfigMode(session.mode) && tokens[0]?.text.toLowerCase() === 'do' && tokens.length > 1) { specs = EXEC; tokens = tokens.slice(1); }
+  const kind = kindOfSession(session);
+  let specs = specsFor(session.mode, kind);
+  if (isConfigMode(session.mode) && tokens[0]?.text.toLowerCase() === 'do' && tokens.length > 1) { specs = execSpecs(kind); tokens = tokens.slice(1); }
   const last = tokens.pop();
   const { words } = nextChoices(specs, tokens);
   const hits = words.filter(w => /^[a-z]/.test(w) && w.toLowerCase().startsWith(last.text.toLowerCase()));

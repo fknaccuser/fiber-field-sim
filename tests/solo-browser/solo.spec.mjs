@@ -427,6 +427,28 @@ test.describe('Do labs', () => {
     await expect(page.locator('.sk-sheet .sk-lab', { hasText: 'Static routes end to end' })).toContainText('Passed clean');
   });
 
+  test('a switch lab runs switch IOS and a PC prompt side by side', async ({ page }) => {
+    await enableMap(page);
+    await page.click('.sk-back:has-text("Map")');
+    await page.click('.sk-node[data-tree="t2"]');
+    await page.locator('.sk-branch-row', { hasText: 'Trunks' }).click();
+    await page.locator('.sk-lab', { hasText: 'Trunk between two switches' }).locator('.sk-go').click();
+    await page.click('.lab-stage:has-text("Typed")');
+    await expect(page.locator('.lab-tab')).toHaveCount(6);
+    const type = async (line) => { await page.fill('.lab-command', line); await page.press('.lab-command', 'Enter'); };
+    for (const l of ['en', 'show interfaces g0/1 switchport']) await type(l);
+    await expect(page.locator('.lab-screen')).toContainText('Operational Mode: static access');
+    await page.fill('.lab-goal[data-goal="mode"] .lab-ask-input', 'static access');
+    await page.click('.lab-goal[data-goal="mode"] .lab-ask-go');
+    for (const l of ['conf t', 'int g0/1', 'switchport mode trunk']) await type(l);
+    await expect(page.locator('.lab-goal[data-goal="trunk1"]')).toHaveClass(/is-done/);
+    await expect(page.locator('.lab-prompt')).toHaveText('SW1(config-if)#');
+    await page.click('.lab-tab[data-device="PC1"]');
+    await expect(page.locator('.lab-prompt')).toHaveText('C:\\>');
+    await type('ping 10.0.10.12');
+    await expect(page.locator('.lab-screen')).toContainText('Reply from 10.0.10.12');
+  });
+
   test('a guided lab is played by picking answers and tiles, then offers Assisted', async ({ page }) => {
     await enableMap(page);
     await page.click('.sk-back:has-text("Map")');

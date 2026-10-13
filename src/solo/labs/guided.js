@@ -12,6 +12,8 @@
 // because knowing which mode a command lives in is half of IOS. A mode step
 // the router is already in is skipped at run time.
 
+import { GUIDED_SWITCH } from './guided-switch.js';
+
 const Q = (q, choices) => ({ q, choices: choices.map(([text, ok, why]) => ({ text, ok: Boolean(ok), why })) });
 const S = (device, tiles, traps = []) => ({ device, tiles, traps: traps.map(([text, why]) => ({ text, why })) });
 
@@ -506,5 +508,7 @@ export const GUIDED = {
     ]),
   },
 };
+
+Object.assign(GUIDED, GUIDED_SWITCH);
 
 export const guidedFor = (labId) => GUIDED[labId] ?? null;

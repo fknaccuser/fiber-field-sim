@@ -8,6 +8,12 @@ import { branchById } from '../../src/solo/tree/ccna.js';
 const ANSWERS = {
   'route-reading': { exit: 'Gi0/0', admet: '110/3', gw: '203.0.113.1', nbr: '2.2.2.2' },
   'ospf-dr': { who: '3.3.3.3' },
+  'sw-mac-table': { where: 'Fa0/7' },
+  'sw-trunk': { mode: 'static access' },
+  'sw-etherchannel': { blocked: 'Gi0/2' },
+  'sw-stp': { who: 'ACC1', blocked: 'ACC1 Gi0/2' },
+  'sw-portsec': { state: 'err-disabled' },
+  'sw-cdp': { edgeport: 'Fa0/24', sw3port: 'Gi0/1', edgeip: '172.16.0.1' },
 };
 
 // Play a lab the way the "show me" help would: each goal's commands in order.
@@ -44,7 +50,8 @@ for (const lab of LABS) {
 }
 
 test('every Do tier on the map that labs cover has at least one lab', () => {
-  for (const id of ['t0-nav', 't0-base', 't0-save', 't0-remote', 't0-inspect', 't3-table', 't3-static', 't3-ospf']) {
+  for (const id of ['t0-nav', 't0-base', 't0-save', 't0-remote', 't0-inspect', 't3-table', 't3-static', 't3-ospf',
+    't1-switching', 't1-client', 't2-vlans', 't2-trunks', 't2-etherchannel', 't2-stp', 't2-discovery', 't5-l2sec', 't5-access']) {
     assert.ok(labsForBranch(id).length > 0, id);
   }
 });
