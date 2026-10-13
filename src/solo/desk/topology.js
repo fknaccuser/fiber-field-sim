@@ -67,14 +67,19 @@ export function renderTopology(world, order, { onPick, current = null } = {}) {
       const edge = (node) => { const [w, h] = SIZE[node.kind]; return Math.min((w / 2) / (Math.abs(ux) || 1e-6), (h / 2) / (Math.abs(uy) || 1e-6)); };
       const place = (node, sx, sy, dir, name, st) => {
         if (name === 'FastEthernet0') return; // a PC's only NIC needs no label
-        const d = edge(node) + 1.6;
+        // Toward a PC, put the switch's port name partway down the cable,
+        // where fanned-out cables have room between them.
+        const far = node === A ? B : A;
+        const d = far.kind === 'pc' && node.kind !== 'pc' ? Math.max(edge(node) + 1.6, len * 0.42) : edge(node) + 1.6;
         const x = sx + dir * ux * d;
         const y = sy + dir * uy * d;
         // Parallel cables put their labels on their own outer side.
         const out = off < 0 ? -1 : 1;
+        // A steep cable leaning left gets its label on the left.
+        const lean = off !== 0 ? out : (dir * ux < 0.15 ? -1 : 1);
         const side = Math.abs(ux) > Math.abs(uy)
           ? { dx: 0, dy: out < 0 ? -1.3 : 3, anchor: 'middle' }
-          : { dx: out * 1.6, dy: 1, anchor: out < 0 ? 'end' : 'start' };
+          : { dx: (lean < 0 ? -1 : 1) * 1.6, dy: 1, anchor: lean < 0 ? 'end' : 'start' };
         labels.append(s('text', { x: x + side.dx, y: y + side.dy, 'text-anchor': side.anchor, class: `desk-port is-${st}` }, short(name)));
       };
       place(A, x1, y1, 1, ia, ends[0]);

@@ -10,6 +10,13 @@ import { CCNA_MAP, ALL_BRANCHES, TIERS } from './ccna.js';
 import { CCNA_BANK } from '../study/questions.js';
 import { inBlueprint, sampleExam } from '../study/bank.js';
 import { labsForBranch } from '../labs/catalog.js';
+import { TEMPLATES } from '../desk/jobs.js';
+
+// Branches the Field desk can light: builds and changes light Do, repair
+// tickets light Fix.
+const DESK_DO = new Set(TEMPLATES.filter(t => !t.kind.startsWith('repair')).flatMap(t => t.lights));
+const DESK_FIX = new Set(TEMPLATES.filter(t => t.kind.startsWith('repair')).flatMap(t => t.lights));
+export const deskLights = (branchId, tier) => (tier === 'fix' ? DESK_FIX : DESK_DO).has(branchId);
 
 const DAY = 86_400_000;
 // A light starts dimming after two weeks untouched and is dark after six.
@@ -23,7 +30,7 @@ export const FINAL_SIZE = 50;
 export const EXAM_PASS = 0.85;
 
 export function emptyRecord() {
-  return { know: {}, labs: {}, exams: {}, final: null, seen: {}, desk: {} };
+  return { know: {}, labs: {}, exams: {}, final: null, seen: {}, desk: {}, deskDo: {}, deskFix: {} };
 }
 
 export function normalizeRecord(raw) {
@@ -35,6 +42,8 @@ export function normalizeRecord(raw) {
     final: r.final && typeof r.final === 'object' ? r.final : null,
     seen: r.seen && typeof r.seen === 'object' ? r.seen : {},
     desk: r.desk && typeof r.desk === 'object' ? r.desk : {},
+    deskDo: r.deskDo && typeof r.deskDo === 'object' ? r.deskDo : {},
+    deskFix: r.deskFix && typeof r.deskFix === 'object' ? r.deskFix : {},
   };
 }
 
@@ -84,6 +93,16 @@ function freshness(at, now) {
   return 1 - (days - FADE_START_DAYS) / (FADE_END_DAYS - FADE_START_DAYS);
 }
 
+// The stronger of two lights: mastered beats practiced; the later wins a tie.
+function stronger(lit, desk, source) {
+  if (!desk?.state) return lit;
+  const other = { state: desk.state, at: desk.at, source };
+  if (!lit) return other;
+  const rank = (x) => (x.state === 'mastered' ? 2 : 1);
+  if (rank(other) !== rank(lit)) return rank(other) > rank(lit) ? other : lit;
+  return String(other.at) > String(lit.at) ? other : lit;
+}
+
 // tierState -> { state, fresh, at, source }
 //   state: 'mastered' | 'practiced' | 'faded' | 'off' | 'soon' | 'none'
 //   'soon'  the tier exists for this skill but the app cannot test it yet
@@ -95,21 +114,25 @@ export function tierState(branch, tier, { record = emptyRecord(), completedRuns 
     const k = record.know[branch.id];
     if (k?.state) lit = { state: k.state, at: k.at, source: k.source ?? 'check' };
   } else if (tier === 'fix') {
-    if (!branch.recipes?.length) return { state: 'soon', fresh: 0, at: null, source: null };
-    const runs = completedRuns.filter(r => r?.mode === 'repair' && (r.recipes ?? []).some(id => branch.recipes.includes(id)));
+    // Fix is lit by repair tickets: the Field desk's, and the older Field's.
+    if (!branch.recipes?.length && !deskLights(branch.id, 'fix')) return { state: 'soon', fresh: 0, at: null, source: null };
+    const runs = completedRuns.filter(r => r?.mode === 'repair' && (r.recipes ?? []).some(id => (branch.recipes ?? []).includes(id)));
     const clean = runs.filter(r => !r.assisted).sort((a, b) => String(b.completedAt).localeCompare(String(a.completedAt)))[0];
     const helped = runs.filter(r => r.assisted).sort((a, b) => String(b.completedAt).localeCompare(String(a.completedAt)))[0];
     if (clean) lit = { state: 'mastered', at: clean.completedAt, source: 'ticket' };
     else if (helped) lit = { state: 'practiced', at: helped.completedAt, source: 'ticket' };
+    lit = stronger(lit, record.deskFix?.[branch.id], 'desk');
   } else if (tier === 'do') {
-    // Do is lit by the branch's labs: mastered once every one is passed
-    // without help, practiced once any is finished at all.
+    // Do is lit by the branch's labs (mastered once every one is passed
+    // without help, practiced once any is finished) or by a clean Field
+    // desk work order.
     const labs = labsForBranch(branch.id);
-    if (!labs.length) return { state: 'soon', fresh: 0, at: null, source: null };
+    if (!labs.length && !deskLights(branch.id, 'do')) return { state: 'soon', fresh: 0, at: null, source: null };
     const results = labs.map(l => record.labs?.[l.id]).filter(Boolean);
     const times = results.map(r => r.at).sort();
-    if (results.length === labs.length && results.every(r => r.state === 'mastered')) lit = { state: 'mastered', at: times[0], source: 'lab' };
+    if (labs.length && results.length === labs.length && results.every(r => r.state === 'mastered')) lit = { state: 'mastered', at: times[0], source: 'lab' };
     else if (results.length) lit = { state: 'practiced', at: times[times.length - 1], source: 'lab' };
+    lit = stronger(lit, record.deskDo?.[branch.id], 'desk');
   }
   if (!lit) return { state: 'off', fresh: 0, at: null, source: null };
   const fresh = freshness(lit.at, now);
@@ -327,7 +350,7 @@ export function nextStep(progress, map = CCNA_MAP) {
 
 // A Field desk work order, graded. Kept per kind: runs, the best score in
 // each mode, and the last attempt.
-export function recordDesk(record, { kind, mode, pct, helped = false, seed = null }, now = Date.now()) {
+export function recordDesk(record, { kind, mode, pct, helped = false, seed = null, lights = [] }, now = Date.now()) {
   const prior = record.desk?.[kind] ?? { runs: 0, best: null, bestSim: null, last: null };
   const at = new Date(now).toISOString();
   const next = {
@@ -336,5 +359,18 @@ export function recordDesk(record, { kind, mode, pct, helped = false, seed = nul
     bestSim: mode === 'sim' && !helped ? Math.max(prior.bestSim ?? 0, pct) : prior.bestSim,
     last: { pct, mode, helped, seed, at },
   };
-  return { ...record, desk: { ...(record.desk ?? {}), [kind]: next } };
+  let out = { ...record, desk: { ...(record.desk ?? {}), [kind]: next } };
+  // A full score lights the branches the order exercises: Fix for a repair
+  // ticket, Do for a build or change. Mastered only in sim mode, unhelped.
+  if (pct === 100 && lights.length) {
+    const key = kind.startsWith('repair') ? 'deskFix' : 'deskDo';
+    const state = mode === 'sim' && !helped ? 'mastered' : 'practiced';
+    const table = { ...(record[key] ?? {}) };
+    for (const b of lights) {
+      const prior = table[b];
+      table[b] = prior?.state === 'mastered' && state !== 'mastered' ? { ...prior } : { state, at };
+    }
+    out = { ...out, [key]: table };
+  }
+  return out;
 }

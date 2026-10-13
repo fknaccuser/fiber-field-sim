@@ -33,9 +33,12 @@ const clock = (ms) => {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 };
 const NOTE_MIN = 12;
+const SWITCH_BUILDS = ['build-access', 'build-ssh', 'build-vlans', 'build-uplink', 'build-bundle', 'build-edge'];
+const groupOf = (kind) => (kind.startsWith('repair') ? 'Trouble tickets' : kind.startsWith('change') ? 'Changes' : SWITCH_BUILDS.includes(kind) ? 'Switch builds' : 'Router builds');
 
-// createDesk({ getRecord, onRecord, onExit })
-export function createDesk({ getRecord, onRecord, onExit } = {}) {
+// createDesk({ getRecord, onRecord, onExit, start })
+// start = { kind, seed, fault?, mode } opens straight onto that order.
+export function createDesk({ getRecord, onRecord, onExit, start = null } = {}) {
   const root = el('section', 'desk');
   const ui = { view: 'queue', batch: TEMPLATES.map(t => ({ kind: t.kind, seed: newSeed() })), tab: 'order' };
   let run = null;
@@ -52,15 +55,23 @@ export function createDesk({ getRecord, onRecord, onExit } = {}) {
     top.append(title);
     root.append(top);
     root.append(el('p', 'desk-intro', 'Build jobs on switches fresh from the box. Every order is new: other names, other VLANs, other ports. Learning ticks as you go; Sim runs against the clock and grades like the exam.'));
-    const list = el('div', 'desk-queue');
     const record = getRecord?.() ?? {};
+    let list = null;
+    let group = null;
     for (const item of ui.batch) {
+      const g = groupOf(item.kind);
+      if (g !== group) {
+        group = g;
+        root.append(el('h2', 'desk-group', g));
+        list = el('div', 'desk-queue');
+        root.append(list);
+      }
       const order = makeOrder(item.kind, item.seed);
       const card = el('article', 'desk-card');
       const head = el('div', 'desk-card-head');
       head.append(el('span', 'desk-num', order.number), el('span', `desk-pri is-${order.priority.toLowerCase()}`, order.priority));
       card.append(head, el('h2', null, order.title), el('p', 'desk-card-site', `${order.site} · ${order.requester}`));
-      const tags = el('p', 'desk-card-tags', order.lights.map(b => branchById(b)?.name).filter(Boolean).join(' · '));
+      const tags = el('p', 'desk-card-tags', item.kind.startsWith('repair') ? 'Fault unknown until you look' : order.lights.map(b => branchById(b)?.name).filter(Boolean).join(' · '));
       card.append(tags);
       const past = record.desk?.[item.kind];
       if (past) card.append(el('p', 'desk-card-past', `Best ${past.best}%${past.bestSim !== null && past.bestSim !== undefined ? ` · best sim ${past.bestSim}%` : ''} · ${past.runs} run${past.runs === 1 ? '' : 's'}`));
@@ -69,13 +80,12 @@ export function createDesk({ getRecord, onRecord, onExit } = {}) {
       card.append(row);
       list.append(card);
     }
-    root.append(list);
     root.append(btn('sk-back desk-reroll', 'New batch of orders', () => { ui.batch = TEMPLATES.map(t => ({ kind: t.kind, seed: newSeed() })); draw(); }));
   }
 
   // ---------- an order ----------
   function openOrder(item, mode) {
-    const order = makeOrder(item.kind, item.seed);
+    const order = makeOrder(item.kind, item.seed, item.fault ? { fault: item.fault } : {});
     const world = buildWorld(order);
     run = {
       item, order, world, mode, baseline: baselineOf(world),
@@ -283,7 +293,7 @@ export function createDesk({ getRecord, onRecord, onExit } = {}) {
     const g = grade(run.order, run.world, run.baseline, { elapsedMs: Date.now() - run.started });
     run.result = g;
     run.submitting = false;
-    onRecord?.({ kind: run.order.kind, mode: run.mode, pct: g.pct, helped: run.helped.size > 0, seed: run.item.seed, note: run.note });
+    onRecord?.({ kind: run.order.kind, mode: run.mode, pct: g.pct, helped: run.helped.size > 0, seed: run.item.seed, note: run.note, lights: run.order.lights });
     ui.view = 'result';
     draw();
     window.scrollTo?.(0, 0);
@@ -356,6 +366,7 @@ export function createDesk({ getRecord, onRecord, onExit } = {}) {
   }
 
   root.destroy = stopTimer;
-  draw();
+  if (start) openOrder({ kind: start.kind, seed: start.seed, fault: start.fault ?? null }, start.mode ?? 'learn');
+  else draw();
   return root;
 }

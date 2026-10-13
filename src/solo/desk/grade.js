@@ -37,7 +37,7 @@ export function configEntries(dev) {
   for (const line of runningConfig(dev).split('\n').slice(3)) {
     if (line === '!' || line === 'end' || !line.trim()) continue;
     if (/^\S/.test(line)) {
-      if (/^(interface|line|router) /.test(line)) { header = line; out.add(`${header}|`); } else { header = 'global'; out.add(`global|${line}`); }
+      if (/^(interface|line|router|ip dhcp pool|ip access-list) /.test(line)) { header = line; out.add(`${header}|`); } else { header = 'global'; out.add(`global|${line}`); }
     } else out.add(`${header}|${line.trim()}`);
   }
   for (const [v, x] of Object.entries(dev.config.vlans ?? {})) out.add(`vlan|${v} ${x.name}`);
@@ -88,3 +88,6 @@ export function grade(order, world, baseline, { elapsedMs = 0 } = {}) {
   const pct = Math.max(0, Math.round((100 * (got - extras.length)) / total));
   return { reqs, tests, extras, total, got, pct, elapsedMs, over: elapsedMs > order.minutes * 60000 };
 }
+
+// A copy of the world to try things in without touching the learner's.
+export const cloneWorld = (world) => JSON.parse(JSON.stringify(world));

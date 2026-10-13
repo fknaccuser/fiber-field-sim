@@ -11,11 +11,15 @@
 // "interface g0/1" works from inside another interface.
 
 import {
-  interfaceState, routingTable, neighbors, ospfEnabled, ospfRole, ospfCost, ping as pingWorld, trace as traceWorld,
+  interfaceState, routingTable, neighbors, ospfEnabled, ospfRole, ospfCost, ping as pingWorld, trace as traceWorld, exchange, requestDhcp,
   refresh, clearOspf, save, unsaved, reload, makeInterface, l2Of, takeNotices,
 } from './world.js';
 import { parseIp, formatIp, maskToLen, lenToMask, network, isIp, isMask, classfulLen } from './ip4.js';
 import { makeSwitchport, parseVlanList, formatVlanList, isSub, isSvi, isPo, parentOf } from './switching.js';
+import {
+  aclKind, parseAce, addAce, showAccessLists, aclConfigLines, emptyNat, natConfigLines, showNatTranslations,
+  emptyDhcp, dhcpConfigLines, showDhcpBinding,
+} from './services.js';
 import {
   showVlanBrief, showInterfacesStatus, showInterfacesTrunk, showSwitchport, showInterface, showMacTable, showSpanningTree,
   showEtherchannelSummary, showPortSecurity, showPortSecurityInterface, showCdpNeighbors, showCdpDetail, showLldpNeighbors, showHostRoute,
@@ -196,6 +200,8 @@ export function runningConfig(dev) {
   for (const [name, u] of Object.entries(c.users)) L.push(`username ${name}${u.privilege ? ` privilege ${u.privilege}` : ''} ${u.secret ? `secret 9 ${fakeHash(u.secret)}` : `password ${u.password}`}`);
   if (Object.keys(c.users).length) L.push('!');
   if (c.domain) L.push(`ip domain name ${c.domain}`, '!');
+  if (c.timestamps) L.push('service timestamps log datetime msec', '!');
+  L.push(...dhcpConfigLines(dev));
   if (c.servicePasswordEncryption) L.push('service password-encryption', '!');
   if (isSwitch) {
     L.push(`spanning-tree mode ${c.stp.mode}`);
@@ -228,6 +234,10 @@ export function runningConfig(dev) {
     if (i.ospf.priority !== 1) L.push(` ip ospf priority ${i.ospf.priority}`);
     if (i.ospf.cost !== null) L.push(` ip ospf cost ${i.ospf.cost}`);
     if (i.ospf.pid !== null) L.push(` ip ospf ${i.ospf.pid} area ${i.ospf.area}`);
+    if (i.helper) L.push(` ip helper-address ${formatIp(i.helper)}`);
+    if (i.aclIn) L.push(` ip access-group ${i.aclIn} in`);
+    if (i.aclOut) L.push(` ip access-group ${i.aclOut} out`);
+    if (i.nat) L.push(` ip nat ${i.nat}`);
     if (i.cdp === false) L.push(' no cdp enable');
     if (i.shutdown) L.push(' shutdown');
     L.push('!');
@@ -243,6 +253,10 @@ export function runningConfig(dev) {
   for (const s of c.statics) L.push(`ip route ${formatIp(s.net)} ${formatIp(lenToMask(s.len))}${s.intf ? ` ${s.intf}` : ''}${s.nh !== null && s.nh !== undefined ? ` ${formatIp(s.nh)}` : ''}${s.ad !== 1 ? ` ${s.ad}` : ''}`);
   if (c.sshVersion) L.push(`ip ssh version ${c.sshVersion}`);
   if (c.statics.length || c.sshVersion) L.push('!');
+  const svc = [...natConfigLines(dev), ...aclConfigLines(dev)];
+  if (svc.length) L.push(...svc, '!');
+  const ops = [...(c.logHosts ?? []).map(h => `logging host ${formatIp(h)}`), ...(c.ntp ?? []).map(h => `ntp server ${formatIp(h)}`)];
+  if (ops.length) L.push(...ops, '!');
   if (c.banner) L.push(`banner motd ^C${c.banner}^C`, '!');
   const blocks = [['con', 'line con 0'], ['vty', 'line vty 0 4']];
   if (isSwitch) blocks.push(['vty', 'line vty 5 15']);
@@ -387,7 +401,7 @@ function pingText(world, deviceId, dstText, sourceText) {
   const head = `Type escape sequence to abort.\nSending 5, 100-byte ICMP Echos to ${dstText}, timeout is 2 seconds:${src !== null ? `\nPacket sent with a source address of ${formatIp(src)}` : ''}`;
   return r.ok
     ? { text: `${head}\n!!!!!\nSuccess rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms`, ok: true, src }
-    : { text: `${head}\n.....\nSuccess rate is 0 percent (0/5)`, ok: false, src };
+    : { text: `${head}\n${r.reason === 'acl' && r.stage === 'there' ? 'U.U.U' : '.....'}\nSuccess rate is 0 percent (0/5)`, ok: false, src };
 }
 
 // ---------- the commands ----------
@@ -427,7 +441,51 @@ const SHOW_COMMON = [
   cmd(['show', 'interfaces', W('name', 'intf')], ({ name }, s) => ({ out: intfArg(s, name) ?? showInterface(s.world, s.deviceId, name) }), { key: 'show interfaces' }),
 ];
 
+
+// ---------- ACLs, NAT, DHCP, NTP, logging (routers) ----------
+
+function showIpInterface(world, dev, name) {
+  const i = dev.config.interfaces[name];
+  const st = interfaceState(world, dev.id, name);
+  const lines = [`${name} is ${st.status}, line protocol is ${st.protocol}`];
+  lines.push(i.ip !== null ? `  Internet address is ${formatIp(i.ip)}/${maskToLen(i.mask)}` : '  Internet protocol processing disabled');
+  if (i.ip !== null) {
+    lines.push('  Broadcast address is 255.255.255.255');
+    lines.push(`  Helper address is ${i.helper ? formatIp(i.helper) : 'not set'}`);
+    lines.push(`  Outgoing Common access list is not set`, `  Outgoing access list is ${i.aclOut ?? 'not set'}`, `  Inbound Common access list is not set`, `  Inbound  access list is ${i.aclIn ?? 'not set'}`);
+    lines.push(`  IP NAT ${i.nat ? `${i.nat} interface` : 'disabled'}`);
+  }
+  return lines.join('\n');
+}
+
+function showNtp(world, dev) {
+  const servers = dev.config.ntp ?? [];
+  if (!servers.length) return '%NTP is not enabled.';
+  const out = ['  address         ref clock       st   when   poll reach  delay  offset   disp'];
+  for (const sv of servers) {
+    const ok = pingWorld(world, dev.id, sv).ok;
+    out.push(`${ok ? '*~' : ' ~'}${formatIp(sv).padEnd(16)}${ok ? '.GPS.'.padEnd(16) : '.INIT.'.padEnd(16)}${ok ? '  1' : ' 16'}     ${ok ? '12' : ' -'}     64   ${ok ? '377' : '  0'}  1.021   0.214  0.091`);
+  }
+  out.push(' * sys.peer, # selected, + candidate, - outlyer, x falseticker', ' ~ configured');
+  return out.join('\n');
+}
+
+const SHOW_SERVICES = [
+  cmd(['show', ALT('ipkw', ['ip'], { opt: true }), 'access-lists', W('name', 'word', { opt: true })], ({ name }, s) => ({ out: showAccessLists(s.dev, name ?? null) }), { key: 'show access-lists' }),
+  cmd(['show', 'ip', 'nat', 'translations'], (_, s) => ({ out: showNatTranslations(s.world, s.dev) }), { key: 'show ip nat translations' }),
+  cmd(['show', 'ip', 'dhcp', 'binding'], (_, s) => ({ out: showDhcpBinding(s.world, s.dev) }), { key: 'show ip dhcp binding' }),
+  cmd(['show', 'ip', 'interface', W('name', 'intf')], ({ name }, s) => ({ out: intfArg(s, name) ?? showIpInterface(s.world, s.dev, name) }), { key: 'show ip interface' }),
+  cmd(['show', 'ntp', 'associations'], (_, s) => ({ out: showNtp(s.world, s.dev) }), { key: 'show ntp associations' }),
+];
+
+const CLEAR_NAT = cmd(['clear', 'ip', 'nat', 'translation', W('star', 'word')], ({ star }, s) => {
+  if (star !== '*') return { out: invalidAt(s, s.line.indexOf(star)) };
+  if (s.world.natTable) s.world.natTable[s.deviceId] = [];
+  return { out: '' };
+}, { key: 'clear ip nat translation' });
+
 const SHOW = [
+  ...SHOW_SERVICES,
   cmd(['show', 'ip', 'route', ALT('filter', ['connected', 'static', 'ospf'], { opt: true })], ({ filter }, s) => ({ out: showIpRoute(s.world, s.deviceId, filter ?? null) }), { key: 'show ip route' }),
   cmd(['show', 'ip', 'ospf', 'neighbor'], (_, s) => ({ out: showOspfNeighbor(s.world, s.deviceId) }), { key: 'show ip ospf neighbor' }),
   cmd(['show', 'ip', 'ospf', 'interface', 'brief'], (_, s) => ({ out: showOspfIntBrief(s.world, s.deviceId) }), { key: 'show ip ospf interface brief' }),
@@ -514,7 +572,7 @@ const ENABLE = cmd(['enable'], (_, s) => {
 const LOGOUT = cmd([ALT('how', ['exit', 'logout'])], (_, s) => { s.mode = 'user'; return { out: `\n${s.dev.config.hostname} con0 is now available\n\nPress RETURN to get started.` }; });
 
 const USER = [ENABLE, LOGOUT, PING, TRACEROUTE, ...SHOW];
-const EXEC = [...PRIV_ONLY, CLEAR_OSPF, LOGOUT, PING, TRACEROUTE, ...SHOW];
+const EXEC = [...PRIV_ONLY, CLEAR_OSPF, CLEAR_NAT, LOGOUT, PING, TRACEROUTE, ...SHOW];
 const USER_SWITCH = [ENABLE, LOGOUT, PING, TRACEROUTE, ...SHOW_SWITCH];
 const EXEC_SWITCH = [...PRIV_ONLY, CLEAR_MAC, LOGOUT, PING, TRACEROUTE, ...SHOW_SWITCH];
 
@@ -628,8 +686,126 @@ const GLOBAL_COMMON = [
   cmd(['exit'], (_, s) => { s.mode = 'exec'; return { out: '' }; }, { once: true }),
 ];
 
+const ensureNat = (c) => (c.nat ??= emptyNat());
+const ensureDhcp = (c) => (c.dhcp ??= emptyDhcp());
+
+// "network 10.0.0.0 255.255.255.0" or "network 10.0.0.0 /24".
+function readNetwork(text) {
+  const m = /^(\S+)\s+(\/\d+|\S+)$/.exec(text.trim());
+  if (!m || !isIp(m[1])) return null;
+  const len = m[2].startsWith('/') ? Number(m[2].slice(1)) : maskToLen(m[2]);
+  if (len === null || len > 30) return null;
+  return { net: network(parseIp(m[1]), len), len };
+}
+
+const ACL_GLOBAL = [
+  cmd(['access-list', W('name', 'num'), W('rest', 'rest')], ({ name, rest }, s) => {
+    const kind = aclKind(name);
+    if (!kind) return { out: invalidAt(s, s.line.indexOf(String(name))) };
+    const e = parseAce(kind, rest);
+    if (!e) return { out: invalidAt(s, s.line.indexOf(rest)) };
+    return { out: addAce(s.dev, String(name), kind, e) };
+  }, { key: 'access-list', no: ({ name }, s) => { if (s.dev.config.acls) delete s.dev.config.acls[String(name)]; }, noShape: ['access-list', W('name', 'num'), W('rest', 'rest', { opt: true })] }),
+  cmd(['ip', 'access-list', ALT('kind', ['standard', 'extended']), W('name', 'word')], ({ kind, name }, s) => {
+    const c = s.dev.config;
+    c.acls ??= {};
+    if (c.acls[name] && c.acls[name].kind !== kind) return { out: `% A named access list of another type exists with name ${name}` };
+    c.acls[name] ??= { kind, named: aclKind(name) === null, entries: [] };
+    s.mode = 'acl';
+    s.ctx = { acl: name, kind };
+    return { out: '' };
+  }, { key: 'ip access-list', no: ({ name }, s) => { if (s.dev.config.acls) delete s.dev.config.acls[name]; } }),
+  cmd(['ip', 'nat', 'inside', 'source', 'list', W('acl', 'word'), ALT('how', ['interface', 'pool']), W('target', 'rest')], ({ acl, how, target }, s) => {
+    const t = target.trim().split(/\s+/);
+    const overload = t[t.length - 1]?.toLowerCase() === 'overload';
+    if (overload) t.pop();
+    const nat = ensureNat(s.dev.config);
+    let rule;
+    if (how === 'interface') {
+      const r = readInterface(t.map(x => ({ text: x })), 0);
+      if (!r || !s.dev.config.interfaces[r.name]) return { out: invalidAt(s, s.line.indexOf(target)) };
+      rule = { acl, iface: r.name, pool: null, overload: true };
+      if (!overload) return { out: '% Interface overload is the only form this lab supports; add overload.' };
+    } else {
+      if (t.length !== 1) return { out: invalidAt(s, s.line.indexOf(target)) };
+      rule = { acl, iface: null, pool: t[0], overload };
+    }
+    nat.rules = nat.rules.filter(r => r.acl !== acl);
+    nat.rules.push(rule);
+    return { out: '' };
+  }, { key: 'ip nat inside source list', no: ({ acl }, s) => { const nat = s.dev.config.nat; if (nat) nat.rules = nat.rules.filter(r => r.acl !== acl); }, noShape: ['ip', 'nat', 'inside', 'source', 'list', W('acl', 'word'), W('rest', 'rest', { opt: true })] }),
+  cmd(['ip', 'nat', 'inside', 'source', 'static', W('local', 'ip'), W('global', 'ip')], ({ local, global }, s) => {
+    const nat = ensureNat(s.dev.config);
+    nat.statics = nat.statics.filter(x => x.local !== parseIp(local));
+    nat.statics.push({ local: parseIp(local), global: parseIp(global) });
+    return { out: '' };
+  }, { key: 'ip nat inside source static', no: ({ local }, s) => { const nat = s.dev.config.nat; if (nat) nat.statics = nat.statics.filter(x => x.local !== parseIp(local)); } }),
+  cmd(['ip', 'nat', 'pool', W('name', 'word'), W('start', 'ip'), W('end', 'ip'), 'netmask', W('mask', 'mask')], ({ name, start, end, mask }, s) => {
+    if (parseIp(end) < parseIp(start)) return { out: '%Pool end address is less than start address' };
+    ensureNat(s.dev.config).pools[name] = { start: parseIp(start), end: parseIp(end), mask: parseIp(mask) };
+    return { out: '' };
+  }, { key: 'ip nat pool', no: ({ name }, s) => { if (s.dev.config.nat) delete s.dev.config.nat.pools[name]; }, noShape: ['ip', 'nat', 'pool', W('name', 'word'), W('rest', 'rest', { opt: true })] }),
+  cmd(['ip', 'dhcp', 'excluded-address', W('lo', 'ip'), W('hi', 'ip', { opt: true })], ({ lo, hi }, s) => {
+    const d = ensureDhcp(s.dev.config);
+    const a = parseIp(lo);
+    const b = hi ? parseIp(hi) : a;
+    if (b < a) return { out: '% Invalid address range' };
+    if (!d.excluded.some(([x, y]) => x === a && y === b)) d.excluded.push([a, b]);
+    return { out: '' };
+  }, { key: 'ip dhcp excluded-address', no: ({ lo, hi }, s) => { const d = s.dev.config.dhcp; if (d) { const a = parseIp(lo); const b = hi ? parseIp(hi) : a; d.excluded = d.excluded.filter(([x, y]) => !(x === a && y === b)); } } }),
+  cmd(['ip', 'dhcp', 'pool', W('name', 'word')], ({ name }, s) => {
+    const d = ensureDhcp(s.dev.config);
+    d.pools[name] ??= { net: null, len: null, router: null, dns: null, domain: null };
+    s.mode = 'dhcp';
+    s.ctx = { pool: name };
+    return { out: '' };
+  }, { key: 'ip dhcp pool', no: ({ name }, s) => { if (s.dev.config.dhcp) delete s.dev.config.dhcp.pools[name]; } }),
+  cmd(['ntp', 'server', W('ip', 'ip')], ({ ip }, s) => { const c = s.dev.config; c.ntp ??= []; if (!c.ntp.includes(parseIp(ip))) c.ntp.push(parseIp(ip)); return { out: '' }; }, { key: 'ntp server', no: ({ ip }, s) => { const c = s.dev.config; c.ntp = (c.ntp ?? []).filter(x => x !== parseIp(ip)); } }),
+  cmd(['logging', ALT('host', ['host'], { opt: true }), W('ip', 'ip')], ({ ip }, s) => { const c = s.dev.config; c.logHosts ??= []; if (!c.logHosts.includes(parseIp(ip))) c.logHosts.push(parseIp(ip)); return { out: '' }; }, { key: 'logging host', no: ({ ip }, s) => { const c = s.dev.config; c.logHosts = (c.logHosts ?? []).filter(x => x !== parseIp(ip)); } }),
+  cmd(['service', 'timestamps', ALT('what', ['log', 'debug']), ALT('fmt', ['datetime', 'uptime'], { opt: true }), ALT('ms', ['msec'], { opt: true })], (_, s) => { s.dev.config.timestamps = true; return { out: '' }; }, { key: 'service timestamps', no: (_, s) => { s.dev.config.timestamps = false; }, noShape: ['service', 'timestamps', W('rest', 'rest', { opt: true })] }),
+];
+
+const IFACE_SERVICES = [
+  cmd(['ip', 'access-group', W('acl', 'word'), ALT('dir', ['in', 'out'])], ({ acl, dir }, s) => {
+    const i = s.dev.config.interfaces[s.ctx.intf];
+    if (dir === 'in') i.aclIn = acl; else i.aclOut = acl;
+    return { out: '' };
+  }, { key: 'ip access-group', no: ({ dir }, s) => { const i = s.dev.config.interfaces[s.ctx.intf]; if (dir === 'in') i.aclIn = null; else i.aclOut = null; }, noShape: ['ip', 'access-group', W('acl', 'word'), ALT('dir', ['in', 'out'])] }),
+  cmd(['ip', 'nat', ALT('role', ['inside', 'outside'])], ({ role }, s) => { s.dev.config.interfaces[s.ctx.intf].nat = role; return { out: '' }; }, { key: 'ip nat', no: (_, s) => { s.dev.config.interfaces[s.ctx.intf].nat = null; } }),
+  cmd(['ip', 'helper-address', W('ip', 'ip')], ({ ip }, s) => { s.dev.config.interfaces[s.ctx.intf].helper = parseIp(ip); return { out: '' }; }, { key: 'ip helper-address', no: (_, s) => { s.dev.config.interfaces[s.ctx.intf].helper = null; }, noShape: ['ip', 'helper-address', W('ip', 'ip', { opt: true })] }),
+];
+
+const ACL_MODE = [
+  cmd([W('seq', 'num', { opt: true }), ALT('action', ['permit', 'deny']), W('rest', 'rest')], ({ seq, action, rest }, s) => {
+    const e = parseAce(s.ctx.kind, `${action} ${rest}`);
+    if (!e) return { out: invalidAt(s, s.line.indexOf(rest)) };
+    return { out: addAce(s.dev, s.ctx.acl, s.ctx.kind, e, seq ?? null) };
+  }, { key: 'ace' }),
+  cmd(['remark', W('text', 'rest')], () => ({ out: '' }), { key: 'remark' }),
+  cmd(['no', W('seq', 'num')], ({ seq }, s) => { const acl = s.dev.config.acls[s.ctx.acl]; acl.entries = acl.entries.filter(e => e.seq !== seq); return { out: '' }; }, { key: 'no ace' }),
+  END,
+  cmd(['exit'], (_, s) => { s.mode = 'config'; s.ctx = {}; return { out: '' }; }, { once: true }),
+];
+
+const DHCP_MODE = [
+  cmd(['network', W('text', 'rest')], ({ text }, s) => {
+    const n = readNetwork(text);
+    if (!n) return { out: invalidAt(s, s.line.indexOf(text)) };
+    Object.assign(s.dev.config.dhcp.pools[s.ctx.pool], n);
+    return { out: '' };
+  }, { key: 'dhcp network' }),
+  cmd(['default-router', W('ip', 'ip')], ({ ip }, s) => { s.dev.config.dhcp.pools[s.ctx.pool].router = parseIp(ip); return { out: '' }; }, { key: 'default-router', no: (_, s) => { s.dev.config.dhcp.pools[s.ctx.pool].router = null; }, noShape: ['default-router', W('ip', 'ip', { opt: true })] }),
+  cmd(['dns-server', W('ip', 'ip')], ({ ip }, s) => { s.dev.config.dhcp.pools[s.ctx.pool].dns = parseIp(ip); return { out: '' }; }, { key: 'dns-server', no: (_, s) => { s.dev.config.dhcp.pools[s.ctx.pool].dns = null; }, noShape: ['dns-server', W('ip', 'ip', { opt: true })] }),
+  cmd(['domain-name', W('name', 'word')], ({ name }, s) => { s.dev.config.dhcp.pools[s.ctx.pool].domain = name; return { out: '' }; }, { key: 'dhcp domain-name' }),
+  cmd(['lease', W('days', 'num'), W('rest', 'rest', { opt: true })], () => ({ out: '' }), { key: 'lease' }),
+  END,
+  cmd(['exit'], (_, s) => { s.mode = 'config'; s.ctx = {}; return { out: '' }; }, { once: true }),
+];
+
+
 const GLOBAL = [
   ...GLOBAL_COMMON,
+  ...ACL_GLOBAL,
   cmd(['ip', 'route', W('net', 'ip'), W('mask', 'mask'), W('via', 'rest')], ({ net, mask, via }, s) => {
     const parsed = parseRouteTail(via);
     if (!parsed) return { out: invalidAt(s, s.line.indexOf(via)) };
@@ -746,6 +922,7 @@ const IP_ADDRESS = cmd(['ip', 'address', W('ip', 'ip'), W('mask', 'mask')], ({ i
 
 const IFACE = [
   IP_ADDRESS,
+  ...IFACE_SERVICES,
   cmd(['encapsulation', ALT('e', ['dot1q']), W('vlan', 'num'), ALT('native', ['native'], { opt: true })], ({ vlan, native }, s) => {
     if (!isSub(s.ctx.intf)) return { out: invalidAt(s, 0) };
     if (vlan < 1 || vlan > 4094) return { out: invalidAt(s, s.line.search(/\d+\s*(native)?\s*$/)) };
@@ -871,7 +1048,10 @@ const IFACE_SWITCH = [
     if (!sw.psec.macs.some(m => m.mac === mac.toLowerCase())) sw.psec.macs.push({ mac: mac.toLowerCase(), sticky: true });
     sw.psec.sticky = true;
     return { out: '' };
-  }, { key: 'switchport port-security mac-address sticky', no: (_, s, sw) => { sw.psec.sticky = false; sw.psec.macs = sw.psec.macs.filter(m => !m.sticky); }, noShape: ['switchport', 'port-security', 'mac-address', 'sticky'] }),
+  }, { key: 'switchport port-security mac-address sticky', no: ({ mac }, s, sw) => {
+    if (mac) { sw.psec.macs = sw.psec.macs.filter(m => m.mac !== mac.toLowerCase()); return; }
+    sw.psec.sticky = false; sw.psec.macs = sw.psec.macs.filter(m => !m.sticky);
+  }, noShape: ['switchport', 'port-security', 'mac-address', 'sticky', W('mac', 'word', { opt: true })] }),
   swc(['switchport', 'port-security', 'mac-address', W('mac', 'word')], ({ mac }, s, sw) => {
     if (!MAC_RE.test(mac)) return { out: invalidAt(s, s.line.indexOf(mac)) };
     if (sw.psec.macs.length >= sw.psec.max) return { out: `Total secure mac-addresses on interface ${s.ctx.intf} has reached maximum limit.` };
@@ -979,17 +1159,46 @@ function pcPing(s, dstText) {
   const r = pingWorld(s.world, s.deviceId, dst, null);
   const owner = Object.values(s.world.devices).find(dv => Object.values(dv.config.interfaces).some(i => i.ip === dst));
   const ttl = owner?.kind === 'pc' ? 128 : 255;
-  const replies = r.ok ? Array(4).fill(`Reply from ${dstText}: bytes=32 time<1ms TTL=${ttl}`) : Array(4).fill('Request timed out.');
+  const blocker = r.reason === 'acl' && r.stage === 'there' ? s.world.devices[r.acl.device]?.config.interfaces[r.acl.intf]?.ip : null;
+  const replies = r.ok ? Array(4).fill(`Reply from ${dstText}: bytes=32 time<1ms TTL=${ttl}`)
+    : blocker ? Array(4).fill(`Reply from ${formatIp(blocker)}: Destination host unreachable.`) : Array(4).fill('Request timed out.');
   const stats = `Ping statistics for ${dstText}:\n    Packets: Sent = 4, Received = ${r.ok ? 4 : 0}, Lost = ${r.ok ? 0 : 4} (${r.ok ? 0 : 100}% loss),${r.ok ? '\nApproximate round trip times in milli-seconds:\n    Minimum = 0ms, Maximum = 1ms, Average = 0ms' : ''}`;
   return { text: `\nPinging ${dstText} with 32 bytes of data:\n\n${replies.join('\n')}\n\n${stats}`, ok: r.ok, src: nic.ip };
 }
 
 const PC = [
+  cmd(['ipconfig', ALT('op', ['/renew', '/release'])], ({ op }, s) => {
+    const c = s.dev.config;
+    const nic = c.interfaces.FastEthernet0;
+    if (op === '/release') {
+      nic.ip = null; nic.mask = null; c.gateway = null; c.dns = null; c.dhcp = true;
+      return { out: '\nEthernet adapter FastEthernet0:\n\n   IPv4 Address. . . . . . . . . . . : 0.0.0.0' };
+    }
+    const r = requestDhcp(s.world, s.deviceId);
+    c.dhcp = true;
+    s.events.push({ kind: 'dhcp', ok: r.ok, ip: r.ip ?? null });
+    if (!r.ok) {
+      // No server answered: Windows falls back to a link-local address.
+      const h = parseInt(s.dev.mac.replace(/\./g, '').slice(-4), 16);
+      nic.ip = parseIp(`169.254.${(h >> 8) % 254 + 1}.${(h & 255) % 254 + 1}`);
+      nic.mask = parseIp('255.255.0.0');
+      c.gateway = null;
+      return { out: 'An error occurred while renewing interface FastEthernet0 : unable to contact your DHCP server.  Request has timed out.' };
+    }
+    nic.ip = r.ip; nic.mask = lenToMask(r.len); c.gateway = r.router; c.dns = r.dns;
+    return { out: `\nEthernet adapter FastEthernet0:\n\n   Connection-specific DNS Suffix  . :\n   IPv4 Address. . . . . . . . . . . : ${formatIp(r.ip)}\n   Subnet Mask . . . . . . . . . . . : ${formatIp(lenToMask(r.len))}\n   Default Gateway . . . . . . . . . : ${r.router === null ? '' : formatIp(r.router)}` };
+  }, { key: 'ipconfig renew' }),
+  cmd(['telnet', W('dst', 'ip'), W('port', 'num', { opt: true })], ({ dst, port }, s) => {
+    const p = port ?? 23;
+    const r = exchange(s.world, s.deviceId, parseIp(dst), { proto: 'tcp', port: p });
+    s.events.push({ kind: 'tcp', dst: parseIp(dst), port: p, ok: r.ok });
+    return { out: r.ok ? `Connecting To ${dst}...\nConnected to ${dst} on port ${p}. (Closed: this lab only tests the connection.)` : `Connecting To ${dst}...Could not open connection to the host, on port ${p}: Connect failed` };
+  }, { key: 'telnet' }),
   cmd(['ipconfig', ALT('all', ['/all'], { opt: true })], ({ all }, s) => {
     const nic = s.dev.config.interfaces.FastEthernet0;
     const v = (x) => (x === null || x === undefined ? '0.0.0.0' : formatIp(x));
     const lines = ['', 'Ethernet adapter FastEthernet0:', '', '   Connection-specific DNS Suffix  . :'];
-    if (all) lines.push(`   Physical Address. . . . . . . . . : ${winMac(s.dev.mac)}`, '   DHCP Enabled. . . . . . . . . . . : No');
+    if (all) lines.push(`   Physical Address. . . . . . . . . : ${winMac(s.dev.mac)}`, `   DHCP Enabled. . . . . . . . . . . : ${s.dev.config.dhcp ? 'Yes' : 'No'}`);
     lines.push(`   IPv4 Address. . . . . . . . . . . : ${v(nic.ip)}`, `   Subnet Mask . . . . . . . . . . . : ${v(nic.mask)}`, `   Default Gateway . . . . . . . . . : ${s.dev.config.gateway === null ? '' : formatIp(s.dev.config.gateway)}`);
     if (all) lines.push(`   DNS Servers . . . . . . . . . . . : ${s.dev.config.dns === null ? '' : formatIp(s.dev.config.dns)}`);
     return { out: lines.join('\n') };
@@ -998,6 +1207,7 @@ const PC = [
     const nic = s.dev.config.interfaces.FastEthernet0;
     nic.ip = parseIp(ip);
     nic.mask = parseIp(mask);
+    s.dev.config.dhcp = false;
     if (gw !== undefined) s.dev.config.gateway = parseIp(gw);
     return { out: '' };
   }, { key: 'ipconfig set' }),
@@ -1025,10 +1235,12 @@ const MODES = {
   router: { specs: { router: ROUTER, switch: ROUTER }, prompt: (h) => `${h}(config-router)#` },
   line: { specs: { router: LINE, switch: LINE }, prompt: (h) => `${h}(config-line)#` },
   vlan: { specs: { router: VLAN_MODE, switch: VLAN_MODE }, prompt: (h) => `${h}(config-vlan)#` },
+  acl: { specs: { router: ACL_MODE, switch: ACL_MODE }, prompt: (h, s) => `${h}(config-${s?.ctx?.kind === 'extended' ? 'ext' : 'std'}-nacl)#` },
+  dhcp: { specs: { router: DHCP_MODE, switch: DHCP_MODE }, prompt: (h) => `${h}(dhcp-config)#` },
   pc: { specs: { pc: PC }, prompt: () => 'C:\\>' },
 };
 
-const isConfigMode = (mode) => ['config', 'if', 'router', 'line', 'vlan'].includes(mode);
+const isConfigMode = (mode) => ['config', 'if', 'router', 'line', 'vlan', 'acl', 'dhcp'].includes(mode);
 
 // The "no" form of each command that has one, as its own grammar.
 function noSpecs(specs) {
@@ -1069,7 +1281,7 @@ function snapshot(world, deviceId) {
   return { ifs, nbrs };
 }
 
-function diffNotices(before, after) {
+function diffNotices(before, after, pid = 1) {
   const out = [];
   for (const [n, st] of Object.entries(after.ifs)) {
     const was = before.ifs[n];
@@ -1080,12 +1292,12 @@ function diffNotices(before, after) {
   for (const [k, state] of Object.entries(after.nbrs)) {
     if (before.nbrs[k] === state) continue;
     const [rid, intf] = k.split('|');
-    if (state === 'FULL') out.push(`%OSPF-5-ADJCHG: Process 1, Nbr ${formatIp(Number(rid))} on ${intf} from LOADING to FULL, Loading Done`);
+    if (state === 'FULL') out.push(`%OSPF-5-ADJCHG: Process ${pid}, Nbr ${formatIp(Number(rid))} on ${intf} from LOADING to FULL, Loading Done`);
   }
   for (const k of Object.keys(before.nbrs)) {
     if (after.nbrs[k]) continue;
     const [rid, intf] = k.split('|');
-    out.push(`%OSPF-5-ADJCHG: Process 1, Nbr ${formatIp(Number(rid))} on ${intf} from FULL to DOWN, Neighbor Down: Interface down or detached`);
+    out.push(`%OSPF-5-ADJCHG: Process ${pid}, Nbr ${formatIp(Number(rid))} on ${intf} from FULL to DOWN, Neighbor Down: Interface down or detached`);
   }
   return out;
 }
@@ -1133,7 +1345,7 @@ export function execute(session, rawLine) {
     refresh(world);
     const after = snapshot(world, session.deviceId);
     const logs = takeNotices(world, session.deviceId);
-    const notices = dev.kind === 'pc' ? [] : [...session.notices, ...logs, ...diffNotices(before, after)];
+    const notices = dev.kind === 'pc' ? [] : [...session.notices, ...logs, ...diffNotices(before, after, dev.config.ospf?.pid ?? 1)];
     return [text, ...notices].filter(t => t !== '' && t !== undefined && t !== null).join('\n');
   };
 
@@ -1183,7 +1395,7 @@ export function execute(session, rawLine) {
 
   let r = runOne(session, specs, tokens);
   // A sub-mode falls back to global configuration, leaving the sub-mode.
-  if (r.error && ['if', 'router', 'line', 'vlan'].includes(session.mode)) {
+  if (r.error && ['if', 'router', 'line', 'vlan', 'acl', 'dhcp'].includes(session.mode)) {
     const saved = { mode: session.mode, ctx: session.ctx };
     session.mode = 'config';
     const g = runOne(session, specsFor('config', kind), tokens);

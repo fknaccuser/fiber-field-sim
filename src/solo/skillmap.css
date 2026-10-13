@@ -511,3 +511,6 @@
 .desk-graded code { font: 12.5px/1.4 var(--font-mono); color: var(--sk-ink); overflow-wrap: anywhere; }
 .desk-why { grid-column: 2; display: grid; gap: 6px; }
 .desk-quote { margin: 0; padding: 10px 12px; border-left: 3px solid var(--sk-light); background: var(--sk-panel); border-radius: 6px; color: var(--sk-ink); font-size: 14.5px; white-space: pre-wrap; }
+
+.desk-group { margin: 10px 0 0; font: 700 12px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--sk-ink-3); }
+.sk-lab.is-order { border-style: dashed; }

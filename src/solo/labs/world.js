@@ -12,6 +12,7 @@ import {
   computeL2, enforce, nativeMismatches, physState, makeSwitchport, macFrom, OUI, keyOf,
   isSub, isSvi, isPo, isLoop, parentOf,
 } from './switching.js';
+import { aclPermits, natRole, natIn, natOut, natClaims, poolFor, lease } from './services.js';
 
 // The derived layer 2 state of each world, rebuilt by refresh().
 const L2 = new WeakMap();
@@ -74,12 +75,15 @@ export function makeSwitch(id, { ports = SWITCH_PORTS, mac = null } = {}) {
 }
 
 // A PC: one NIC, an address, a gateway.
-export function makePc(id, { ip = null, mask = null, gateway = null, mac = null } = {}) {
+export function makePc(id, { ip = null, mask = null, gateway = null, mac = null, services = [], dhcp = false } = {}) {
   const config = makeDevice('x', []).config;
   config.hostname = id;
   config.interfaces = { FastEthernet0: makeInterface('FastEthernet0', { shutdown: false, ip: ip === null ? null : parseIp(ip), mask: mask === null ? null : parseIp(mask) }) };
   config.gateway = gateway === null ? null : parseIp(gateway);
   config.dns = null;
+  // A server is a PC that listens: services lists its open TCP ports.
+  config.services = [...services];
+  config.dhcp = dhcp;
   return { id, kind: 'pc', ports: ['FastEthernet0'], mac: mac ?? macFrom(`pc|${id}`, OUI.pc), config, startup: null, rsaBits: null, ospfRid: null };
 }
 
@@ -391,6 +395,12 @@ function ownerIn(world, ip, fromDevice, fromIntf) {
     const intf = world.devices[id]?.config.interfaces[name];
     if (intf?.ip === ip && interfaceState(world, id, name).up) return { device: id, intf: name };
   }
+  // A NAT router answers for its static and pool addresses on the outside.
+  for (const k of reach.ends) {
+    const [id, name] = k.split('|');
+    if (id === fromDevice) continue;
+    if (natClaims(world.devices[id], name, ip) && interfaceState(world, id, name).up) return { device: id, intf: name };
+  }
   return null;
 }
 
@@ -405,55 +415,118 @@ function heard(world, deviceId, ifName) {
   }
 }
 
-// Follow the packet hop by hop. Returns the device that owns dst, or null;
-// trail collects the address of each hop that forwarded it.
-function deliver(world, fromDevice, dst, trail = null) {
+const owns = (world, d, ip) => Object.values(world.devices[d].config.interfaces).some(i => i.ip === ip && interfaceState(world, d, i.name).up);
+
+// Walk one packet hop by hop: routing, ACLs in and out, and NAT where an
+// inside interface meets an outside one.
+// pkt = { src, dst, proto: 'icmp'|'tcp'|'udp', sport, dport, reply }
+// Returns { ok, at, pkt, reason, hops: [{ device, ip }] }.
+export function walk(world, fromDevice, pkt, { trail = null } = {}) {
   let at = fromDevice;
-  for (let hop = 0; hop < 16; hop += 1) {
+  let ingress = null;
+  let p = { ...pkt };
+  for (let hop = 0; hop < 20; hop += 1) {
     const dev = world.devices[at];
-    if (Object.values(dev.config.interfaces).some(i => i.ip === dst && interfaceState(world, at, i.name).up)) return at;
+    if (ingress && natRole(dev, ingress) === 'outside') p = natIn(world, dev, p);
+    if (owns(world, at, p.dst)) return { ok: true, at, pkt: p };
     // Hosts do not forward other people's packets.
-    if (at !== fromDevice && isHost(world, at)) return null;
-    const route = lookup(world, at, dst);
-    if (!route) return null;
+    if (at !== fromDevice && isHost(world, at)) return { ok: false, reason: 'host', at, pkt: p };
+    const route = lookup(world, at, p.dst);
+    if (!route) return { ok: false, reason: 'no-route', at, pkt: p };
     const h = route.hops[0];
-    if (!h.intf || !interfaceState(world, at, h.intf).up) return null;
-    const target = route.type === 'connected' || route.type === 'local' || !h.nh ? dst : h.nh;
+    if (!h.intf || !interfaceState(world, at, h.intf).up) return { ok: false, reason: 'down', at, pkt: p };
+    if (!aclPermits(dev, h.intf, 'out', p)) return { ok: false, reason: 'acl', at, pkt: p, acl: { device: at, intf: h.intf, dir: 'out' } };
+    if (ingress && natRole(dev, ingress) === 'inside' && natRole(dev, h.intf) === 'outside') {
+      const q = natOut(world, dev, h.intf, p);
+      if (!q) return { ok: false, reason: 'nat', at, pkt: p };
+      p = q;
+    }
+    const target = route.type === 'connected' || route.type === 'local' || !h.nh ? p.dst : h.nh;
     heard(world, at, h.intf);
     const owner = ownerIn(world, target, at, h.intf);
-    if (!owner) return null;
+    if (!owner) return { ok: false, reason: 'arp', at, pkt: p };
     heard(world, owner.device, owner.intf);
+    if (!aclPermits(world.devices[owner.device], owner.intf, 'in', p)) return { ok: false, reason: 'acl', at: owner.device, pkt: p, acl: { device: owner.device, intf: owner.intf, dir: 'in' } };
     if (trail && owner.device !== fromDevice) trail.push({ device: owner.device, ip: world.devices[owner.device].config.interfaces[owner.intf].ip });
     at = owner.device;
+    ingress = owner.intf;
   }
-  return null;
+  return { ok: false, reason: 'loop', at, pkt: p };
+}
+
+// What a device answers on: ICMP always; TCP and UDP when a service is up.
+export function listens(world, d, proto, port) {
+  if (proto === 'icmp') return true;
+  const dev = world.devices[d];
+  if (proto === 'udp' && port === 67) return Object.keys(dev.config.dhcp?.pools ?? {}).length > 0;
+  if (dev.kind === 'pc') return (dev.config.services ?? []).includes(port);
+  if (proto === 'tcp' && port === 23) return ['telnet', 'all'].includes(dev.config.lines.vty.transport ?? 'all') && Boolean(dev.config.lines.vty.login);
+  if (proto === 'tcp' && port === 22) return Boolean(dev.rsaBits) && ['ssh', 'all', 'ssh telnet'].includes(dev.config.lines.vty.transport ?? 'all');
+  return false;
+}
+
+function sourceFor(world, deviceId, dst, source) {
+  if (source !== null) return source;
+  if (owns(world, deviceId, dst)) return dst;
+  const route = lookup(world, deviceId, dst);
+  if (!route) return null;
+  return world.devices[deviceId].config.interfaces[route.hops[0].intf]?.ip ?? null;
+}
+
+// A request there and its reply back. proto/port default to a ping.
+export function exchange(world, deviceId, dst, { source = null, proto = 'icmp', port = null } = {}) {
+  const src = sourceFor(world, deviceId, dst, source);
+  if (src === null) return { ok: false, reason: lookup(world, deviceId, dst) ? 'no-source' : 'no-route' };
+  const sport = proto === 'icmp' ? null : 49152 + (dst % 1000);
+  const there = walk(world, deviceId, { src, dst, proto, sport, dport: port, reply: false });
+  if (!there.ok) return { ok: false, reason: there.reason, acl: there.acl, stage: 'there' };
+  if (!listens(world, there.at, proto, port)) return { ok: false, reason: 'refused', stage: 'there' };
+  const back = walk(world, there.at, { src: there.pkt.dst, dst: there.pkt.src, proto, sport: port, dport: sport, reply: true });
+  if (!back.ok || back.at !== deviceId) return { ok: false, reason: back.reason ?? 'no-return', acl: back.acl, stage: 'back' };
+  return { ok: true };
 }
 
 // tracert / traceroute: the address of each hop on the way there.
 export function trace(world, deviceId, dst) {
   const trail = [];
-  const there = deliver(world, deviceId, dst, trail);
-  return { ok: Boolean(there), hops: trail };
+  const src = sourceFor(world, deviceId, dst, null);
+  if (src === null) return { ok: false, hops: [] };
+  const r = walk(world, deviceId, { src, dst, proto: 'icmp', reply: false }, { trail });
+  return { ok: r.ok, hops: trail };
+}
+
+// A PC asks for an address: its broadcast reaches every interface in its
+// VLAN. A router there either serves it from a local pool for that subnet,
+// or relays it to its ip helper-address, if the relay can reach the server.
+// Returns { ok, ip, len, router, dns, server } or { ok: false, apipa }.
+export function requestDhcp(world, pcId) {
+  const pc = world.devices[pcId];
+  const reach = l2Of(world).reach[keyOf(pcId, 'FastEthernet0')];
+  for (const k of reach?.ends ?? []) {
+    const [d, i] = k.split('|');
+    const dev = world.devices[d];
+    if (d === pcId || (dev.kind ?? 'router') === 'pc') continue;
+    const intf = dev.config.interfaces[i];
+    if (intf?.ip === null || intf?.ip === undefined || !interfaceState(world, d, i).up) continue;
+    let server = null;
+    if (poolFor(dev, intf.ip)) server = d;
+    else if (intf.helper) {
+      const r = exchange(world, d, intf.helper, { source: intf.ip, proto: 'udp', port: 67 });
+      if (r.ok) server = Object.keys(world.devices).find(id => owns(world, id, intf.helper)) ?? null;
+    }
+    if (!server) continue;
+    const hit = poolFor(world.devices[server], intf.ip);
+    if (!hit) continue;
+    const addr = lease(world, server, hit.name, pc.mac);
+    if (addr === null) continue;
+    return { ok: true, ip: addr, len: hit.pool.len, router: hit.pool.router, dns: hit.pool.dns, server };
+  }
+  return { ok: false };
 }
 
 // ping: there and back. source defaults to the exit interface's address.
 export function ping(world, deviceId, dst, source = null) {
-  const route = lookup(world, deviceId, dst);
-  const local = Object.values(world.devices[deviceId].config.interfaces).some(i => i.ip === dst && interfaceState(world, deviceId, i.name).up);
-  if (!route && !local) return { ok: false, reason: 'no-route' };
-  let src = source;
-  if (src === null) {
-    if (local) src = dst;
-    else {
-      const intf = world.devices[deviceId].config.interfaces[route.hops[0].intf];
-      src = intf?.ip ?? null;
-    }
-  }
-  if (src === null) return { ok: false, reason: 'no-source' };
-  const there = deliver(world, deviceId, dst);
-  if (!there) return { ok: false, reason: 'no-reach' };
-  const back = deliver(world, there, src);
-  return back === deviceId ? { ok: true } : { ok: false, reason: 'no-return' };
+  return exchange(world, deviceId, dst, { source });
 }
 
 // ---------- after every change ----------

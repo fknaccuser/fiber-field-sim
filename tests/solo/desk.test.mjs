@@ -30,10 +30,11 @@ for (const t of TEMPLATES) {
       assert.equal(g.pct, 100);
     }
   });
-  test(`${t.kind}: lights branches with a Do tier, and seeds differ`, () => {
-    for (const b of t.lights) assert.ok(branchById(b)?.tiers.includes('do'), b);
+  test(`${t.kind}: lights branches with the right tier, and seeds differ`, () => {
+    const tier = t.kind.startsWith('repair') ? 'fix' : 'do';
+    for (const b of t.lights) assert.ok(branchById(b)?.tiers.includes(tier), `${b} has no ${tier} tier`);
     const a = makeOrder(t.kind, 1);
-    const texts = new Set(Array.from({ length: 20 }, (_, k) => JSON.stringify(makeOrder(t.kind, k + 1).requirements.map(r => r.text))));
+    const texts = new Set(Array.from({ length: 20 }, (_, k) => { const o = makeOrder(t.kind, k + 1); return JSON.stringify([o.requirements.map(r => r.text), o.notes]); }));
     assert.ok(texts.size >= 5, `${t.kind} has little variety`);
     assert.ok(a.number && a.site && a.summary);
   });
@@ -61,4 +62,32 @@ test('partial credit: half the requirements, no extras', () => {
   assert.deepEqual(g.reqs.filter(r => r.ok).map(r => r.id), ['domain', 'v2']);
   assert.equal(g.extras.length, 0);
   assert.ok(g.pct > 0 && g.pct < 100);
+});
+
+test('every repair fault starts broken somewhere else tests can see, and its own fix restores it all', async () => {
+  const { REPAIR_TEMPLATES } = await import('../../src/solo/desk/jobs-repair.js');
+  for (const t of REPAIR_TEMPLATES) {
+    for (const f of t.faults) {
+      for (const seed of [11, 12, 13, 14]) {
+        const order = makeOrder(t.kind, seed, { fault: f.id });
+        assert.equal(order.fault, f.id);
+        const fresh = buildWorld(order);
+        const before = grade(order, fresh, baselineOf(fresh));
+        assert.ok(!before.reqs[0].ok, `${f.id} seed ${seed} starts fixed`);
+        assert.ok(before.tests.some(x => !x.ok) || f.id === 'ec-mode', `${f.id} seed ${seed}: no acceptance test notices the fault`);
+        const { world, baseline } = solve(order);
+        const g = grade(order, world, baseline);
+        assert.equal(g.pct, 100, `${f.id} seed ${seed}: ${JSON.stringify({ r: g.reqs.filter(r => !r.ok).map(r => r.id), t: g.tests.filter(x => !x.ok).map(x => x.id), e: g.extras.map(e => e.text) })}`);
+      }
+    }
+  }
+});
+
+test('a repair ticket can be asked for by branch', async () => {
+  const { repairFor } = await import('../../src/solo/desk/jobs-repair.js');
+  for (const b of ['t2-vlans', 't2-trunks', 't4-nat', 't5-acl', 't2-etherchannel', 't2-stp', 't1-client', 't3-static', 't4-dhcp-dns', 't0-remote', 't5-l2sec']) {
+    const r = repairFor(b, 5);
+    assert.ok(r, b);
+    assert.ok(makeOrder(r.kind, r.seed, { fault: r.fault }).lights.includes(b), b);
+  }
 });

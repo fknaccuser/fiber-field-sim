@@ -14,6 +14,8 @@ import { rngOf, int, pick, sample, privateBase, subnetIn, addHost } from '../stu
 import { interfaceState, ping as pingWorld, l2Of } from '../labs/world.js';
 import { memberFlag, operMode } from '../labs/switching.js';
 import { parseIp } from '../labs/ip4.js';
+import { ROUTER_TEMPLATES } from './jobs-router.js';
+import { REPAIR_TEMPLATES } from './jobs-repair.js';
 
 const ip = parseIp;
 const NIC = 'FastEthernet0';
@@ -389,11 +391,13 @@ export const TEMPLATES = [
   },
 ];
 
+TEMPLATES.push(...ROUTER_TEMPLATES, ...REPAIR_TEMPLATES);
+
 export const templateOf = (kind) => TEMPLATES.find(t => t.kind === kind) ?? null;
 
-export function makeOrder(kind, seed) {
+export function makeOrder(kind, seed, opts = {}) {
   const t = templateOf(kind);
   if (!t) throw new Error(`Unknown work order kind "${kind}"`);
   linkSeq = 0;
-  return { ...t.make(seed), seed };
+  return { ...t.make(seed, opts), seed, ...(opts.fault ? { fixedFault: opts.fault } : {}) };
 }

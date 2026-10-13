@@ -12,13 +12,15 @@
 import { CCNA_MAP, TIERS, treeById, branchById } from './ccna.js';
 import {
   emptyRecord, normalizeRecord, mapProgress, knowCheckDeck, treeExamDeck, finalDeck,
-  recordKnowCheck, recordTreeExam, recordFinal, recordLab, recordDesk, newlyLit, markSeen, nextStep,
+  recordKnowCheck, recordTreeExam, recordFinal, recordLab, recordDesk, deskLights, newlyLit, markSeen, nextStep,
   EXAM_PASS, KNOW_CHECK_SIZE, TREE_EXAM_SIZE, FINAL_SIZE,
 } from './progress.js';
 import { codeForRecipe } from '../study/hub.js';
 import { labsForBranch } from '../labs/catalog.js';
 import { createLabScreen } from '../labs/screen.js';
 import { createDesk } from '../desk/screen.js';
+import { TEMPLATES } from '../desk/jobs.js';
+import { repairFor } from '../desk/jobs-repair.js';
 import { suggestedStage, STAGE_LABEL } from '../labs/coach.js';
 import { GLOSSARY, TERM_BY_ID, searchGlossary } from '../glossary/terms.js';
 
@@ -215,9 +217,10 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
   }
 
   // The Field desk: build work orders, learning or against the clock.
-  function openDesk() {
+  function openDesk(start = null) {
     ui.deskEl?.destroy?.();
     ui.deskEl = createDesk({
+      start,
       getRecord: () => record,
       onRecord: (r) => { record = recordDesk(record, r); save(); },
       onExit: () => { ui.deskEl?.destroy?.(); ui.deskEl = null; ui.view = ui.back === 'tree' ? 'tree' : 'map'; draw(); window.scrollTo?.(0, 0); },
@@ -228,9 +231,23 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
     window.scrollTo?.(0, 0);
   }
 
+  const freshSeed = () => Math.floor(Math.random() * 1e9) + 1;
+  // A first run of a tier works in Learning; once practiced, in Sim.
+  const modeFor = (lit) => (lit?.state ? 'sim' : 'learn');
+
+  // Fix: a Field desk repair ticket whose fault exercises this branch. The
+  // older Field's tickets remain only for branches the desk cannot cover.
   function startTicket(branch) {
+    const r = repairFor(branch.id, freshSeed());
+    if (r) { openDesk({ ...r, mode: modeFor(record.deskFix?.[branch.id]) }); return; }
     const code = codeForRecipe(branch.recipes[Math.floor(Math.random() * branch.recipes.length)]);
     if (code) onLaunch?.(code);
+  }
+
+  const ordersFor = (branchId) => TEMPLATES.filter(t => !t.kind.startsWith('repair') && t.lights.includes(branchId));
+  function startOrder(branchId, kind = null) {
+    const t = kind ? TEMPLATES.find(x => x.kind === kind) : ordersFor(branchId)[0];
+    if (t) openDesk({ kind: t.kind, seed: freshSeed(), mode: modeFor(record.deskDo?.[branchId]) });
   }
 
   // The dock's Next: run the step itself, one tap from the map.
@@ -240,8 +257,10 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
     if (step.tier === 'know') startKnowCheck(branch.id);
     else if (step.tier === 'do') {
       const labs = labsForBranch(branch.id);
-      const lab = labs.find(l => record.labs?.[l.id]?.state !== 'mastered') ?? labs[0];
+      const lab = labs.find(l => record.labs?.[l.id]?.state !== 'mastered');
       if (lab) openLab(lab, branch);
+      else if (ordersFor(branch.id).length) startOrder(branch.id);
+      else if (labs[0]) openLab(labs[0], branch);
     } else startTicket(branch);
   }
 
@@ -497,7 +516,7 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
       row.append(words);
       if (tier === 'know') {
         row.append(btn('sk-go sk-go-small', st.state === 'mastered' ? 'Recheck' : `Check · ${Math.min(KNOW_CHECK_SIZE, s.questions)}`, () => startKnowCheck(b.id)));
-      } else if (tier === 'fix' && b.recipes?.length) {
+      } else if (tier === 'fix' && (deskLights(b.id, 'fix') || b.recipes?.length)) {
         row.append(btn('sk-go sk-go-small', 'Start a ticket', () => startTicket(b)));
       } else if (st.state === 'soon') {
         row.append(el('span', 'sk-soon', tier === 'do' ? 'Console labs' : 'More tickets'));
@@ -514,6 +533,16 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
           const done = res?.stages ? Object.keys(res.stages).map(k => STAGE_LABEL[k]).join(', ') : '';
           words.append(el('span', null, res ? (res.state === 'mastered' ? 'Passed clean, typed' : `Done: ${done}`) : `${lab.goals.length} goals on ${lab.devices.length} ${lab.devices.length === 1 ? 'device' : 'devices'}`));
           lrow.append(words, btn('sk-go sk-go-small', res?.state === 'mastered' ? 'Run again' : `Start · ${STAGE_LABEL[nextStage]}`, () => openLab(lab, b)));
+          sheet.append(lrow);
+        }
+        // Field desk work orders that exercise this branch, new every time.
+        for (const t of ordersFor(b.id)) {
+          const past = record.desk?.[t.kind];
+          const lrow = el('div', `sk-lab is-order${past?.bestSim === 100 ? ' is-mastered' : past ? ' is-practiced' : ''}`);
+          const words = el('div', 'sk-tier-text');
+          words.append(el('b', null, t.title));
+          words.append(el('span', null, past ? `Work order · best ${past.best}%${past.bestSim !== null && past.bestSim !== undefined ? `, sim ${past.bestSim}%` : ''}` : `Work order · about ${t.minutes} min, new each time`));
+          lrow.append(words, btn('sk-go sk-go-small', 'Open', () => startOrder(b.id, t.kind)));
           sheet.append(lrow);
         }
       }

@@ -430,7 +430,7 @@ test.describe('Do labs', () => {
   test('the Field desk takes a work order from the queue to a grade', async ({ page }) => {
     await enableMap(page);
     await page.click('.sk-dock-btn.is-field');
-    await expect(page.locator('.desk-card')).toHaveCount(6);
+    await expect(page.locator('.desk-group')).toHaveText(['Switch builds', 'Router builds', 'Changes', 'Trouble tickets']);
     await page.locator('.desk-card', { hasText: 'Lock a switch down to SSH' }).locator('.sk-go:has-text("Learning")').click();
     await expect(page.locator('.desk-req')).toHaveCount(6);
     // Help shows the exact commands; type them on the console tab.
@@ -533,18 +533,19 @@ test.describe('Map home', () => {
     await expect(page.locator('.gl-card')).toHaveCount(0);
   });
 
-  test('a ticket started from Fix hands back to the same tree', async ({ page }) => {
+  test('a ticket started from Fix opens a Field desk repair and hands back to the same tree', async ({ page }) => {
     await enableMap(page);
     await page.click('.sk-back:has-text("Map")');
     await page.click('.sk-node[data-tree="t2"]');
     await page.locator('.sk-branch-row', { hasText: 'VLANs' }).first().click();
     await page.click('.sk-sheet .sk-go:has-text("Start a ticket")');
-    await expect(page.locator('.mission-screen')).toBeVisible();
-    await hideGuide(page);
-    await page.click('.mission-exit');
+    await expect(page.locator('.desk-order')).toBeVisible();
+    await expect(page.locator('.sk-kicker')).toContainText('INC');
+    await expect(page.locator('.desk-summary')).toContainText('Reported by');
+    await page.click('.sk-back:has-text("Queue")');
+    await page.click('.sk-back:has-text("Map")');
     await expect(page.locator('.skillmap.is-home')).toBeVisible();
     await expect(page.locator('.sk-title h1')).toHaveText('Network Access');
-    await expect(page.locator('.sk-dock-next')).toContainText('Open ticket');
   });
 
   test('the console drill shows painted router output with a legend', async ({ page }) => {

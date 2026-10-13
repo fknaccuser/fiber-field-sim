@@ -139,7 +139,8 @@ test('Do lights from labs: clean is mastered, helped is practiced, every lab nee
   rec = recordLab(rec, 'static-floating', { assisted: true }, NOW + DAY);
   assert.equal(tierState(b, 'do', { record: rec, now: NOW + DAY }).state, 'mastered', 'a later helped run keeps the clean pass');
   assert.equal(tierState(branchById('t2-vlans'), 'do', { record: rec, now: NOW }).state, 'off');
-  assert.equal(tierState(branchById('t4-nat'), 'do', { record: rec, now: NOW }).state, 'soon');
+  assert.equal(tierState(branchById('t1-ipv6'), 'do', { record: rec, now: NOW }).state, 'soon');
+  assert.equal(tierState(branchById('t4-nat'), 'do', { record: rec, now: NOW }).state, 'off', 'the Field desk can light it now');
 });
 
 test('next step walks the map: Know first, faded lights before new ones', async () => {
@@ -155,4 +156,17 @@ test('next step walks the map: Know first, faded lights before new ones', async 
   // Sixty days on, the lit Know has faded and comes back first.
   step = nextStep(mapProgress({ record, completedRuns: [], now: now + 60 * 86400000 }));
   assert.deepEqual([step.branchId, step.tier, step.reason], ['t0-nav', 'know', 'relight']);
+});
+
+test('a clean sim work order lights Do or Fix; learning mode only practices', async () => {
+  const { recordDesk, emptyRecord: empty } = await import('../../src/solo/tree/progress.js');
+  let rec = recordDesk(empty(), { kind: 'build-nat', mode: 'learn', pct: 100, lights: ['t4-nat', 't5-acl'] }, NOW);
+  assert.equal(tierState(branchById('t4-nat'), 'do', { record: rec, now: NOW }).state, 'practiced');
+  rec = recordDesk(rec, { kind: 'build-nat', mode: 'sim', pct: 92, lights: ['t4-nat'] }, NOW);
+  assert.equal(tierState(branchById('t4-nat'), 'do', { record: rec, now: NOW }).state, 'practiced', 'short of 100 lights nothing new');
+  rec = recordDesk(rec, { kind: 'build-nat', mode: 'sim', pct: 100, lights: ['t4-nat'] }, NOW);
+  assert.equal(tierState(branchById('t4-nat'), 'do', { record: rec, now: NOW }).state, 'mastered');
+  rec = recordDesk(rec, { kind: 'repair-branch', mode: 'sim', pct: 100, lights: ['t2-trunks'] }, NOW);
+  assert.equal(tierState(branchById('t2-trunks'), 'fix', { record: rec, now: NOW }).state, 'mastered');
+  assert.equal(rec.desk['build-nat'].runs, 3);
 });
