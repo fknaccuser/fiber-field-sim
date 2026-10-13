@@ -10,11 +10,24 @@ async function openMore(page) {
   if (!(await more.evaluate(el => el.open))) await page.click('.home-more-summary');
 }
 
-async function enableApp(page) {
+// The skill map is home; the older home screen (backups, tickets by code)
+// is one tap away under More.
+async function toClassicHome(page) {
+  await expect(page.locator('.skillmap.is-home')).toBeVisible();
+  await page.click('.sk-dock-btn.is-more');
+  await expect(page.locator('.home-screen')).toBeVisible();
+}
+
+async function enableMap(page) {
   await page.goto('/');
   await page.fill('#opening-command', 'enable');
   await page.press('#opening-command', 'Enter');
-  await expect(page.locator('.home-screen')).toBeVisible();
+  await expect(page.locator('.skillmap.is-home')).toBeVisible();
+}
+
+async function enableApp(page) {
+  await enableMap(page);
+  await toClassicHome(page);
 }
 
 async function waitOfflineReady(page) {
@@ -40,7 +53,7 @@ test.describe('Offline installation and update behavior', () => {
     await page.reload();
     await page.fill('#opening-command', 'enable');
     await page.press('#opening-command', 'Enter');
-    await expect(page.locator('.home-screen')).toBeVisible();
+    await toClassicHome(page);
     await expect(page.locator('.home-offline-ready')).toHaveText('Ready offline');
 
     await context.setOffline(false);
@@ -77,7 +90,7 @@ test.describe('Offline installation and update behavior', () => {
     await reopened.goto('/');
     await reopened.fill('#opening-command', 'enable');
     await reopened.press('#opening-command', 'Enter');
-    await expect(reopened.locator('.home-screen')).toBeVisible();
+    await toClassicHome(reopened);
     await reopened.click('.home-continue');
     await expect(reopened.locator('.mission-screen')).toBeVisible();
     await expect(reopened.locator('.mission-title')).toHaveText(title);

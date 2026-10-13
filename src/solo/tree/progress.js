@@ -285,3 +285,41 @@ export function recordLab(record, labId, { assisted = false, stage = 'typed', wr
   if (prior?.state === 'mastered' && state === 'practiced' && freshness(prior.at, now) > 0) { state = 'mastered'; when = prior.at; }
   return { ...record, labs: { ...(record.labs ?? {}), [labId]: { state, at: when, stages } } };
 }
+
+// ---------- what to do next ----------
+
+// nextStep(progress) -> { treeId, branchId, tier, reason } or null when the
+// whole map is lit. A faded light comes first (relighting is quick and the
+// knowledge is slipping); otherwise the first ready branch in map order, and
+// within it the first tier that is not lit yet, Know before Do before Fix.
+// Tiers the app cannot run yet (too few questions, no lab, no ticket) are
+// skipped so Next never points at a dead end.
+export function nextStep(progress, map = CCNA_MAP) {
+  const runnable = (b, s, tier) => {
+    if (!b.tiers.includes(tier)) return false;
+    const st = s.tiers[tier].state;
+    if (st === 'none' || st === 'soon') return false;
+    if (tier === 'know') return s.questions >= KNOW_MIN_QUESTIONS;
+    return true;
+  };
+  const walk = (test) => {
+    for (const tree of map.trees) {
+      const t = progress.trees.find(x => x.id === tree.id);
+      for (let i = 0; i < tree.branches.length; i += 1) {
+        const b = tree.branches[i];
+        const s = t.branches[i];
+        for (const tier of TIERS) {
+          if (runnable(b, s, tier) && test(s, tier)) return { treeId: tree.id, branchId: b.id, tier };
+        }
+      }
+    }
+    return null;
+  };
+  const faded = walk((s, tier) => s.tiers[tier].state === 'faded');
+  if (faded) return { ...faded, reason: 'relight' };
+  const next = walk((s, tier) => s.readiness === 'ready' && s.tiers[tier].state !== 'mastered');
+  if (next) return { ...next, reason: 'next' };
+  // Nothing ready: the first unlit tier anywhere, even if it is harder.
+  const any = walk((s, tier) => s.tiers[tier].state !== 'mastered');
+  return any ? { ...any, reason: 'stretch' } : null;
+}

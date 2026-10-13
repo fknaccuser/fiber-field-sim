@@ -137,3 +137,18 @@ test('Do lights from labs: clean is mastered, helped is practiced, every lab nee
   assert.equal(tierState(b, 'do', { record: rec, now: NOW + DAY }).state, 'mastered', 'a later helped run keeps the clean pass');
   assert.equal(tierState(branchById('t2-vlans'), 'do', { record: rec, now: NOW }).state, 'soon');
 });
+
+test('next step walks the map: Know first, faded lights before new ones', async () => {
+  const { nextStep, mapProgress, emptyRecord, recordKnowCheck } = await import('../../src/solo/tree/progress.js');
+  const now = Date.parse('2026-10-12T12:00:00Z');
+  let record = emptyRecord();
+  let step = nextStep(mapProgress({ record, completedRuns: [], now }));
+  assert.deepEqual([step.branchId, step.tier, step.reason], ['t0-nav', 'know', 'next']);
+  record = recordKnowCheck(record, 't0-nav', { right: 5, total: 5 }, now);
+  step = nextStep(mapProgress({ record, completedRuns: [], now }));
+  assert.equal(step.branchId, 't0-nav');
+  assert.equal(step.tier, 'do');
+  // Sixty days on, the lit Know has faded and comes back first.
+  step = nextStep(mapProgress({ record, completedRuns: [], now: now + 60 * 86400000 }));
+  assert.deepEqual([step.branchId, step.tier, step.reason], ['t0-nav', 'know', 'relight']);
+});

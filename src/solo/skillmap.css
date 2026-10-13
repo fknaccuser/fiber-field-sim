@@ -303,3 +303,104 @@
 .lab-undo { justify-self: start; min-height: 34px; background: transparent; color: var(--sk-ink-2); border: 1px solid var(--sk-line); border-radius: 999px; padding: 0 12px; font-size: 13px; }
 .lab-tip { margin: 0; font-size: 12.5px; color: var(--sk-ink-3); }
 @media (prefers-reduced-motion: reduce) { .lab-slot { animation: none; } .lab-choice.is-wrong, .lab-tile.is-wrong { animation: none; } }
+
+/* ---------- the map as home: the next branch and the dock ---------- */
+.sk-branch.is-next .sk-branch-row { border-color: var(--sk-light); box-shadow: 0 0 0 1px var(--sk-light), 0 0 18px rgb(242 193 46 / 0.18); }
+.sk-branch.is-next .sk-tag { color: var(--sk-light); }
+
+.skillmap.is-home:not(.is-lab) { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+.sk-dock {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; z-index: 20;
+  width: min(760px, 100vw); box-sizing: border-box;
+  display: grid; grid-template-columns: minmax(0, 1fr) repeat(4, 58px); gap: 4px; align-items: stretch;
+  padding: 8px 10px max(8px, env(safe-area-inset-bottom));
+  background: rgb(10 13 16 / 0.94); backdrop-filter: blur(8px);
+  border-top: 1px solid var(--sk-line);
+}
+.sk-dock-next {
+  display: grid; gap: 2px; align-content: center; text-align: left; min-height: 56px; min-width: 0;
+  padding: 6px 12px; border-radius: 12px; border: 1px solid var(--sk-light);
+  background: var(--sk-light); color: #14110a;
+}
+.sk-dock-kicker { font: 700 10px/1 var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.75; }
+.sk-dock-what { font: 700 15px/1.2 var(--font-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sk-dock-btn {
+  display: grid; justify-items: center; align-content: center; gap: 3px; min-height: 56px; padding: 0;
+  background: transparent; border: 0; border-radius: 10px; color: var(--sk-ink-2); font: 600 11px/1 var(--font-body);
+}
+.sk-dock-icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sk-dock-btn.is-more .sk-dock-icon { stroke-width: 3.2; }
+.sk-dock-btn:focus-visible, .sk-dock-next:focus-visible { outline: 2px solid var(--sk-light); outline-offset: 2px; }
+@media (hover: hover) { .sk-dock-btn:hover { color: var(--sk-ink); background: var(--sk-panel-2); } }
+.skillmap .home-pending-prompt { margin: 0 0 12px; padding: 12px; border: 1px solid var(--sk-warn); border-radius: 12px; background: var(--sk-panel); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.skillmap .home-pending-prompt p { flex: 1 1 100%; margin: 0; }
+.skillmap .home-pending-prompt button { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--sk-line); background: var(--sk-panel-2); color: var(--sk-ink); }
+
+/* ---------- glossary: tappable terms, the term card, the list ---------- */
+.gl-term {
+  display: inline; padding: 0; margin: 0; border: 0; background: none; min-height: 0;
+  font: inherit; color: inherit; cursor: help; text-align: inherit;
+  text-decoration: underline dotted; text-decoration-thickness: 1.5px; text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, currentColor 55%, transparent);
+}
+.gl-term:hover, .gl-term:focus-visible { text-decoration-style: solid; outline: none; }
+.gl-term:focus-visible { box-shadow: 0 0 0 2px #f2c12e; border-radius: 2px; }
+
+.gl-layer {
+  --sk-bg: #0a0d10; --sk-panel: #11161b; --sk-panel-2: #172028; --sk-line: #2a3943;
+  --sk-ink: #e9eeec; --sk-ink-2: #9aa8b1; --sk-ink-3: #66757e; --sk-light: #f2c12e;
+  position: fixed; inset: 0; z-index: 1000; display: grid; align-items: end; justify-items: center;
+}
+.gl-scrim { position: absolute; inset: 0; border: 0; padding: 0; background: rgb(0 0 0 / 0.5); min-height: 0; }
+.gl-card {
+  position: relative; width: min(560px, 100vw); box-sizing: border-box; max-height: 80dvh; overflow: auto;
+  margin: 0; padding: 18px 18px max(18px, env(safe-area-inset-bottom));
+  background: var(--sk-panel); color: var(--sk-ink); border: 1px solid var(--sk-line); border-top: 3px solid var(--sk-light);
+  border-radius: 16px 16px 0 0; display: grid; gap: 12px; animation: gl-up 0.18s ease-out;
+}
+@media (min-width: 600px) { .gl-layer { align-items: center; } .gl-card { border-radius: 16px; } }
+@keyframes gl-up { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .gl-card { animation: none; } }
+.gl-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.gl-name { margin: 0; font: 700 22px/1.2 var(--font-display, inherit); color: var(--sk-ink); }
+.gl-close, .gl-all { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--sk-line); background: transparent; color: var(--sk-ink-2); font: 600 14px var(--font-body, inherit); }
+.gl-plain { margin: 0; font-size: 18px; line-height: 1.45; color: var(--sk-ink); }
+.gl-exam, .gl-cmd { display: grid; gap: 4px; padding: 10px 12px; border-radius: 10px; background: var(--sk-panel-2); }
+.gl-exam p { margin: 0; font-size: 15px; line-height: 1.45; color: var(--sk-ink-2); }
+.gl-cmd code { font: 15px/1.4 var(--font-mono, monospace); color: var(--sk-light); overflow-wrap: anywhere; }
+.gl-label { font: 700 10px/1 var(--font-mono, monospace); letter-spacing: 0.12em; text-transform: uppercase; color: var(--sk-ink-3); }
+.gl-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.gl-go { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--sk-light); background: var(--sk-light); color: #14110a; font: 700 15px var(--font-body, inherit); }
+
+.skillmap .gl-search {
+  width: 100%; box-sizing: border-box; min-height: 48px; padding: 0 14px; margin: 0 0 10px;
+  background: var(--sk-panel); color: var(--sk-ink); border: 1px solid var(--sk-line); border-radius: 12px; font-size: 17px;
+}
+.skillmap .gl-search:focus { outline: 2px solid var(--sk-light); outline-offset: 1px; }
+.gl-filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 8px; scrollbar-width: none; }
+.skillmap .gl-filter { flex: none; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--sk-line); background: transparent; color: var(--sk-ink-2); font: 600 13px var(--font-mono); }
+.skillmap .gl-filter.is-on { border-color: var(--sk-light); color: var(--sk-light); }
+.gl-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.gl-item { border: 1px solid var(--sk-line); border-radius: 12px; background: var(--sk-panel); }
+.gl-item.is-open { border-color: var(--sk-light); }
+.skillmap .gl-row { display: grid; gap: 3px; width: 100%; text-align: left; padding: 10px 14px; min-height: 52px; background: transparent; border: 0; color: var(--sk-ink); border-radius: 12px; }
+.gl-row-name { font: 700 16px/1.2 var(--font-body); }
+.gl-row-plain { font-size: 14px; line-height: 1.4; color: var(--sk-ink-2); }
+.gl-more { display: grid; gap: 8px; padding: 0 14px 14px; }
+.gl-empty { color: var(--sk-ink-2); padding: 12px 4px; }
+.sk-ref { margin-left: auto; }
+.sk-ref::before { content: none; }
+.sk-terms { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px; }
+.sk-terms-label { font: 700 10px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--sk-ink-3); margin-right: 2px; }
+.skillmap .sk-term { min-height: 32px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--sk-line); background: var(--sk-panel-2); color: var(--sk-ink); font-size: 13px; }
+/* The app's light button styles must not reach the dark map, its dock or the term card. */
+.gl-layer > .gl-scrim, .gl-layer > .gl-scrim:hover { background: rgb(0 0 0 / 0.55); border: 0; transform: none; }
+.skillmap .gl-row:hover:not(:disabled), .skillmap .gl-row[aria-expanded='true'] { background: var(--sk-panel-2); color: var(--sk-ink); }
+.skillmap .gl-filter:hover:not(:disabled), .skillmap .gl-filter[aria-pressed='true'] { background: transparent; color: var(--sk-light); border-color: var(--sk-light); }
+.skillmap .gl-filter[aria-pressed='false']:hover:not(:disabled) { color: var(--sk-ink); border-color: var(--sk-ink-3); }
+.skillmap .sk-term:hover:not(:disabled) { background: var(--sk-glass); color: var(--sk-ink); border-color: var(--sk-ink-3); }
+.skillmap .sk-dock-btn:hover:not(:disabled) { background: var(--sk-panel-2); color: var(--sk-ink); border: 0; }
+.skillmap .sk-dock-next:hover:not(:disabled) { background: var(--sk-light); color: #14110a; border-color: var(--sk-light); filter: brightness(1.06); }
+.gl-layer .gl-close:hover:not(:disabled), .gl-layer .gl-all:hover:not(:disabled) { background: var(--sk-panel-2); color: var(--sk-ink); border-color: var(--sk-ink-3); }
+.gl-layer .gl-go:hover:not(:disabled), .skillmap .gl-go:hover:not(:disabled) { background: var(--sk-light); color: #14110a; border-color: var(--sk-light); filter: brightness(1.06); }
+.gl-term:hover:not(:disabled), .gl-term:active:not(:disabled) { background: none; border: 0; transform: none; }

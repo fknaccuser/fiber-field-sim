@@ -12,13 +12,14 @@
 import { CCNA_MAP, TIERS, treeById, branchById } from './ccna.js';
 import {
   emptyRecord, normalizeRecord, mapProgress, knowCheckDeck, treeExamDeck, finalDeck,
-  recordKnowCheck, recordTreeExam, recordFinal, recordLab, newlyLit, markSeen,
+  recordKnowCheck, recordTreeExam, recordFinal, recordLab, newlyLit, markSeen, nextStep,
   EXAM_PASS, KNOW_CHECK_SIZE, TREE_EXAM_SIZE, FINAL_SIZE,
 } from './progress.js';
 import { codeForRecipe } from '../study/hub.js';
 import { labsForBranch } from '../labs/catalog.js';
 import { createLabScreen } from '../labs/screen.js';
 import { suggestedStage, STAGE_LABEL } from '../labs/coach.js';
+import { GLOSSARY, TERM_BY_ID, searchGlossary } from '../glossary/terms.js';
 
 export const STORAGE_KEY = 'field-skill-tree-v1';
 const SVG = 'http://www.w3.org/2000/svg';
@@ -138,14 +139,23 @@ export function renderConstellation(progress, { interactive = false, onOpenTree,
 }
 
 // ---------- the screen ----------
-export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz } = {}) {
-  const root = el('main', 'skillmap');
+// home: when the map is the app's home screen, the host passes the dock's
+// actions ({ onExam, onGlossary, onProgress, onMore, getActiveTicket,
+// onContinue, banners }) and the map opens on the tree of the next step.
+export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, home = null } = {}) {
+  const root = el('main', `skillmap${home ? ' is-home' : ''}`);
   let record = load();
   let storageError = '';
-  const ui = { view: 'map', treeId: null, branchId: null, labEl: null };
+  const ui = { view: 'map', treeId: null, branchId: null, labEl: null, scrollNext: false, query: '', treeFilter: 'all', openTerm: null, back: null };
 
   const runs = () => (getCompletedRuns?.() ?? []).filter(Boolean);
   const progress = () => mapProgress({ record, completedRuns: runs(), now: Date.now() });
+
+  // Open on the tree being worked, with the next branch in view.
+  if (home) {
+    const first = nextStep(progress());
+    if (first) Object.assign(ui, { view: 'tree', treeId: first.treeId, scrollNext: true });
+  }
   function save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(record)); storageError = ''; } catch {
       storageError = 'Progress could not be saved on this device. Keep this tab open to keep it.';
@@ -202,6 +212,135 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz } = 
     window.scrollTo?.(0, 0);
   }
 
+  function startTicket(branch) {
+    const code = codeForRecipe(branch.recipes[Math.floor(Math.random() * branch.recipes.length)]);
+    if (code) onLaunch?.(code);
+  }
+
+  // The dock's Next: run the step itself, one tap from the map.
+  function runStep(step) {
+    if (!step) { startFinal(); return; }
+    const branch = branchById(step.branchId);
+    if (step.tier === 'know') startKnowCheck(branch.id);
+    else if (step.tier === 'do') {
+      const labs = labsForBranch(branch.id);
+      const lab = labs.find(l => record.labs?.[l.id]?.state !== 'mastered') ?? labs[0];
+      if (lab) openLab(lab, branch);
+    } else startTicket(branch);
+  }
+
+  const ICON = {
+    exam: 'M6 3h12v18H6zM9 8h6M9 12h6M9 16h4',
+    glossary: 'M5 4h9a4 4 0 0 1 4 4v12H9a4 4 0 0 1-4-4zM5 16a4 4 0 0 1 4-4h9',
+    progress: 'M5 20V12M10 20V6M15 20V10M20 20V4',
+    more: 'M5 12h.01M12 12h.01M19 12h.01',
+  };
+  function icon(name) {
+    const i = svg('svg', { viewBox: '0 0 24 24', class: 'sk-dock-icon', 'aria-hidden': 'true' });
+    i.append(svg('path', { d: ICON[name] }));
+    return i;
+  }
+
+  // ---------- the glossary ----------
+  function drawGlossary() {
+    const top = el('header', 'sk-top');
+    top.append(btn('sk-back', ui.back === 'tree' ? 'Tree' : 'Map', () => go(ui.back === 'tree' ? 'tree' : 'map', { openTerm: null })));
+    const title = el('div', 'sk-title');
+    title.append(el('span', 'sk-kicker', `${GLOSSARY.length} terms`));
+    title.append(el('h1', null, 'Glossary'));
+    top.append(title);
+    if (home?.onReference) top.append(btn('sk-back sk-ref', 'Commands', () => home.onReference()));
+    root.append(top);
+
+    const search = el('input', 'gl-search');
+    search.type = 'search';
+    search.placeholder = 'Search terms, like trunk or 802.1Q';
+    search.setAttribute('aria-label', 'Search the glossary');
+    search.value = ui.query;
+    root.append(search);
+
+    const filters = el('div', 'gl-filters');
+    filters.setAttribute('role', 'group');
+    filters.setAttribute('aria-label', 'Tree');
+    for (const [id, label] of [['all', 'All'], ...CCNA_MAP.trees.map(t => [t.id, t.num === 0 ? 'IOS' : pad2(t.num)])]) {
+      const f = btn(`gl-filter${ui.treeFilter === id ? ' is-on' : ''}`, label, () => { ui.treeFilter = id; drawList(); filters.querySelectorAll('.gl-filter').forEach(x => x.classList.toggle('is-on', x === f)); });
+      f.setAttribute('aria-pressed', String(ui.treeFilter === id));
+      filters.append(f);
+    }
+    root.append(filters);
+
+    const list = el('ul', 'gl-list');
+    root.append(list);
+    function drawList() {
+      list.textContent = '';
+      const terms = searchGlossary(ui.query).filter(t => ui.treeFilter === 'all' || t.branch.startsWith(`${ui.treeFilter}-`));
+      if (!terms.length) list.append(el('li', 'gl-empty', 'No term matches. Try a shorter word.'));
+      for (const t of terms) {
+        const open = ui.openTerm === t.id;
+        const li = el('li', `gl-item${open ? ' is-open' : ''}`);
+        li.dataset.term = t.id;
+        const row = btn('gl-row', '', () => { ui.openTerm = open ? null : t.id; drawList(); });
+        row.setAttribute('aria-expanded', String(open));
+        row.append(el('span', 'gl-row-name', t.term), el('span', 'gl-row-plain', t.plain));
+        li.append(row);
+        if (open) {
+          const more = el('div', 'gl-more');
+          const exam = el('div', 'gl-exam');
+          exam.append(el('span', 'gl-label', 'On the exam'), el('p', null, t.exam));
+          more.append(exam);
+          if (t.cmd) {
+            const cmd = el('div', 'gl-cmd');
+            cmd.append(el('span', 'gl-label', 'IOS'), el('code', null, t.cmd));
+            more.append(cmd);
+          }
+          const b = branchById(t.branch);
+          if (b) more.append(btn('gl-go', `On the map: ${b.name}`, () => openBranch(b.id)));
+          li.append(more);
+        }
+        list.append(li);
+      }
+    }
+    search.addEventListener('input', () => { ui.query = search.value; ui.openTerm = null; drawList(); });
+    drawList();
+    if (ui.openTerm) requestAnimationFrame(() => list.querySelector('.gl-item.is-open')?.scrollIntoView?.({ block: 'center' }));
+  }
+
+  function openBranch(branchId) {
+    const b = branchById(branchId);
+    if (!b) return;
+    const tree = CCNA_MAP.trees.find(t => t.branches.some(x => x.id === branchId));
+    go('tree', { treeId: tree.id, branchId: b.id });
+    window.scrollTo?.(0, 0);
+  }
+
+  function openGlossary(termId = null) {
+    const t = termId ? TERM_BY_ID.get(termId) : null;
+    if (ui.view !== 'glossary') ui.back = ui.view === 'tree' ? 'tree' : 'map';
+    Object.assign(ui, { view: 'glossary', branchId: null, openTerm: t?.id ?? null, query: t ? '' : ui.query, treeFilter: t ? 'all' : ui.treeFilter });
+    draw();
+    if (!t) window.scrollTo?.(0, 0);
+  }
+
+  function drawDock(p) {
+    const dock = el('nav', 'sk-dock');
+    dock.setAttribute('aria-label', 'Main');
+    const ticket = home.getActiveTicket?.();
+    const step = nextStep(p);
+    const go = btn('sk-dock-next', '', () => (ticket ? home.onContinue?.() : runStep(step)));
+    const lead = !step ? '' : step.reason === 'relight' ? 'Relight' : step.reason === 'stretch' ? 'Stretch' : 'Next';
+    const kicker = ticket ? 'Open ticket' : !step ? 'Map lit' : `${lead} · ${TIER_LABEL[step.tier]}`;
+    const what = ticket ? 'Continue it' : !step ? 'Take the final' : branchById(step.branchId).name;
+    go.setAttribute('aria-label', ticket ? 'Continue your open ticket' : !step ? 'Take the final' : `${lead}: ${what}, ${TIER_LABEL[step.tier]}`);
+    go.append(el('span', 'sk-dock-kicker', kicker), el('span', 'sk-dock-what', what));
+    dock.append(go);
+    for (const [name, label, fn] of [['exam', 'Exam', home.onExam], ['glossary', 'Glossary', () => openGlossary()], ['progress', 'Progress', home.onProgress], ['more', 'More', home.onMore]]) {
+      const b = btn(`sk-dock-btn is-${name}`, '', () => fn?.());
+      b.append(icon(name), el('span', null, label));
+      dock.append(b);
+    }
+    root.append(dock);
+  }
+
   // Lights that came on since the last look run their pulse once.
   function takeNew(p) {
     const fresh = newlyLit(p, record);
@@ -211,7 +350,7 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz } = 
 
   function drawMap(p, fresh) {
     const top = el('header', 'sk-top');
-    top.append(btn('sk-back', 'Home', () => onExit?.()));
+    if (!home) top.append(btn('sk-back', 'Home', () => onExit?.()));
     const title = el('div', 'sk-title');
     title.append(el('span', 'sk-kicker', CCNA_MAP.title));
     title.append(el('h1', null, 'Skill map'));
@@ -243,6 +382,7 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz } = 
   }
 
   function drawTree(p, fresh) {
+    const next = home ? nextStep(p) : null;
     const tree = treeById(ui.treeId);
     const t = p.trees.find(x => x.id === tree.id);
     const top = el('header', 'sk-top');
@@ -260,7 +400,8 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz } = 
     const spine = el('ol', 'sk-spine');
     tree.branches.forEach((b, i) => {
       const s = t.branches[i];
-      const li = el('li', `sk-branch is-${s.readiness}${s.started ? ' is-started' : ''}`);
+      const isNext = next?.branchId === b.id;
+      const li = el('li', `sk-branch is-${s.readiness}${s.started ? ' is-started' : ''}${isNext ? ' is-next' : ''}`);
       const row = btn('sk-branch-row', '', () => { ui.branchId = b.id; draw(); });
       row.setAttribute('aria-label', `${b.name}: ${TIERS.filter(x => b.tiers.includes(x)).map(x => `${TIER_LABEL[x]} ${s.tiers[x].state}`).join(', ')}. ${s.readiness}`);
       const port = el('span', 'sk-port');
@@ -273,10 +414,11 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz } = 
         leds.append(led(tier, s.tiers[tier].state, fresh.has(`${b.id}:${tier}`)));
       }
       body.append(leds);
-      const tag = el('span', 'sk-tag', s.readiness === 'done' ? 'DONE' : s.readiness === 'ready' ? 'READY' : 'HARDER');
+      const tag = el('span', 'sk-tag', isNext ? 'NEXT' : s.readiness === 'done' ? 'DONE' : s.readiness === 'ready' ? 'READY' : 'HARDER');
       row.append(port, body, tag);
       li.append(row);
       spine.append(li);
+      if (isNext && ui.scrollNext) { ui.scrollNext = false; requestAnimationFrame(() => li.scrollIntoView?.({ block: 'center' })); }
     });
     root.append(spine);
 
@@ -308,6 +450,15 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz } = 
     const topics = el('ul', 'sk-topics');
     for (const topic of b.topics) topics.append(el('li', null, topic));
     sheet.append(topics);
+    // Terms not already named in the topics above, so nothing shows twice.
+    const named = b.topics.join(' ').toLowerCase();
+    const words = GLOSSARY.filter(x => x.branch === b.id && !named.includes(x.term.toLowerCase()));
+    if (words.length) {
+      const chips = el('div', 'sk-terms');
+      chips.append(el('span', 'sk-terms-label', 'Terms'));
+      for (const w of words) chips.append(btn('sk-term', w.term, () => openGlossary(w.id)));
+      sheet.append(chips);
+    }
 
     if (s.readiness === 'hard') {
       const missing = (b.needs ?? []).map(branchById).filter(n => p.statusById[n.id]?.tiers.know.state !== 'mastered');
@@ -330,10 +481,7 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz } = 
       if (tier === 'know') {
         row.append(btn('sk-go sk-go-small', st.state === 'mastered' ? 'Recheck' : `Check · ${Math.min(KNOW_CHECK_SIZE, s.questions)}`, () => startKnowCheck(b.id)));
       } else if (tier === 'fix' && b.recipes?.length) {
-        row.append(btn('sk-go sk-go-small', 'Start a ticket', () => {
-          const code = codeForRecipe(b.recipes[Math.floor(Math.random() * b.recipes.length)]);
-          if (code) onLaunch?.(code);
-        }));
+        row.append(btn('sk-go sk-go-small', 'Start a ticket', () => startTicket(b)));
       } else if (st.state === 'soon') {
         row.append(el('span', 'sk-soon', tier === 'do' ? 'Console labs' : 'More tickets'));
       }
@@ -362,12 +510,18 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz } = 
     root.classList.remove('is-lab');
     const p = progress();
     const fresh = takeNew(p);
-    if (ui.view === 'tree' && ui.treeId) drawTree(p, fresh);
+    for (const banner of home?.banners?.() ?? []) root.append(banner);
+    if (ui.view === 'glossary') drawGlossary();
+    else if (ui.view === 'tree' && ui.treeId) drawTree(p, fresh);
     else drawMap(p, fresh);
     if (storageError) root.append(el('p', 'sk-error', storageError));
+    if (home) drawDock(p);
   }
 
   draw();
   root.refresh = () => { record = load(); draw(); };
+  root.openGlossary = openGlossary;
+  root.openBranch = openBranch;
+  root.busy = () => ui.view === 'lab';
   return root;
 }

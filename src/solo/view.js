@@ -126,7 +126,7 @@ function familyLabel(family) {
   return SKILLS.find((s) => s.family === family)?.label ?? 'Mixed challenge';
 }
 
-function renderPendingMissionPrompt(state, actions) {
+export function renderPendingMissionPrompt(state, actions) {
   const request = state.pendingMissionRequest;
   const box = document.createElement('div');
   box.className = 'home-pending-prompt';

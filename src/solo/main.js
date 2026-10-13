@@ -2,6 +2,8 @@ import { createIssueLibrary } from './issue-library.js';
 import { createExamPrep, prepSnapshot } from './study/hub.js';
 import { createThemeToggle } from './backlight.js';
 import { createSkillMap, skillMapSnapshot, renderConstellation } from './tree/screen.js';
+import { branchById } from './tree/ccna.js';
+import { installGlossary } from './glossary/link.js';
 import { guidedFix, guidedVerify, guidedNote, plainResult, currentGuidedStep } from './guide-steps.js';
 import {
   createInitialState,
@@ -51,6 +53,7 @@ import {
 import { openStore, previewBackup } from './store.js';
 import {
   renderHome,
+  renderPendingMissionPrompt,
   renderCareer,
   renderMission,
   renderDebrief,
@@ -108,7 +111,12 @@ let updateServiceWorkerFn = null;
 let builderScreen = null;
 let libraryScreen = null;
 let examPrepScreen = null;
-let skillMapScreen = null;
+// The skill map is the home screen. It is made once and kept, so the tree
+// and branch you were on are still open when a ticket or exam hands back.
+// classicHome shows the older home screen (backups, the issue library, the
+// builder), reached from the map's More.
+let mapHome = null;
+let classicHome = false;
 
 function render() {
   const focusedCommand = document.activeElement?.matches('.terminal-input') ? { name: document.activeElement.getAttribute('aria-label'), value: document.activeElement.value, start: document.activeElement.selectionStart, end: document.activeElement.selectionEnd } : null;
@@ -120,11 +128,14 @@ function render() {
   if (builderScreen) { root.appendChild(builderScreen); return; }
   if (libraryScreen) { root.appendChild(libraryScreen); return; }
   if (examPrepScreen) { root.appendChild(examPrepScreen); return; }
-  if (skillMapScreen) { root.appendChild(skillMapScreen); return; }
   if (state.screen === 'opening') {
     root.appendChild(renderOpening());
   } else if (state.screen === 'initializing') {
     root.appendChild(renderInitializing());
+  } else if (state.screen === 'home' && !classicHome) {
+    const map = ensureMapHome();
+    map.refresh();
+    root.appendChild(map);
   } else if (state.screen === 'home') {
     root.appendChild(
       renderHome(state, {
@@ -411,22 +422,41 @@ function openStudyScreen() {
 // The skill map keeps its own view (which tree is open) while a check or exam
 // runs in the exam prep screens, then takes the score back and redraws.
 function openSkillMap() {
-  skillMapScreen = createSkillMap({
+  classicHome = false;
+  state = { ...state, screen: 'home' };
+  render();
+  window.scrollTo?.(0, 0);
+}
+
+function openQuiz(quiz) {
+  examPrepScreen = createExamPrep({
+    quiz,
     getCompletedRuns: () => state.profile?.completedRuns ?? [],
-    onExit: () => { skillMapScreen = null; render(); },
-    onLaunch: (code) => { skillMapScreen = null; startCode(code); },
-    onQuiz: (quiz) => {
-      examPrepScreen = createExamPrep({
-        quiz,
-        getCompletedRuns: () => state.profile?.completedRuns ?? [],
-        onExit: () => { examPrepScreen?.destroy?.(); examPrepScreen = null; skillMapScreen?.refresh?.(); render(); window.scrollTo?.(0, 0); },
-      });
-      render();
-      window.scrollTo?.(0, 0);
-    },
+    onExit: () => { examPrepScreen?.destroy?.(); examPrepScreen = null; render(); window.scrollTo?.(0, 0); },
   });
   render();
   window.scrollTo?.(0, 0);
+}
+
+function ensureMapHome() {
+  if (mapHome) return mapHome;
+  mapHome = createSkillMap({
+    getCompletedRuns: () => state.profile?.completedRuns ?? [],
+    onLaunch: (code) => startCode(code),
+    onQuiz: openQuiz,
+    home: {
+      onExam: () => openExamPrep('home'),
+      onReference: openReferenceScreen,
+      onProgress: openProgress,
+      onMore: () => { classicHome = true; render(); window.scrollTo?.(0, 0); },
+      getActiveTicket: () => state.mission?.status === 'active',
+      onContinue: continueMission,
+      banners: () => (state.pendingMissionRequest
+        ? [renderPendingMissionPrompt(state, { onConfirmReplace: confirmReplace, onCancelReplace: () => { cancelReplace(); continueMission(); } })]
+        : []),
+    },
+  });
+  return mapHome;
 }
 
 function openExamPrep(initialScreen = 'home') {
@@ -1040,6 +1070,7 @@ async function reloadForUpdate() {
 async function start() {
   state = await boot(store);
   render();
+  installGlossary(document.getElementById('root'), glossaryHooks);
   setupServiceWorkerRegistration();
 }
 
@@ -1048,3 +1079,28 @@ if (document.readyState === 'loading') {
 } else {
   start();
 }
+
+// The glossary lives in the map. Opening it from anywhere else (a term card,
+// a ticket's debrief) lands on the map's glossary view.
+function openGlossary(termId = null) {
+  classicHome = false;
+  state = { ...state, screen: 'home' };
+  ensureMapHome().openGlossary(termId);
+  render();
+}
+
+function openBranchOnMap(branchId) {
+  classicHome = false;
+  state = { ...state, screen: 'home' };
+  ensureMapHome().openBranch(branchId);
+  render();
+}
+
+// Term cards offer the map and the glossary only when leaving the screen
+// costs nothing: never in the middle of a ticket, a lab or an exam.
+function glossaryHooks() {
+  const busy = state.screen === 'mission' || examPrepScreen || builderScreen || libraryScreen || mapHome?.busy?.();
+  if (busy) return {};
+  return { branchName: (id) => branchById(id)?.name, onOpenBranch: openBranchOnMap, onOpenGlossary: openGlossary };
+}
+

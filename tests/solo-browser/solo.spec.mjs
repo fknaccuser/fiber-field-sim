@@ -24,11 +24,24 @@ async function hideGuide(page) {
   await expect(page.locator('.spotlight')).toHaveCount(0);
 }
 
-async function enableApp(page) {
+// The skill map is home; the older home screen (backups, tickets by code)
+// is one tap away under More.
+async function toClassicHome(page) {
+  await expect(page.locator('.skillmap.is-home')).toBeVisible();
+  await page.click('.sk-dock-btn.is-more');
+  await expect(page.locator('.home-screen')).toBeVisible();
+}
+
+async function enableMap(page) {
   await page.goto('/');
   await page.fill('#opening-command', 'enable');
   await page.press('#opening-command', 'Enter');
-  await expect(page.locator('.home-screen')).toBeVisible();
+  await expect(page.locator('.skillmap.is-home')).toBeVisible();
+}
+
+async function enableApp(page) {
+  await enableMap(page);
+  await toClassicHome(page);
 }
 
 test.describe('The Field Solo', () => {
@@ -154,7 +167,7 @@ test.describe('The Field Solo', () => {
     // A fresh load always starts at the opening screen (openingEnabled default).
     await page.fill('#opening-command', 'enable');
     await page.press('#opening-command', 'Enter');
-    await expect(page.locator('.home-screen')).toBeVisible();
+    await toClassicHome(page);
 
     const continueButton = page.locator('.home-continue');
     await expect(continueButton).toBeEnabled();
@@ -326,6 +339,7 @@ test.describe('Determinism and storage across separate browser contexts', () => 
     await page.reload();
     await page.fill('#opening-command', 'enable');
     await page.press('#opening-command', 'Enter');
+    await toClassicHome(page);
     await page.click('.home-continue');
     await expect(page.locator('.mission-screen')).toBeVisible();
     await hideGuide(page);
@@ -345,8 +359,13 @@ test.describe('Skill map', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test('opens from home, zooms into a tree, and a know check lights or records the branch', async ({ page }) => {
-    await enableApp(page);
-    await page.click('.home-skillmap');
+    await enableMap(page);
+    // Home opens on the tree being worked, with the next branch marked.
+    await expect(page.locator('.sk-title h1')).toHaveText('IOS Foundations');
+    await expect(page.locator('.sk-branch.is-next')).toContainText('Navigate');
+    await expect(page.locator('.sk-dock-next')).toContainText('Next · Know');
+    await expect(page.locator('.sk-dock-next')).toContainText('Navigate');
+    await page.click('.sk-back:has-text("Map")');
     await expect(page.locator('.sk-constellation .sk-node')).toHaveCount(7);
     await page.click('.sk-node[data-tree="t1"]');
     await expect(page.locator('.sk-title h1')).toHaveText('Network Fundamentals');
@@ -378,8 +397,8 @@ test.describe('Do labs', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test('a static routing lab ticks its checklist from typed commands and lights Do', async ({ page }) => {
-    await enableApp(page);
-    await page.click('.home-skillmap');
+    await enableMap(page);
+    await page.click('.sk-back:has-text("Map")');
     await page.click('.sk-node[data-tree="t3"]');
     await page.locator('.sk-branch-row', { hasText: 'Static routing' }).click();
     await page.locator('.sk-lab', { hasText: 'Static routes end to end' }).locator('.sk-go').click();
@@ -409,8 +428,8 @@ test.describe('Do labs', () => {
   });
 
   test('a guided lab is played by picking answers and tiles, then offers Assisted', async ({ page }) => {
-    await enableApp(page);
-    await page.click('.home-skillmap');
+    await enableMap(page);
+    await page.click('.sk-back:has-text("Map")');
     await page.click('.sk-node[data-tree="t0"]');
     await page.locator('.sk-branch-row', { hasText: 'Navigate' }).click();
     await page.locator('.sk-lab', { hasText: 'First boot' }).locator('.sk-go').click();
@@ -429,5 +448,53 @@ test.describe('Do labs', () => {
     await expect(page.locator('.lab-goal.is-done')).toHaveCount(await page.locator('.lab-goal').count());
     await page.click('.lab-done .sk-go:has-text("Start Assisted")');
     await expect(page.locator('.lab-stage.is-on')).toContainText('Assisted');
+  });
+});
+
+test.describe('Map home', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('the glossary finds a term, shows both layers, and jumps to its branch', async ({ page }) => {
+    await enableMap(page);
+    await page.click('.sk-dock-btn.is-glossary');
+    await expect(page.locator('.sk-title h1')).toHaveText('Glossary');
+    await page.fill('.gl-search', 'dot1q');
+    await expect(page.locator('.gl-item').first()).toContainText('802.1Q');
+    await page.locator('.gl-item').first().locator('.gl-row').click();
+    await expect(page.locator('.gl-item.is-open .gl-exam')).toContainText('4-byte tag');
+    await page.click('.gl-item.is-open .gl-go');
+    await expect(page.locator('.sk-sheet h2')).toHaveText('Trunks');
+
+    // The sheet's term chips open the glossary on that term.
+    await page.locator('.sk-sheet .sk-term', { hasText: 'Trunk' }).click();
+    await expect(page.locator('.gl-item.is-open')).toContainText('Trunk');
+  });
+
+  test('a term inside text opens its card', async ({ page }) => {
+    await enableMap(page);
+    await page.click('.sk-back:has-text("Map")');
+    await page.click('.sk-node[data-tree="t2"]');
+    await page.locator('.sk-branch-row', { hasText: 'Trunks' }).click();
+    const term = page.locator('.sk-topics .gl-term').first();
+    await expect(term).toBeVisible();
+    await term.click();
+    await expect(page.locator('.gl-card')).toBeVisible();
+    await expect(page.locator('.gl-card .gl-plain')).not.toBeEmpty();
+    await page.click('.gl-card .gl-close');
+    await expect(page.locator('.gl-card')).toHaveCount(0);
+  });
+
+  test('a ticket started from Fix hands back to the same tree', async ({ page }) => {
+    await enableMap(page);
+    await page.click('.sk-back:has-text("Map")');
+    await page.click('.sk-node[data-tree="t2"]');
+    await page.locator('.sk-branch-row', { hasText: 'VLANs' }).first().click();
+    await page.click('.sk-sheet .sk-go:has-text("Start a ticket")');
+    await expect(page.locator('.mission-screen')).toBeVisible();
+    await hideGuide(page);
+    await page.click('.mission-exit');
+    await expect(page.locator('.skillmap.is-home')).toBeVisible();
+    await expect(page.locator('.sk-title h1')).toHaveText('Network Access');
+    await expect(page.locator('.sk-dock-next')).toContainText('Open ticket');
   });
 });
