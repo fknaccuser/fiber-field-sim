@@ -427,6 +427,33 @@ test.describe('Do labs', () => {
     await expect(page.locator('.sk-sheet .sk-lab', { hasText: 'Static routes end to end' })).toContainText('Passed clean');
   });
 
+  test('the Field desk takes a work order from the queue to a grade', async ({ page }) => {
+    await enableMap(page);
+    await page.click('.sk-dock-btn.is-field');
+    await expect(page.locator('.desk-card')).toHaveCount(6);
+    await page.locator('.desk-card', { hasText: 'Lock a switch down to SSH' }).locator('.sk-go:has-text("Learning")').click();
+    await expect(page.locator('.desk-req')).toHaveCount(6);
+    // Help shows the exact commands; type them on the console tab.
+    await page.locator('.desk-req[data-req="domain"] .desk-hint-btn').click();
+    const shown = (await page.locator('.desk-req[data-req="domain"] .lab-show').textContent()).split('\n').slice(1).map(l => l.trim()).filter(Boolean);
+    await page.click('.desk-tab[data-tab="console"]');
+    for (const l of shown) { await page.fill('#desk-cmd', l); await page.press('#desk-cmd', 'Enter'); }
+    await expect(page.locator('.lab-screen')).toContainText('ip domain name');
+    await page.click('.desk-tab[data-tab="order"]');
+    await expect(page.locator('.desk-req[data-req="domain"]')).toHaveClass(/is-done/);
+    await page.click('.desk-tab[data-tab="map"]');
+    await expect(page.locator('.desk-node')).toHaveCount(3);
+    await page.click('.desk-tab[data-tab="order"]');
+    await page.click('.desk-submit');
+    await expect(page.locator('.desk-close .sk-go')).toBeDisabled();
+    await page.fill('#desk-note', 'Set the domain name; the rest is still to do.');
+    await page.click('.desk-close .sk-go');
+    await expect(page.locator('.desk-pct')).toBeVisible();
+    await expect(page.locator('.desk-graded li.is-ok')).not.toHaveCount(0);
+    await page.click('.desk-card-go .sk-back:has-text("Queue")');
+    await expect(page.locator('.desk-card', { hasText: 'Lock a switch down to SSH' })).toContainText('1 run');
+  });
+
   test('a switch lab runs switch IOS and a PC prompt side by side', async ({ page }) => {
     await enableMap(page);
     await page.click('.sk-back:has-text("Map")');

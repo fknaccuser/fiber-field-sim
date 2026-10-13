@@ -23,7 +23,7 @@ export const FINAL_SIZE = 50;
 export const EXAM_PASS = 0.85;
 
 export function emptyRecord() {
-  return { know: {}, labs: {}, exams: {}, final: null, seen: {} };
+  return { know: {}, labs: {}, exams: {}, final: null, seen: {}, desk: {} };
 }
 
 export function normalizeRecord(raw) {
@@ -34,6 +34,7 @@ export function normalizeRecord(raw) {
     exams: r.exams && typeof r.exams === 'object' ? r.exams : {},
     final: r.final && typeof r.final === 'object' ? r.final : null,
     seen: r.seen && typeof r.seen === 'object' ? r.seen : {},
+    desk: r.desk && typeof r.desk === 'object' ? r.desk : {},
   };
 }
 
@@ -322,4 +323,18 @@ export function nextStep(progress, map = CCNA_MAP) {
   // Nothing ready: the first unlit tier anywhere, even if it is harder.
   const any = walk((s, tier) => s.tiers[tier].state !== 'mastered');
   return any ? { ...any, reason: 'stretch' } : null;
+}
+
+// A Field desk work order, graded. Kept per kind: runs, the best score in
+// each mode, and the last attempt.
+export function recordDesk(record, { kind, mode, pct, helped = false, seed = null }, now = Date.now()) {
+  const prior = record.desk?.[kind] ?? { runs: 0, best: null, bestSim: null, last: null };
+  const at = new Date(now).toISOString();
+  const next = {
+    runs: prior.runs + 1,
+    best: Math.max(prior.best ?? 0, pct),
+    bestSim: mode === 'sim' && !helped ? Math.max(prior.bestSim ?? 0, pct) : prior.bestSim,
+    last: { pct, mode, helped, seed, at },
+  };
+  return { ...record, desk: { ...(record.desk ?? {}), [kind]: next } };
 }

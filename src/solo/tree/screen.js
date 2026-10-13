@@ -12,12 +12,13 @@
 import { CCNA_MAP, TIERS, treeById, branchById } from './ccna.js';
 import {
   emptyRecord, normalizeRecord, mapProgress, knowCheckDeck, treeExamDeck, finalDeck,
-  recordKnowCheck, recordTreeExam, recordFinal, recordLab, newlyLit, markSeen, nextStep,
+  recordKnowCheck, recordTreeExam, recordFinal, recordLab, recordDesk, newlyLit, markSeen, nextStep,
   EXAM_PASS, KNOW_CHECK_SIZE, TREE_EXAM_SIZE, FINAL_SIZE,
 } from './progress.js';
 import { codeForRecipe } from '../study/hub.js';
 import { labsForBranch } from '../labs/catalog.js';
 import { createLabScreen } from '../labs/screen.js';
+import { createDesk } from '../desk/screen.js';
 import { suggestedStage, STAGE_LABEL } from '../labs/coach.js';
 import { GLOSSARY, TERM_BY_ID, searchGlossary } from '../glossary/terms.js';
 
@@ -146,7 +147,7 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
   const root = el('main', `skillmap${home ? ' is-home' : ''}`);
   let record = load();
   let storageError = '';
-  const ui = { view: 'map', treeId: null, branchId: null, labEl: null, scrollNext: false, query: '', treeFilter: 'all', openTerm: null, back: null };
+  const ui = { view: 'map', treeId: null, branchId: null, labEl: null, deskEl: null, scrollNext: false, query: '', treeFilter: 'all', openTerm: null, back: null };
 
   const runs = () => (getCompletedRuns?.() ?? []).filter(Boolean);
   const progress = () => mapProgress({ record, completedRuns: runs(), now: Date.now() });
@@ -213,6 +214,20 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
     window.scrollTo?.(0, 0);
   }
 
+  // The Field desk: build work orders, learning or against the clock.
+  function openDesk() {
+    ui.deskEl?.destroy?.();
+    ui.deskEl = createDesk({
+      getRecord: () => record,
+      onRecord: (r) => { record = recordDesk(record, r); save(); },
+      onExit: () => { ui.deskEl?.destroy?.(); ui.deskEl = null; ui.view = ui.back === 'tree' ? 'tree' : 'map'; draw(); window.scrollTo?.(0, 0); },
+    });
+    ui.back = ui.view === 'tree' ? 'tree' : 'map';
+    ui.view = 'desk';
+    draw();
+    window.scrollTo?.(0, 0);
+  }
+
   function startTicket(branch) {
     const code = codeForRecipe(branch.recipes[Math.floor(Math.random() * branch.recipes.length)]);
     if (code) onLaunch?.(code);
@@ -235,6 +250,7 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
     glossary: 'M5 4h9a4 4 0 0 1 4 4v12H9a4 4 0 0 1-4-4zM5 16a4 4 0 0 1 4-4h9',
     progress: 'M5 20V12M10 20V6M15 20V10M20 20V4',
     more: 'M5 12h.01M12 12h.01M19 12h.01',
+    field: 'M4 5h6v4H4zM14 5h6v4h-6zM9 15h6v4H9zM7 9v3h10V9M12 12v3',
   };
   function icon(name) {
     const i = svg('svg', { viewBox: '0 0 24 24', class: 'sk-dock-icon', 'aria-hidden': 'true' });
@@ -334,7 +350,7 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
     go.setAttribute('aria-label', ticket ? 'Continue your open ticket' : !step ? 'Take the final' : `${lead}: ${what}, ${TIER_LABEL[step.tier]}`);
     go.append(el('span', 'sk-dock-kicker', kicker), el('span', 'sk-dock-what', what));
     dock.append(go);
-    for (const [name, label, fn] of [['exam', 'Exam', home.onExam], ['glossary', 'Glossary', () => openGlossary()], ['progress', 'Progress', home.onProgress], ['more', 'More', home.onMore]]) {
+    for (const [name, label, fn] of [['field', 'Field', () => openDesk()], ['exam', 'Exam', home.onExam], ['glossary', 'Glossary', () => openGlossary()], ['progress', 'Progress', home.onProgress], ['more', 'More', home.onMore]]) {
       const b = btn(`sk-dock-btn is-${name}`, '', () => fn?.());
       b.append(icon(name), el('span', null, label));
       dock.append(b);
@@ -508,7 +524,8 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
   function draw() {
     root.textContent = '';
     if (ui.view === 'lab' && ui.labEl) { root.classList.add('is-lab'); root.append(ui.labEl); return; }
-    root.classList.remove('is-lab');
+    if (ui.view === 'desk' && ui.deskEl) { root.classList.add('is-lab', 'is-desk'); root.append(ui.deskEl); return; }
+    root.classList.remove('is-lab', 'is-desk');
     const p = progress();
     const fresh = takeNew(p);
     for (const banner of home?.banners?.() ?? []) root.append(banner);
@@ -523,6 +540,7 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
   root.refresh = () => { record = load(); draw(); };
   root.openGlossary = openGlossary;
   root.openBranch = openBranch;
-  root.busy = () => ui.view === 'lab';
+  root.busy = () => ui.view === 'lab' || ui.view === 'desk';
+  root.openDesk = openDesk;
   return root;
 }
