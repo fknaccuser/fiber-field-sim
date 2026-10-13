@@ -8,6 +8,7 @@
 
 import { TREE_QUESTIONS } from './questions-tree.js';
 import { BANK_EXPANSION } from './bank/index.js';
+import { GENERATED_BANK } from './gen/index.js';
 
 const CORE_BANK = [
   {
@@ -1261,4 +1262,4 @@ const CORE_BANK = [
 
 // The skill tree's questions join the main bank, so quizzes and mock exams
 // draw on them too.
-export const CCNA_BANK = [...CORE_BANK, ...TREE_QUESTIONS, ...BANK_EXPANSION];
+export const CCNA_BANK = [...CORE_BANK, ...TREE_QUESTIONS, ...BANK_EXPANSION, ...GENERATED_BANK];

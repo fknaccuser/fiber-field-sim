@@ -19,6 +19,8 @@ import { TIERS, tierById, generate, isCorrect as drillCorrect, emptySession, rec
 import { parameters } from '../seed.js';
 import { renderPatchPanel } from '../patch-panel.js';
 import { renderExhibit } from './exhibit.js';
+import { freshen } from './gen/index.js';
+import { rotate } from './rotation.js';
 
 export const STORAGE_KEY = 'field-exam-prep-v1';
 
@@ -109,8 +111,9 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
   function exit() { stopTicker(); onExit?.(); }
 
   // ---------- quiz and mock exam ----------
+  // Generated questions are rebuilt with fresh numbers every time a deck starts.
   function begin(deck, exam, shortfalls = [], drillLabel = null) {
-    Object.assign(ui, { deck, exam, shortfalls, drillLabel, at: 0, right: 0, screen: 'quiz' });
+    Object.assign(ui, { deck: deck.map(q => freshen(q)), exam, shortfalls, drillLabel, at: 0, right: 0, screen: 'quiz' });
     loadQuestion();
   }
   function loadQuestion() {
@@ -124,7 +127,7 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
     const correct = isCorrect(q, q.format === 'single' ? ui.pick[0] : ui.pick);
     if (correct) ui.right += 1;
     const prior = saved.quiz[q.id] ?? { right: 0, seen: 0 };
-    saved.quiz[q.id] = { right: prior.right + (correct ? 1 : 0), seen: prior.seen + 1 };
+    saved.quiz[q.id] = { right: prior.right + (correct ? 1 : 0), seen: prior.seen + 1, last: { ok: correct, at: Date.now() } };
     save();
     ui.graded = { correct };
     draw();
@@ -219,9 +222,11 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
     root.append(el('p', 'ep-label', 'Drills and recall'));
     const more = el('div', 'ep-actions');
     const consolePool = filter(CONSOLE_POOL, { blueprint: saved.blueprint });
-    const consoleGo = btn('ep-go', `Console drill · ${consolePool.length} questions`, () => {
-      const order = presentation({ choices: consolePool }).choiceOrder.map(i => consolePool[i]);
-      begin(order.slice(0, CONSOLE_DRILL_SIZE), false, [], 'Console drill');
+    // Unseen questions first, misses back after two days, right answers rest
+    // for ten; generated questions also get new numbers every time.
+    const generated = consolePool.filter(q => q.gen).length;
+    const consoleGo = btn('ep-go', `Console drill · ${consolePool.length} questions, ${generated} new every time`, () => {
+      begin(rotate(consolePool, saved.quiz, { count: CONSOLE_DRILL_SIZE }), false, [], 'Console drill');
     });
     consoleGo.disabled = !consolePool.length;
     more.append(consoleGo);
