@@ -16,6 +16,7 @@ import { memberFlag, operMode } from '../labs/switching.js';
 import { parseIp } from '../labs/ip4.js';
 import { ROUTER_TEMPLATES } from './jobs-router.js';
 import { REPAIR_TEMPLATES } from './jobs-repair.js';
+import { IPV6_TEMPLATES } from './jobs-ipv6.js';
 
 const ip = parseIp;
 const NIC = 'FastEthernet0';
@@ -391,7 +392,7 @@ export const TEMPLATES = [
   },
 ];
 
-TEMPLATES.push(...ROUTER_TEMPLATES, ...REPAIR_TEMPLATES);
+TEMPLATES.push(...ROUTER_TEMPLATES, ...IPV6_TEMPLATES, ...REPAIR_TEMPLATES);
 
 export const templateOf = (kind) => TEMPLATES.find(t => t.kind === kind) ?? null;
 

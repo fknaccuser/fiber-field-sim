@@ -85,7 +85,7 @@ test('every repair fault starts broken somewhere else tests can see, and its own
 
 test('a repair ticket can be asked for by branch', async () => {
   const { repairFor } = await import('../../src/solo/desk/jobs-repair.js');
-  for (const b of ['t2-vlans', 't2-trunks', 't4-nat', 't5-acl', 't2-etherchannel', 't2-stp', 't1-client', 't3-static', 't4-dhcp-dns', 't0-remote', 't5-l2sec']) {
+  for (const b of ['t2-vlans', 't2-trunks', 't4-nat', 't5-acl', 't2-etherchannel', 't2-stp', 't1-client', 't3-static', 't4-dhcp-dns', 't0-remote', 't5-l2sec', 't1-ipv6']) {
     const r = repairFor(b, 5);
     assert.ok(r, b);
     assert.ok(makeOrder(r.kind, r.seed, { fault: r.fault }).lights.includes(b), b);

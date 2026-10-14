@@ -12,6 +12,7 @@ import { exchange, requestDhcp, l2Of } from '../labs/world.js';
 import { memberFlag } from '../labs/switching.js';
 import { parseIp } from '../labs/ip4.js';
 import { cloneWorld } from './grade.js';
+import { IPV6_REPAIRS } from './jobs-ipv6.js';
 
 const ip = parseIp;
 const NIC = 'FastEthernet0';
@@ -276,6 +277,8 @@ export const REPAIR_TEMPLATES = [
     },
   },
 ];
+
+REPAIR_TEMPLATES.push(...IPV6_REPAIRS);
 
 // Which branches a repair ticket can light, and a seed and fault for one.
 export function repairFor(branchId, seed) {

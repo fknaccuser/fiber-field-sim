@@ -24,6 +24,8 @@ import {
   showVlanBrief, showInterfacesStatus, showInterfacesTrunk, showSwitchport, showInterface, showMacTable, showSpanningTree,
   showEtherchannelSummary, showPortSecurity, showPortSecurityInterface, showCdpNeighbors, showCdpDetail, showLldpNeighbors, showHostRoute,
 } from './show-l2.js';
+import { parse6, format6, parsePrefix6, net6, isLinkLocal, solicited } from './ip6.js';
+import { v6Of, routingTable6, ping6, trace6, slaacFrom } from './v6.js';
 
 // ---------- interface names ----------
 
@@ -57,6 +59,8 @@ export const shortIf = (name) => name.replace('GigabitEthernet', 'Gi').replace('
 
 const ARG = {
   ip: { check: isIp, help: 'A.B.C.D' },
+  ip6: { check: (t) => parse6(t) !== null, help: 'X:X:X:X::X' },
+  ip6pfx: { check: (t) => parsePrefix6(t) !== null, help: 'X:X:X:X::X/<0-128>' },
   mask: { check: isMask, help: 'A.B.C.D  Mask' },
   wild: { check: isIp, help: 'A.B.C.D  Wildcard bits' },
   num: { check: (t) => /^\d+$/.test(t), help: '<0-4294967295>' },
@@ -201,6 +205,7 @@ export function runningConfig(dev) {
   if (Object.keys(c.users).length) L.push('!');
   if (c.domain) L.push(`ip domain name ${c.domain}`, '!');
   if (c.timestamps) L.push('service timestamps log datetime msec', '!');
+  L.push(...v6GlobalLines(c));
   L.push(...dhcpConfigLines(dev));
   if (c.servicePasswordEncryption) L.push('service password-encryption', '!');
   if (isSwitch) {
@@ -234,6 +239,7 @@ export function runningConfig(dev) {
     if (i.ospf.priority !== 1) L.push(` ip ospf priority ${i.ospf.priority}`);
     if (i.ospf.cost !== null) L.push(` ip ospf cost ${i.ospf.cost}`);
     if (i.ospf.pid !== null) L.push(` ip ospf ${i.ospf.pid} area ${i.ospf.area}`);
+    L.push(...v6InterfaceLines(i));
     if (i.helper) L.push(` ip helper-address ${formatIp(i.helper)}`);
     if (i.aclIn) L.push(` ip access-group ${i.aclIn} in`);
     if (i.aclOut) L.push(` ip access-group ${i.aclOut} out`);
@@ -253,6 +259,8 @@ export function runningConfig(dev) {
   for (const s of c.statics) L.push(`ip route ${formatIp(s.net)} ${formatIp(lenToMask(s.len))}${s.intf ? ` ${s.intf}` : ''}${s.nh !== null && s.nh !== undefined ? ` ${formatIp(s.nh)}` : ''}${s.ad !== 1 ? ` ${s.ad}` : ''}`);
   if (c.sshVersion) L.push(`ip ssh version ${c.sshVersion}`);
   if (c.statics.length || c.sshVersion) L.push('!');
+  const r6 = v6RouteLines(c);
+  if (r6.length) L.push(...r6, '!');
   const svc = [...natConfigLines(dev), ...aclConfigLines(dev)];
   if (svc.length) L.push(...svc, '!');
   const ops = [...(c.logHosts ?? []).map(h => `logging host ${formatIp(h)}`), ...(c.ntp ?? []).map(h => `ntp server ${formatIp(h)}`)];
@@ -484,8 +492,285 @@ const CLEAR_NAT = cmd(['clear', 'ip', 'nat', 'translation', W('star', 'word')], 
   return { out: '' };
 }, { key: 'clear ip nat translation' });
 
+// ---------- IPv6 ----------
+
+const up6 = (x) => format6(x, true);
+
+function showIpv6IntBrief(world, deviceId) {
+  const dev = world.devices[deviceId];
+  const names = Object.keys(dev.config.interfaces).sort(dev.kind === 'switch' ? ifSort : (a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const out = [];
+  for (const n of names) {
+    const st = interfaceState(world, deviceId, n);
+    out.push(`${pad(n, 23)}[${st.status}/${st.protocol}]`);
+    const v = v6Of(world, deviceId, n);
+    if (!v.on) { out.push('    unassigned'); continue; }
+    out.push(`    ${up6(v.ll)}`, ...v.addrs.map(x => `    ${up6(x.addr)}`));
+  }
+  return out.join('\n');
+}
+
+function showIpv6Interface(world, dev, name) {
+  const st = interfaceState(world, dev.id, name);
+  const v = v6Of(world, dev.id, name);
+  const lines = [`${name} is ${st.status}, line protocol is ${st.protocol}`];
+  if (!v.on) return [...lines, '  IPv6 is not enabled on this interface'].join('\n');
+  const conf = dev.config.interfaces[name].v6;
+  const routing = Boolean(dev.config.ipv6?.routing);
+  lines.push(`  IPv6 is ${st.up ? 'enabled' : 'tentative'}, link-local address is ${up6(v.ll)}`, '  No Virtual link-local address(es):');
+  if (conf?.auto) lines.push('  Stateless address autoconfig enabled');
+  lines.push('  Global unicast address(es):');
+  if (!v.addrs.length) lines.push('    none');
+  v.addrs.forEach((x, k) => {
+    const eui = conf?.addrs[k]?.eui ? ' [EUI]' : k >= (conf?.addrs.length ?? 0) ? ' [EUI/CAL/PRE]' : '';
+    lines.push(`    ${up6(x.addr)}, subnet is ${up6(net6(x.addr, x.len))}/${x.len}${eui}`);
+  });
+  const groups = ['FF02::1'];
+  if (routing) groups.push('FF02::2');
+  for (const a of [v.ll, ...v.addrs.map(x => x.addr)]) { const g = up6(solicited(a)); if (!groups.includes(g)) groups.push(g); }
+  lines.push('  Joined group address(es):', ...groups.map(g => `    ${g}`));
+  lines.push('  MTU is 1500 bytes', '  ICMP error messages limited to one every 100 milliseconds', '  ICMP redirects are enabled', '  ICMP unreachables are sent', '  ND DAD is enabled, number of DAD attempts: 1', '  ND reachable time is 30000 milliseconds (using 30000)');
+  if (routing) lines.push('  ND advertised reachable time is 0 (unspecified)', '  ND advertised retransmit interval is 0 (unspecified)', '  ND router advertisements are sent every 200 seconds', '  ND router advertisements live for 1800 seconds', '  ND advertised default router preference is Medium', '  Hosts use stateless autoconfig for addresses.');
+  return lines.join('\n');
+}
+
+const V6_CODES = 'Codes: C - Connected, L - Local, S - Static, U - Per-user Static route\n       B - BGP, R - RIP, H - NHRP, I1 - ISIS L1\n       I2 - ISIS L2, IA - ISIS interarea, IS - ISIS summary, D - EIGRP\n       EX - EIGRP external, ND - ND Default, NDp - ND Prefix, DCE - Destination\n       NDr - Redirect, O - OSPF Intra, OI - OSPF Inter, OE1 - OSPF ext 1\n       OE2 - OSPF ext 2, ON1 - OSPF NSSA ext 1, ON2 - OSPF NSSA ext 2';
+
+function showIpv6Route(world, deviceId, filter = null) {
+  const table = routingTable6(world, deviceId).filter(r => !filter || r.type === filter);
+  const rows = [];
+  for (const r of table) {
+    const code = { connected: 'C', local: 'L', static: 'S' }[r.type];
+    const h = r.hops[0];
+    rows.push(`${pad(code, 4)}${up6(r.net)}/${r.len} [${r.ad}/0]`);
+    if (r.type === 'connected') rows.push(`     via ${h.intf}, directly connected`);
+    else if (r.type === 'local') rows.push(`     via ${h.intf}, receive`);
+    else if (h.nh !== null && h.given) rows.push(`     via ${up6(h.nh)}, ${h.given}`);
+    else if (h.nh !== null) rows.push(`     via ${up6(h.nh)}`);
+    else rows.push(`     via ${h.intf}, directly connected`);
+  }
+  const count = table.length + (filter ? 0 : 1);
+  if (!filter) rows.push('L   FF00::/8 [0/0]', '     via Null0, receive');
+  return `IPv6 Routing Table - default - ${count} entries\n${V6_CODES}\n${rows.join('\n')}`;
+}
+
+function ping6Text(world, deviceId, dst, intf = null) {
+  const r = ping6(world, deviceId, dst, intf);
+  if (r.reason === 'no-route') return { text: '% No valid route for destination', ok: false };
+  const head = `Type escape sequence to abort.\nSending 5, 100-byte ICMP Echos to ${up6(dst)}, timeout is 2 seconds:${intf ? `\nPacket sent with a source address of ${up6(r.src ?? 0n)}%${intf}` : ''}`;
+  return r.ok
+    ? { text: `${head}\n!!!!!\nSuccess rate is 100 percent (5/5), round-trip min/avg/max = 0/0/1 ms`, ok: true }
+    : { text: `${head}\n.....\nSuccess rate is 0 percent (0/5)`, ok: false };
+}
+
+const PING6 = cmd(['ping', ALT('v6', ['ipv6'], { opt: true }), W('dst', 'ip6')], ({ dst }, s) => {
+  const a = parse6(dst);
+  const done = (r) => { s.events.push({ kind: 'ping6', dst: format6(a), ok: r.ok }); return r.text; };
+  if (isLinkLocal(a)) {
+    return { out: '', ask: { prompt: 'Output Interface: ', answer: (t) => {
+      const r = readInterface(tokenize(t), 0);
+      if (!r || !s.dev.config.interfaces[r.name]) return '% Invalid interface. Use full interface name without spaces (e.g. Serial0/1)';
+      return done(ping6Text(s.world, s.deviceId, a, r.name));
+    } } };
+  }
+  return { out: done(ping6Text(s.world, s.deviceId, a)) };
+}, { key: 'ping ipv6' });
+
+const TRACE6 = cmd(['traceroute', ALT('v6', ['ipv6'], { opt: true }), W('dst', 'ip6')], ({ dst }, s) => {
+  const a = parse6(dst);
+  const r = trace6(s.world, s.deviceId, a);
+  const hops = [...r.hops];
+  if (r.ok && hops.length) hops[hops.length - 1] = a;
+  const lines = hops.map((x, k) => `  ${k + 1} ${up6(x)} 0 msec 0 msec 0 msec`);
+  if (!r.ok) lines.push(`  ${hops.length + 1}  *  *  * `);
+  s.events.push({ kind: 'trace6', dst: format6(a), ok: r.ok });
+  return { out: `Type escape sequence to abort.\nTracing the route to ${up6(a)}\n\n${lines.join('\n')}` };
+}, { key: 'traceroute ipv6' });
+
+const SHOW_V6 = [
+  cmd(['show', 'ipv6', 'interface', 'brief'], (_, s) => ({ out: showIpv6IntBrief(s.world, s.deviceId) }), { key: 'show ipv6 interface brief' }),
+  cmd(['show', 'ipv6', 'interface', W('name', 'intf')], ({ name }, s) => ({ out: intfArg(s, name) ?? showIpv6Interface(s.world, s.dev, name) }), { key: 'show ipv6 interface' }),
+  cmd(['show', 'ipv6', 'route', ALT('filter', ['connected', 'static', 'local'], { opt: true })], ({ filter }, s) => ({ out: showIpv6Route(s.world, s.deviceId, filter ?? null) }), { key: 'show ipv6 route' }),
+];
+
+// "GigabitEthernet0/1 FE80::2 5" after the prefix of an ipv6 route.
+function parseRoute6Tail(text) {
+  const tokens = tokenize(text);
+  let i = 0;
+  let nh = null, intf = null, ad = null;
+  const r = readInterface(tokens, 0);
+  if (r) { intf = r.name; i = r.used; }
+  if (tokens[i] && parse6(tokens[i].text) !== null) { nh = parse6(tokens[i].text); i += 1; }
+  if (!intf && nh === null) return null;
+  if (tokens[i] && /^\d+$/.test(tokens[i].text)) { ad = Number(tokens[i].text); i += 1; if (ad < 1 || ad > 254) return null; }
+  if (i < tokens.length) return null;
+  return { nh, intf, ad };
+}
+
+const ensureV6 = (c) => (c.ipv6 ??= { routing: false, statics: [] });
+
+const GLOBAL_V6 = [
+  cmd(['ipv6', 'unicast-routing'], (_, s) => { ensureV6(s.dev.config).routing = true; return { out: '' }; }, { key: 'ipv6 unicast-routing', no: (_, s) => { ensureV6(s.dev.config).routing = false; } }),
+  cmd(['ipv6', 'route', W('pfx', 'ip6pfx'), W('via', 'rest')], ({ pfx, via }, s) => {
+    const p = parsePrefix6(pfx);
+    const t = parseRoute6Tail(via);
+    if (!t) return { out: invalidAt(s, s.line.indexOf(via)) };
+    if (t.intf && !s.dev.config.interfaces[t.intf]) return { out: invalidAt(s, s.line.indexOf(via)) };
+    if (t.nh !== null && isLinkLocal(t.nh) && !t.intf) return { out: '% Interface has to be specified for a link-local nexthop' };
+    const st = { net: format6(net6(p.addr, p.len)), len: p.len, nh: t.nh === null ? null : format6(t.nh), intf: t.intf, ad: t.ad ?? 1 };
+    const c = ensureV6(s.dev.config);
+    c.statics = c.statics.filter(x => !(x.net === st.net && x.len === st.len && x.nh === st.nh && x.intf === st.intf));
+    c.statics.push(st);
+    return { out: '' };
+  }, { key: 'ipv6 route', no: ({ pfx, via }, s) => {
+    const p = parsePrefix6(pfx);
+    const t = via ? parseRoute6Tail(via) : null;
+    const net = format6(net6(p.addr, p.len));
+    const c = ensureV6(s.dev.config);
+    c.statics = c.statics.filter(x => !(x.net === net && x.len === p.len && (!t || (x.nh === (t.nh === null ? null : format6(t.nh)) && x.intf === t.intf))));
+  }, noShape: ['ipv6', 'route', W('pfx', 'ip6pfx'), W('via', 'rest', { opt: true })] }),
+];
+
+const ensureIf6 = (i) => (i.v6 ??= { addrs: [], ll: null, enabled: false, auto: false });
+
+function v6Allowed(s) {
+  const intf = here(s);
+  if (intf.sw) return invalidAt(s, s.line.search(/\bipv6\b/));
+  if (isSub(intf.name) && !intf.encap) return SUBIF_IP_ERROR;
+  return null;
+}
+
+const IFACE_V6 = [
+  cmd(['ipv6', 'address', W('pfx', 'ip6pfx'), ALT('eui', ['eui-64'], { opt: true })], ({ pfx, eui }, s) => {
+    const bad = v6Allowed(s);
+    if (bad) return { out: bad };
+    const p = parsePrefix6(pfx);
+    if (isLinkLocal(p.addr)) return { out: '% Link-local addresses are configured with "ipv6 address FE80::X link-local"' };
+    if (eui && p.len > 64) return { out: `% ${up6(net6(p.addr, p.len))}/${p.len} cannot be used with eui-64: the prefix must be /64 or shorter` };
+    const net = net6(p.addr, p.len);
+    for (const [n, o] of Object.entries(s.dev.config.interfaces)) {
+      if (n === s.ctx.intf || !o.v6) continue;
+      if (o.v6.addrs.some(x => { const m = Math.min(x.len, p.len); return net6(parse6(x.addr), m) === net6(p.addr, m); })) return { out: `% ${up6(net)}/${p.len} overlaps with ${n}` };
+    }
+    const v = ensureIf6(here(s));
+    const entry = { addr: format6(eui ? net : p.addr), len: p.len, eui: Boolean(eui) };
+    v.addrs = v.addrs.filter(x => !(x.addr === entry.addr && x.len === entry.len));
+    v.addrs.push(entry);
+    return { out: '' };
+  }, { key: 'ipv6 address', no: ({ rest }, s) => {
+    const v = here(s).v6;
+    if (!v) return;
+    const t = (rest ?? '').trim().split(/\s+/).filter(Boolean);
+    if (!t.length) { v.addrs = []; v.ll = null; v.auto = false; return; }
+    if ('autoconfig'.startsWith(t[0].toLowerCase())) { v.auto = false; return; }
+    if (t[1] && 'link-local'.startsWith(t[1].toLowerCase())) { v.ll = null; return; }
+    const p = parsePrefix6(t[0]);
+    if (!p) return;
+    const eui = Boolean(t[1]);
+    const addr = format6(eui ? net6(p.addr, p.len) : p.addr);
+    v.addrs = v.addrs.filter(x => !(x.addr === addr && x.len === p.len));
+  }, noShape: ['ipv6', 'address', W('rest', 'rest', { opt: true })] }),
+  cmd(['ipv6', 'address', W('ll', 'ip6'), 'link-local'], ({ ll }, s) => {
+    const bad = v6Allowed(s);
+    if (bad) return { out: bad };
+    const a = parse6(ll);
+    if (!isLinkLocal(a)) return { out: '% Invalid link-local address' };
+    ensureIf6(here(s)).ll = format6(a);
+    return { out: '' };
+  }, { key: 'ipv6 address link-local' }),
+  cmd(['ipv6', 'address', 'autoconfig', ALT('def', ['default'], { opt: true })], (_, s) => {
+    const bad = v6Allowed(s);
+    if (bad) return { out: bad };
+    ensureIf6(here(s)).auto = true;
+    return { out: '' };
+  }, { key: 'ipv6 address autoconfig' }),
+  cmd(['ipv6', 'enable'], (_, s) => {
+    const bad = v6Allowed(s);
+    if (bad) return { out: bad };
+    ensureIf6(here(s)).enabled = true;
+    return { out: '' };
+  }, { key: 'ipv6 enable', no: (_, s) => { if (here(s).v6) here(s).v6.enabled = false; } }),
+];
+
+// Running-configuration lines for IPv6.
+function v6GlobalLines(c) {
+  return c.ipv6?.routing ? ['ipv6 unicast-routing', '!'] : [];
+}
+function v6InterfaceLines(i) {
+  const v = i.v6;
+  if (!v) return [];
+  const L = [];
+  if (v.ll) L.push(` ipv6 address ${up6(parse6(v.ll))} link-local`);
+  for (const x of v.addrs) L.push(` ipv6 address ${up6(parse6(x.addr))}/${x.len}${x.eui ? ' eui-64' : ''}`);
+  if (v.auto) L.push(' ipv6 address autoconfig');
+  if (v.enabled) L.push(' ipv6 enable');
+  return L;
+}
+function v6RouteLines(c) {
+  return (c.ipv6?.statics ?? []).map(x => `ipv6 route ${up6(parse6(x.net))}/${x.len}${x.intf ? ` ${x.intf}` : ''}${x.nh ? ` ${up6(parse6(x.nh))}` : ''}${x.ad !== 1 ? ` ${x.ad}` : ''}`);
+}
+
+// A PC's IPv6: a static address and gateway, or SLAAC.
+function pcV6Lines(world, dev) {
+  const v = v6Of(world, dev.id, 'FastEthernet0');
+  const L = v.addrs.map(x => `   IPv6 Address. . . . . . . . . . . : ${format6(x.addr)}`);
+  L.push(`   Link-local IPv6 Address . . . . . : ${format6(v.ll)}%11`);
+  return L;
+}
+function pcV6Gateway(world, dev) {
+  const c = dev.config.v6;
+  if (c?.gw) return c.gw;
+  if (c?.auto) { const sl = slaacFrom(world, dev.id, 'FastEthernet0'); if (sl) return `${format6(sl.gw)}%11`; }
+  return null;
+}
+
+function pcPing6(s, a) {
+  const r = ping6(s.world, s.deviceId, a);
+  const t = format6(a);
+  if (r.reason === 'no-route') return { text: `\nPinging ${t} with 32 bytes of data:\nPING: transmit failed. General failure. \nPING: transmit failed. General failure. \nPING: transmit failed. General failure. \nPING: transmit failed. General failure. \n\nPing statistics for ${t}:\n    Packets: Sent = 4, Received = 0, Lost = 4 (100% loss),`, ok: false };
+  const replies = Array(4).fill(r.ok ? `Reply from ${t}: time<1ms` : 'Request timed out.');
+  const stats = `Ping statistics for ${t}:\n    Packets: Sent = 4, Received = ${r.ok ? 4 : 0}, Lost = ${r.ok ? 0 : 4} (${r.ok ? 0 : 100}% loss),${r.ok ? '\nApproximate round trip times in milli-seconds:\n    Minimum = 0ms, Maximum = 1ms, Average = 0ms' : ''}`;
+  return { text: `\nPinging ${t} with 32 bytes of data:\n${replies.join('\n')}\n\n${stats}`, ok: r.ok };
+}
+
+const PC_V6 = [
+  cmd(['ipv6config', W('pfx', 'ip6pfx'), W('gw', 'ip6', { opt: true })], ({ pfx, gw }, s) => {
+    const p = parsePrefix6(pfx);
+    const c = s.dev.config;
+    c.v6 = { addrs: [{ addr: format6(p.addr), len: p.len }], gw: gw ? format6(parse6(gw)) : (c.v6?.gw ?? null), auto: false };
+    return { out: '' };
+  }, { key: 'ipv6config set' }),
+  cmd(['ipv6config', 'auto'], (_, s) => {
+    s.dev.config.v6 = { addrs: [], gw: null, auto: true };
+    const sl = slaacFrom(s.world, s.deviceId, 'FastEthernet0');
+    s.events.push({ kind: 'slaac', ok: Boolean(sl) });
+    return { out: sl ? '' : 'IPv6 autoconfiguration failed: no router advertisement was heard on FastEthernet0.' };
+  }, { key: 'ipv6config auto' }),
+  cmd(['ipv6config'], (_, s) => {
+    const gw = pcV6Gateway(s.world, s.dev);
+    return { out: ['', 'Ethernet adapter FastEthernet0:', '', ...pcV6Lines(s.world, s.dev), `   Default Gateway . . . . . . . . . : ${gw ?? ''}`, `   Autoconfiguration . . . . . . . . : ${s.dev.config.v6?.auto ? 'Yes' : 'No'}`].join('\n') };
+  }, { key: 'ipv6config' }),
+  cmd(['ping', W('dst', 'ip6')], ({ dst }, s) => {
+    const a = parse6(dst);
+    const r = pcPing6(s, a);
+    s.events.push({ kind: 'ping6', dst: format6(a), ok: r.ok });
+    return { out: r.text };
+  }, { key: 'ping ipv6' }),
+  cmd(['tracert', W('dst', 'ip6')], ({ dst }, s) => {
+    const a = parse6(dst);
+    const r = trace6(s.world, s.deviceId, a);
+    const hops = [...r.hops];
+    if (r.ok && hops.length) hops[hops.length - 1] = a;
+    const rows = hops.map((x, k) => `${lpad(k + 1, 3)}   0 ms      0 ms      0 ms      ${format6(x)}`);
+    if (!r.ok) rows.push(`${lpad(hops.length + 1, 3)}   *         *         *         Request timed out.`);
+    s.events.push({ kind: 'trace6', dst: format6(a), ok: r.ok });
+    return { out: `\nTracing route to ${format6(a)} over a maximum of 30 hops\n\n${rows.join('\n')}\n\nTrace complete.` };
+  }, { key: 'tracert ipv6' }),
+];
+
 const SHOW = [
   ...SHOW_SERVICES,
+  ...SHOW_V6,
   cmd(['show', 'ip', 'route', ALT('filter', ['connected', 'static', 'ospf'], { opt: true })], ({ filter }, s) => ({ out: showIpRoute(s.world, s.deviceId, filter ?? null) }), { key: 'show ip route' }),
   cmd(['show', 'ip', 'ospf', 'neighbor'], (_, s) => ({ out: showOspfNeighbor(s.world, s.deviceId) }), { key: 'show ip ospf neighbor' }),
   cmd(['show', 'ip', 'ospf', 'interface', 'brief'], (_, s) => ({ out: showOspfIntBrief(s.world, s.deviceId) }), { key: 'show ip ospf interface brief' }),
@@ -571,8 +856,8 @@ const ENABLE = cmd(['enable'], (_, s) => {
 }, { key: 'enable' });
 const LOGOUT = cmd([ALT('how', ['exit', 'logout'])], (_, s) => { s.mode = 'user'; return { out: `\n${s.dev.config.hostname} con0 is now available\n\nPress RETURN to get started.` }; });
 
-const USER = [ENABLE, LOGOUT, PING, TRACEROUTE, ...SHOW];
-const EXEC = [...PRIV_ONLY, CLEAR_OSPF, CLEAR_NAT, LOGOUT, PING, TRACEROUTE, ...SHOW];
+const USER = [ENABLE, LOGOUT, PING, PING6, TRACEROUTE, TRACE6, ...SHOW];
+const EXEC = [...PRIV_ONLY, CLEAR_OSPF, CLEAR_NAT, LOGOUT, PING, PING6, TRACEROUTE, TRACE6, ...SHOW];
 const USER_SWITCH = [ENABLE, LOGOUT, PING, TRACEROUTE, ...SHOW_SWITCH];
 const EXEC_SWITCH = [...PRIV_ONLY, CLEAR_MAC, LOGOUT, PING, TRACEROUTE, ...SHOW_SWITCH];
 
@@ -806,6 +1091,7 @@ const DHCP_MODE = [
 const GLOBAL = [
   ...GLOBAL_COMMON,
   ...ACL_GLOBAL,
+  ...GLOBAL_V6,
   cmd(['ip', 'route', W('net', 'ip'), W('mask', 'mask'), W('via', 'rest')], ({ net, mask, via }, s) => {
     const parsed = parseRouteTail(via);
     if (!parsed) return { out: invalidAt(s, s.line.indexOf(via)) };
@@ -922,6 +1208,7 @@ const IP_ADDRESS = cmd(['ip', 'address', W('ip', 'ip'), W('mask', 'mask')], ({ i
 
 const IFACE = [
   IP_ADDRESS,
+  ...IFACE_V6,
   ...IFACE_SERVICES,
   cmd(['encapsulation', ALT('e', ['dot1q']), W('vlan', 'num'), ALT('native', ['native'], { opt: true })], ({ vlan, native }, s) => {
     if (!isSub(s.ctx.intf)) return { out: invalidAt(s, 0) };
@@ -1199,7 +1486,10 @@ const PC = [
     const v = (x) => (x === null || x === undefined ? '0.0.0.0' : formatIp(x));
     const lines = ['', 'Ethernet adapter FastEthernet0:', '', '   Connection-specific DNS Suffix  . :'];
     if (all) lines.push(`   Physical Address. . . . . . . . . : ${winMac(s.dev.mac)}`, `   DHCP Enabled. . . . . . . . . . . : ${s.dev.config.dhcp ? 'Yes' : 'No'}`);
-    lines.push(`   IPv4 Address. . . . . . . . . . . : ${v(nic.ip)}`, `   Subnet Mask . . . . . . . . . . . : ${v(nic.mask)}`, `   Default Gateway . . . . . . . . . : ${s.dev.config.gateway === null ? '' : formatIp(s.dev.config.gateway)}`);
+    const gw4 = s.dev.config.gateway === null ? '' : formatIp(s.dev.config.gateway);
+    const gw6 = pcV6Gateway(s.world, s.dev);
+    lines.push(...pcV6Lines(s.world, s.dev), `   IPv4 Address. . . . . . . . . . . : ${v(nic.ip)}`, `   Subnet Mask . . . . . . . . . . . : ${v(nic.mask)}`, `   Default Gateway . . . . . . . . . : ${gw6 ?? gw4}`);
+    if (gw6 && gw4) lines.push(`                                       ${gw4}`);
     if (all) lines.push(`   DNS Servers . . . . . . . . . . . : ${s.dev.config.dns === null ? '' : formatIp(s.dev.config.dns)}`);
     return { out: lines.join('\n') };
   }, { key: 'ipconfig' }),
@@ -1225,6 +1515,7 @@ const PC = [
     s.events.push({ kind: 'trace', dst: parseIp(dst), ok: r.ok });
     return { out: `\nTracing route to ${dst} over a maximum of 30 hops: \n\n${rows.join('\n')}\n\nTrace complete.` };
   }, { key: 'tracert' }),
+  ...PC_V6,
 ];
 
 const MODES = {

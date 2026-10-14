@@ -139,7 +139,7 @@ test('Do lights from labs: clean is mastered, helped is practiced, every lab nee
   rec = recordLab(rec, 'static-floating', { assisted: true }, NOW + DAY);
   assert.equal(tierState(b, 'do', { record: rec, now: NOW + DAY }).state, 'mastered', 'a later helped run keeps the clean pass');
   assert.equal(tierState(branchById('t2-vlans'), 'do', { record: rec, now: NOW }).state, 'off');
-  assert.equal(tierState(branchById('t1-ipv6'), 'do', { record: rec, now: NOW }).state, 'soon');
+  assert.equal(tierState(branchById('t1-ipv6'), 'do', { record: rec, now: NOW }).state, 'off', 'the IPv6 lab lights it now');
   assert.equal(tierState(branchById('t4-nat'), 'do', { record: rec, now: NOW }).state, 'off', 'the Field desk can light it now');
 });
 

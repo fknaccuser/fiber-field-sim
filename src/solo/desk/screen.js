@@ -35,12 +35,14 @@ const clock = (ms) => {
 const NOTE_MIN = 12;
 const SWITCH_BUILDS = ['build-access', 'build-ssh', 'build-vlans', 'build-uplink', 'build-bundle', 'build-edge'];
 const groupOf = (kind) => (kind.startsWith('repair') ? 'Trouble tickets' : kind.startsWith('change') ? 'Changes' : SWITCH_BUILDS.includes(kind) ? 'Switch builds' : 'Router builds');
+const GROUPS = ['Switch builds', 'Router builds', 'Changes', 'Trouble tickets'];
+const byGroup = (a, b) => GROUPS.indexOf(groupOf(a.kind)) - GROUPS.indexOf(groupOf(b.kind));
 
 // createDesk({ getRecord, onRecord, onExit, start })
 // start = { kind, seed, fault?, mode } opens straight onto that order.
 export function createDesk({ getRecord, onRecord, onExit, start = null } = {}) {
   const root = el('section', 'desk');
-  const ui = { view: 'queue', batch: TEMPLATES.map(t => ({ kind: t.kind, seed: newSeed() })), tab: 'order' };
+  const ui = { view: 'queue', batch: TEMPLATES.map(t => ({ kind: t.kind, seed: newSeed() })).sort(byGroup), tab: 'order' };
   let run = null;
   let timer = null;
 
@@ -54,7 +56,7 @@ export function createDesk({ getRecord, onRecord, onExit, start = null } = {}) {
     title.append(el('span', 'sk-kicker', 'The Field'), el('h1', null, 'Work orders'));
     top.append(title);
     root.append(top);
-    root.append(el('p', 'desk-intro', 'Build jobs on switches fresh from the box. Every order is new: other names, other VLANs, other ports. Learning ticks as you go; Sim runs against the clock and grades like the exam.'));
+    root.append(el('p', 'desk-intro', 'Builds, changes and trouble tickets on switches and routers. Every order is new: other names, other addresses, other ports. Learning ticks as you go; Sim runs against the clock and grades like the exam.'));
     const record = getRecord?.() ?? {};
     let list = null;
     let group = null;
@@ -80,7 +82,7 @@ export function createDesk({ getRecord, onRecord, onExit, start = null } = {}) {
       card.append(row);
       list.append(card);
     }
-    root.append(btn('sk-back desk-reroll', 'New batch of orders', () => { ui.batch = TEMPLATES.map(t => ({ kind: t.kind, seed: newSeed() })); draw(); }));
+    root.append(btn('sk-back desk-reroll', 'New batch of orders', () => { ui.batch = TEMPLATES.map(t => ({ kind: t.kind, seed: newSeed() })).sort(byGroup); draw(); }));
   }
 
   // ---------- an order ----------

@@ -75,7 +75,7 @@ export function makeSwitch(id, { ports = SWITCH_PORTS, mac = null } = {}) {
 }
 
 // A PC: one NIC, an address, a gateway.
-export function makePc(id, { ip = null, mask = null, gateway = null, mac = null, services = [], dhcp = false } = {}) {
+export function makePc(id, { ip = null, mask = null, gateway = null, mac = null, services = [], dhcp = false, v6 = null } = {}) {
   const config = makeDevice('x', []).config;
   config.hostname = id;
   config.interfaces = { FastEthernet0: makeInterface('FastEthernet0', { shutdown: false, ip: ip === null ? null : parseIp(ip), mask: mask === null ? null : parseIp(mask) }) };
@@ -84,6 +84,8 @@ export function makePc(id, { ip = null, mask = null, gateway = null, mac = null,
   // A server is a PC that listens: services lists its open TCP ports.
   config.services = [...services];
   config.dhcp = dhcp;
+  // IPv6 keeps addresses as text: { addrs: [{ addr, len }], gw, auto }.
+  config.v6 = v6 ? { addrs: [...(v6.addrs ?? [])], gw: v6.gw ?? null, auto: Boolean(v6.auto) } : { addrs: [], gw: null, auto: false };
   return { id, kind: 'pc', ports: ['FastEthernet0'], mac: mac ?? macFrom(`pc|${id}`, OUI.pc), config, startup: null, rsaBits: null, ospfRid: null };
 }
 
