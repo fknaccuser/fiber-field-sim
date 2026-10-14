@@ -15,6 +15,7 @@ import { T6 } from './t6.js';
 import { X_CONSOLE_A } from './x-console-a.js';
 import { X_CONSOLE_B } from './x-console-b.js';
 import { X_CONSOLE_C } from './x-console-c.js';
+import { DND } from './dnd.js';
 
 export const BANK_EXPANSION = [
   ...T0_IOS,
@@ -31,4 +32,5 @@ export const BANK_EXPANSION = [
   ...X_CONSOLE_A,
   ...X_CONSOLE_B,
   ...X_CONSOLE_C,
+  ...DND,
 ];

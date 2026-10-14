@@ -571,5 +571,7 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
   root.openBranch = openBranch;
   root.busy = () => ui.view === 'lab' || ui.view === 'desk';
   root.openDesk = openDesk;
+  // Run one tier of one branch, the way the dock's Next does.
+  root.runStep = (step) => runStep(step);
   return root;
 }

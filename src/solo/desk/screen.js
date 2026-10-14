@@ -11,7 +11,7 @@
 import { TEMPLATES, makeOrder } from './jobs.js';
 import { buildWorld, baselineOf, grade, requirementStates } from './grade.js';
 import { renderTopology } from './topology.js';
-import { createSession, execute, prompt, complete } from '../labs/ios.js';
+import { createConsoles } from './console.js';
 import { branchById } from '../tree/ccna.js';
 
 function el(tag, cls, text) {
@@ -38,9 +38,11 @@ const groupOf = (kind) => (kind.startsWith('repair') ? 'Trouble tickets' : kind.
 const GROUPS = ['Switch builds', 'Router builds', 'Changes', 'Trouble tickets'];
 const byGroup = (a, b) => GROUPS.indexOf(groupOf(a.kind)) - GROUPS.indexOf(groupOf(b.kind));
 
-// createDesk({ getRecord, onRecord, onExit, start })
+// createDesk({ getRecord, onRecord, onExit, start, onSubmit, examLabel })
 // start = { kind, seed, fault?, mode } opens straight onto that order.
-export function createDesk({ getRecord, onRecord, onExit, start = null } = {}) {
+// mode 'exam' is a sim inside the mock exam: no clock of its own (the mock
+// runs one), no way back, no note, and the grade goes to onSubmit unseen.
+export function createDesk({ getRecord, onRecord, onExit, start = null, onSubmit = null, examLabel = 'Simulation' } = {}) {
   const root = el('section', 'desk');
   const ui = { view: 'queue', batch: TEMPLATES.map(t => ({ kind: t.kind, seed: newSeed() })).sort(byGroup), tab: 'order' };
   let run = null;
@@ -91,14 +93,9 @@ export function createDesk({ getRecord, onRecord, onExit, start = null } = {}) {
     const world = buildWorld(order);
     run = {
       item, order, world, mode, baseline: baselineOf(world),
-      sessions: Object.fromEntries(order.devices.map(d => [d.id, createSession(world, d.id)])),
-      logs: {}, hist: {}, current: order.start, started: Date.now(), helped: new Set(), open: new Set(), result: null, note: '', submitting: false,
+      con: createConsoles(world, order.devices, order.start, { redraw: () => draw() }),
+      started: Date.now(), helped: new Set(), open: new Set(), result: null, note: '', submitting: false,
     };
-    for (const d of order.devices) {
-      const dev = world.devices[d.id];
-      run.logs[d.id] = dev.kind === 'pc' ? `Command Prompt on ${d.id}\nType ipconfig, ping or tracert.\n\n` : `\n${dev.config.hostname} con0 is now available\n\nPress RETURN to get started.\n\n`;
-      run.hist[d.id] = { list: [], at: 0 };
-    }
     ui.view = 'order';
     ui.tab = 'order';
     stopTimer();
@@ -119,13 +116,14 @@ export function createDesk({ getRecord, onRecord, onExit, start = null } = {}) {
   function drawOrder() {
     const { order, mode } = run;
     const top = el('header', 'sk-top');
-    top.append(btn('sk-back', 'Queue', () => {
-      const started = Object.values(run.sessions).some(s => s.history.length);
-      if (started && !window.confirm?.('Leave this order? Your work on it is lost.')) return;
-      stopTimer(); run = null; ui.view = 'queue'; draw();
-    }));
+    if (mode !== 'exam') {
+      top.append(btn('sk-back', 'Queue', () => {
+        if (run.con.started() && !window.confirm?.('Leave this order? Your work on it is lost.')) return;
+        stopTimer(); run = null; ui.view = 'queue'; draw();
+      }));
+    }
     const title = el('div', 'sk-title');
-    title.append(el('span', 'sk-kicker', `${order.number} · ${mode === 'sim' ? 'Sim' : 'Learning'}`), el('h1', null, order.title));
+    title.append(el('span', 'sk-kicker', mode === 'exam' ? examLabel : `${order.number} · ${mode === 'sim' ? 'Sim' : 'Learning'}`), el('h1', null, order.title));
     top.append(title);
     if (mode === 'sim') { tick(); top.append(timerChip); }
     root.append(top);
@@ -133,7 +131,7 @@ export function createDesk({ getRecord, onRecord, onExit, start = null } = {}) {
     const tabs = el('div', 'desk-tabs');
     tabs.setAttribute('role', 'tablist');
     for (const [id, label] of [['order', 'Order'], ['map', 'Map'], ['console', 'Console']]) {
-      const t = btn(`desk-tab${ui.tab === id ? ' is-on' : ''}`, label, () => { ui.tab = id; draw(); if (id === 'console') focusInput(); });
+      const t = btn(`desk-tab${ui.tab === id ? ' is-on' : ''}`, label, () => { ui.tab = id; draw(); if (id === 'console') run.con.focus(); });
       t.setAttribute('role', 'tab');
       t.setAttribute('aria-selected', String(ui.tab === id));
       t.dataset.tab = id;
@@ -184,7 +182,21 @@ export function createDesk({ getRecord, onRecord, onExit, start = null } = {}) {
     const tests = el('ul', 'desk-tests');
     for (const t of order.tests) tests.append(el('li', null, t.text));
     pane.append(tests);
-    if (mode === 'sim') pane.append(el('p', 'desk-small', 'Sim rules: no ticks, no help. Configure only what the order asks for; every extra line costs a point.'));
+    if (mode !== 'learn') pane.append(el('p', 'desk-small', 'Sim rules: no ticks, no help. Configure only what the order asks for; every extra line costs a point.'));
+    if (mode === 'exam') {
+      if (!run.submitting) {
+        pane.append(btn('sk-go desk-submit', 'Submit and go on', () => { run.submitting = true; draw(); }));
+        return pane;
+      }
+      const box = el('div', 'desk-close');
+      box.append(el('p', 'desk-small', 'Submit this simulation? There is no coming back to it.'));
+      box.append(btn('sk-go desk-confirm', 'Submit', () => {
+        const g = grade(run.order, run.world, run.baseline, { elapsedMs: Date.now() - run.started });
+        onSubmit?.(g, run.order);
+      }), btn('sk-back', 'Keep working', () => { run.submitting = false; draw(); }));
+      pane.append(box);
+      return pane;
+    }
 
     // Submitting asks for the closing note first: what you did, how you know.
     if (run.submitting) {
@@ -211,7 +223,7 @@ export function createDesk({ getRecord, onRecord, onExit, start = null } = {}) {
 
   function mapPane() {
     const pane = el('section', 'desk-pane desk-map');
-    pane.append(renderTopology(run.world, run.order, { current: run.current, onPick: (d) => { run.current = d; ui.tab = 'console'; draw(); focusInput(); } }));
+    pane.append(renderTopology(run.world, run.order, { current: run.con.current, onPick: (d) => { run.con.current = d; ui.tab = 'console'; draw(); run.con.focus(); } }));
     const key = el('p', 'desk-legend');
     for (const [cls, text] of [['up', 'up'], ['blk', 'blocking'], ['down', 'down'], ['err', 'err-disabled']]) {
       const k = el('span', `desk-key is-${cls}`);
@@ -222,72 +234,7 @@ export function createDesk({ getRecord, onRecord, onExit, start = null } = {}) {
     return pane;
   }
 
-  let inputEl = null;
-  function focusInput() { requestAnimationFrame(() => inputEl?.focus({ preventScroll: true })); }
-
-  function consolePane() {
-    const pane = el('section', 'desk-pane desk-console lab-console');
-    const tabs = el('div', 'lab-tabs');
-    for (const d of run.order.devices) {
-      const host = run.world.devices[d.id].config.hostname;
-      const name = d.kind === 'pc' || ['Switch', 'Router'].includes(host) ? d.id : host;
-      const t = btn(`lab-tab${d.id === run.current ? ' is-on' : ''}`, name, () => { run.current = d.id; draw(); focusInput(); });
-      t.dataset.device = d.id;
-      tabs.append(t);
-    }
-    const screen = el('pre', 'lab-screen');
-    screen.setAttribute('aria-live', 'polite');
-    screen.textContent = run.logs[run.current];
-    const form = el('form', 'lab-input');
-    const s = run.sessions[run.current];
-    const label = el('label', 'lab-prompt', prompt(s));
-    const input = el('input', 'lab-command');
-    Object.assign(input, { type: s.pending?.secret ? 'password' : 'text', autocomplete: 'off', autocapitalize: 'off', spellcheck: false });
-    input.setAttribute('enterkeyhint', 'send');
-    input.setAttribute('aria-label', 'Command');
-    input.id = 'desk-cmd';
-    label.htmlFor = input.id;
-    form.append(label, input);
-    const keys = el('div', 'lab-keys');
-    for (const [lbl, act] of [['Tab', 'tab'], ['?', 'help'], ['↑', 'up'], ['↓', 'down'], ['end', 'end']]) keys.append(btn('lab-key', lbl, () => key(act, input)));
-    form.addEventListener('submit', (e) => { e.preventDefault(); const line = input.value; input.value = ''; send(line); });
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Tab') { e.preventDefault(); key('tab', input); }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); key('up', input); }
-      else if (e.key === 'ArrowDown') { e.preventDefault(); key('down', input); }
-      else if (e.key === '?') { e.preventDefault(); key('help', input); }
-      else if (e.key === 'z' && e.ctrlKey) { e.preventDefault(); key('end', input); }
-    });
-    screen.addEventListener('click', () => { if (!window.getSelection?.()?.toString()) input.focus({ preventScroll: true }); });
-    inputEl = input;
-    pane.append(tabs, screen, form, keys);
-    requestAnimationFrame(() => { screen.scrollTop = screen.scrollHeight; screen.scrollLeft = 0; });
-    return pane;
-  }
-
-  function send(line) {
-    const s = run.sessions[run.current];
-    const p = prompt(s);
-    const secret = Boolean(s.pending?.secret);
-    const out = execute(s, line);
-    run.logs[run.current] += `${p}${secret ? '' : line}\n${out ? `${out}\n` : ''}`;
-    const lines = run.logs[run.current].split('\n');
-    if (lines.length > 600) run.logs[run.current] = lines.slice(-600).join('\n');
-    if (line.trim() && !/\?$/.test(line) && !secret) { const h = run.hist[run.current]; h.list.push(line); h.at = h.list.length; }
-    draw();
-    focusInput();
-  }
-
-  function key(act, input) {
-    const h = run.hist[run.current];
-    const s = run.sessions[run.current];
-    if (act === 'tab') input.value = complete(s, input.value);
-    else if (act === 'help') { run.logs[run.current] += `${prompt(s)}${input.value}?\n${execute(s, `${input.value}?`)}\n`; const v = input.value; draw(); inputEl.value = v; }
-    else if (act === 'up') { if (h.at > 0) { h.at -= 1; input.value = h.list[h.at]; } }
-    else if (act === 'down') { if (h.at < h.list.length) { h.at += 1; input.value = h.list[h.at] ?? ''; } }
-    else if (act === 'end') { send('end'); return; }
-    focusInput();
-  }
+  const consolePane = () => run.con.pane();
 
   // ---------- grading ----------
   function finish() {
@@ -368,6 +315,8 @@ export function createDesk({ getRecord, onRecord, onExit, start = null } = {}) {
   }
 
   root.destroy = stopTimer;
+  // The mock exam grades an open sim as it stands when its clock runs out.
+  root.examGrade = () => (run ? grade(run.order, run.world, run.baseline, { elapsedMs: Date.now() - run.started }) : null);
   if (start) openOrder({ kind: start.kind, seed: start.seed, fault: start.fault ?? null }, start.mode ?? 'learn');
   else draw();
   return root;

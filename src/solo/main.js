@@ -466,6 +466,15 @@ function openExamPrep(initialScreen = 'home') {
     getCompletedRuns: () => state.profile?.completedRuns ?? [],
     onExit: () => { close(); render(); },
     onLaunch: (code) => { close(); startCode(code); },
+    // A weak spot's Do or Fix opens on the skill map, the way its Next would.
+    onPractice: (step) => {
+      close();
+      classicHome = false;
+      state = { ...state, screen: 'home' };
+      render();
+      ensureMapHome().runStep(step);
+      window.scrollTo?.(0, 0);
+    },
   });
   render();
 }

@@ -1783,3 +1783,40 @@ export function complete(session, line) {
 export function normalizeInterface(text) {
   return readInterface(tokenize(String(text ?? '')), 0)?.name ?? null;
 }
+
+// ---------- recognising a command without running it ----------
+// Which command a line is, the way the parser reads it: the same
+// abbreviations and the same argument reading as a live console. Used to
+// grade typed answers, where "sh ip int br" must count as the full form.
+const RECOGNISE_MODES = ['exec', 'config', 'if', 'router', 'line', 'vlan', 'acl', 'dhcp'];
+
+function canonicalArgs(args) {
+  return Object.fromEntries(Object.entries(args ?? {}).map(([k, v]) => [k, typeof v === 'string' ? v.toLowerCase().replace(/\s+/g, ' ') : v]));
+}
+
+// recogniseCommand(line, { kinds, modes }) -> [{ kind, mode, key, args }] for
+// every mode and device kind that accepts the line ("do" and pipes stripped).
+export function recogniseCommand(rawLine, { kinds = ['router', 'switch'], modes = RECOGNISE_MODES } = {}) {
+  let line = String(rawLine ?? '').trim().replace(/\s+/g, ' ');
+  if (/^do /i.test(line)) line = line.slice(3);
+  line = line.replace(/\s*\|.*$/, '');
+  if (!line) return [];
+  const tokens = tokenize(line);
+  const out = [];
+  for (const kind of kinds) {
+    for (const mode of modes) {
+      const p = parse(specsFor(mode, kind), tokens);
+      if (!p.error) out.push({ kind, mode, key: p.spec.key ?? null, args: canonicalArgs(p.args) });
+    }
+  }
+  return out;
+}
+
+// sameCommand(answer, typed): does the typed line mean the answer, in some
+// mode where the answer itself is valid?
+export function sameCommand(answer, typed) {
+  const want = recogniseCommand(answer);
+  if (!want.length) return false;
+  const got = recogniseCommand(typed);
+  return want.some(w => got.some(g => g.kind === w.kind && g.mode === w.mode && g.key === w.key && JSON.stringify(g.args) === JSON.stringify(w.args)));
+}

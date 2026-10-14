@@ -24,3 +24,16 @@ export const Q = (id, domain, branch, prompt, choices, explain, o = {}) => {
     explain,
   };
 };
+
+// Drag-and-drop items. Each takes the same id, domain and branch as Q.
+//   M  match: [[left, right], ...]; every right side distinct
+//   O  order: steps, already in the right order
+//   S  sort into buckets: buckets, then [[item, bucketIndex], ...]
+const dnd = (id, domain, branch, format, prompt, body, explain, o = {}) => ({
+  id, domain, branch, v2: o.v2 ?? 'same', format,
+  ...(o.scenario ? { scenario: o.scenario } : {}),
+  prompt, ...body, explain,
+});
+export const M = (id, domain, branch, prompt, pairs, explain, o) => dnd(id, domain, branch, 'match', prompt, { pairs: pairs.map(([left, right]) => ({ left, right })) }, explain, o);
+export const O = (id, domain, branch, prompt, steps, explain, o) => dnd(id, domain, branch, 'order', prompt, { steps }, explain, o);
+export const S = (id, domain, branch, prompt, buckets, items, explain, o) => dnd(id, domain, branch, 'sort', prompt, { buckets, items: items.map(([text, bucket]) => ({ text, bucket })) }, explain, o);

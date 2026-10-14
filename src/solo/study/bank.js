@@ -29,7 +29,10 @@ export const domainById = (id) => DOMAINS.find(d => d.id === id) ?? null;
 //   v2only  new in v2.0, off-blueprint for the exam live today
 export const V2_TAGS = ['same', 'deeper', 'dropped', 'v2only'];
 
-export const FORMATS = ['single', 'multi', 'match', 'order'];
+export const FORMATS = ['single', 'multi', 'match', 'order', 'sort'];
+// The drag-and-drop shapes: answered by placing pieces rather than picking.
+export const DRAG_FORMATS = ['match', 'order', 'sort'];
+export const isDrag = (q) => DRAG_FORMATS.includes(q.format);
 
 // v1 hides what is not on today's exam; v2 hides what today's exam will lose.
 export const BLUEPRINTS = ['v1', 'v2', 'both'];
@@ -111,6 +114,9 @@ export function presentation(question, rnd = Math.random) {
   if (question.format === 'order') {
     return { shownOrder: shuffled(question.steps.map((_, i) => i), rnd) };
   }
+  if (question.format === 'sort') {
+    return { itemOrder: shuffled(question.items.map((_, i) => i), rnd) };
+  }
   return { choiceOrder: shuffled(question.choices.map((_, i) => i), rnd) };
 }
 
@@ -118,12 +124,17 @@ export function isCorrect(question, answer) {
   if (question.format === 'order') {
     return Array.isArray(answer)
       && answer.length === question.steps.length
-      && answer.every((v, i) => v === i);
+      && question.steps.every((_, i) => answer[i] === i);
   }
   if (question.format === 'match') {
     return Array.isArray(answer)
       && answer.length === question.pairs.length
-      && answer.every((v, i) => v === i);
+      && question.pairs.every((_, i) => answer[i] === i);
+  }
+  if (question.format === 'sort') {
+    return Array.isArray(answer)
+      && answer.length === question.items.length
+      && question.items.every((it, i) => answer[i] === it.bucket);
   }
   const want = question.choices.map((c, i) => (c.correct ? i : null)).filter(i => i !== null);
   const got = Array.isArray(answer) ? [...answer].sort((a, b) => a - b) : [answer];
@@ -178,6 +189,14 @@ export function problems(bank) {
     } else if (q.format === 'order') {
       if (!q.steps || q.steps.length < 3) note(q, 'too few steps to order');
       else if (new Set(q.steps).size !== q.steps.length) note(q, 'duplicate step');
+    } else if (q.format === 'sort') {
+      if (!q.buckets || q.buckets.length < 2) note(q, 'a sort needs two buckets or more');
+      else if (!q.items || q.items.length < 4) note(q, 'too few items to sort');
+      else {
+        q.items.forEach((it, i) => { if (!it.text || !Number.isInteger(it.bucket) || it.bucket < 0 || it.bucket >= q.buckets.length) note(q, `item ${i} is malformed`); });
+        q.buckets.forEach((_, b) => { if (!q.items.some(it => it.bucket === b)) note(q, `bucket ${b} is empty`); });
+        if (new Set(q.items.map(it => it.text)).size !== q.items.length) note(q, 'duplicate item');
+      }
     } else {
       const choices = q.choices ?? [];
       if (choices.length < 2) note(q, `only ${choices.length} choices`);

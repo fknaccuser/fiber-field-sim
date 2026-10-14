@@ -72,7 +72,10 @@ test('filtering by domain and format returns only what was asked for', () => {
   const matching = filter(CCNA_BANK, { formats: ['match', 'order'] });
   assert.ok(matching.length >= 5, 'the bank should carry the richer formats');
   assert.equal(matching.every(q => q.format === 'match' || q.format === 'order'), true);
-  assert.deepEqual(filter(CCNA_BANK, { domains: ['NF'], formats: ['order'] }).map(q => q.domain), ['NF']);
+  const nfOrder = filter(CCNA_BANK, { domains: ['NF'], formats: ['order'] });
+  assert.ok(nfOrder.length > 0);
+  assert.equal(nfOrder.every(q => q.domain === 'NF' && q.format === 'order'), true);
+  assert.ok(filter(CCNA_BANK, { formats: ['sort'] }).length >= 10, 'the bank should carry sort-into-buckets items');
 });
 
 test('a mock exam is drawn to the domain weights', () => {
@@ -128,14 +131,20 @@ test('grading handles every format', () => {
   const match = CCNA_BANK.find(q => q.format === 'match');
   assert.equal(isCorrect(match, match.pairs.map((_, i) => i)), true);
   assert.equal(isCorrect(match, match.pairs.map((_, i) => (i + 1) % match.pairs.length)), false);
+  const holes = []; holes[match.pairs.length - 1] = match.pairs.length - 1;
+  assert.equal(isCorrect(match, holes), false, 'a half-filled match is wrong even where it is placed right');
+
+  const sort = CCNA_BANK.find(q => q.format === 'sort');
+  assert.equal(isCorrect(sort, sort.items.map(it => it.bucket)), true);
+  assert.equal(isCorrect(sort, sort.items.map(it => (it.bucket + 1) % sort.buckets.length)), false);
 });
 
 test('presentation shuffles without losing or inventing an option', () => {
   const rnd = seeded(31);
   for (const q of CCNA_BANK) {
     const p = presentation(q, rnd);
-    const order = p.choiceOrder ?? p.rightOrder ?? p.shownOrder;
-    const size = (q.choices ?? q.pairs ?? q.steps).length;
+    const order = p.choiceOrder ?? p.rightOrder ?? p.shownOrder ?? p.itemOrder;
+    const size = (q.choices ?? q.pairs ?? q.steps ?? q.items).length;
     assert.equal(order.length, size, q.id);
     assert.equal(new Set(order).size, size, `${q.id} repeats an index`);
     assert.equal(order.every(i => i >= 0 && i < size), true, q.id);

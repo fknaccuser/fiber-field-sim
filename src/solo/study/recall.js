@@ -76,9 +76,16 @@ export function normaliseTyped(value) {
     .replace(/^['"]|['"]$/g, '');
 }
 
-export function checkTyped(card, value) {
+// sameCommand(answer, typed), when given, reads a command card's answer the
+// way IOS would: any abbreviation the parser accepts counts, so the accept
+// list only has to carry the forms IOS spells differently (wr, copy run start).
+export function checkTyped(card, value, { sameCommand = null } = {}) {
   const given = normaliseTyped(value);
   if (!given) return { correct: false, empty: true };
   const accepted = [card.answer, ...(card.accept ?? [])].map(normaliseTyped);
-  return { correct: accepted.includes(given), empty: false };
+  if (accepted.includes(given)) return { correct: true, empty: false };
+  if (card.kind === 'command' && sameCommand) {
+    if ([card.answer, ...(card.accept ?? [])].some(a => sameCommand(a, value))) return { correct: true, empty: false, read: 'ios' };
+  }
+  return { correct: false, empty: false };
 }

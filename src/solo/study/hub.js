@@ -9,7 +9,9 @@
 // (bank, recall, concepts, mastery, drills/subnet), all under test. This
 // file only draws them.
 
-import { DOMAINS, filter, sampleExam, coverage, presentation, isCorrect, expectedSelections, quotas } from './bank.js';
+import { DOMAINS, filter, sampleExam, coverage, presentation, isCorrect, expectedSelections, quotas, isDrag } from './bank.js';
+import { renderDrag, dragProgress, dragHelp } from './drag.js';
+import { sameCommand } from '../labs/ios.js';
 import { CCNA_BANK } from './questions.js';
 import { review, dueCards, summarise, checkTyped, nextDue } from './recall.js';
 import { RECALL_DECK } from './recall-deck.js';
@@ -21,6 +23,19 @@ import { renderPatchPanel } from '../patch-panel.js';
 import { renderExhibit } from './exhibit.js';
 import { freshen } from './gen/index.js';
 import { rotate } from './rotation.js';
+import { createMockScreen, loadRun, runLeftMs } from '../exam/mock-screen.js';
+import { MOCKS } from '../exam/mock.js';
+import { createSimletScreen } from '../exam/simlet-screen.js';
+import { SIMLETS } from '../exam/simlets.js';
+import { readinessReport } from '../exam/readiness.js';
+import { mapProgress, normalizeRecord, questionPools } from '../tree/progress.js';
+import { branchById } from '../tree/ccna.js';
+
+const MAP_KEY = 'field-skill-tree-v1';
+function mapRecord() {
+  try { return normalizeRecord(JSON.parse(localStorage.getItem(MAP_KEY) ?? 'null')); } catch { return normalizeRecord(null); }
+}
+const TIER_WORD = { know: 'Know', do: 'Do', fix: 'Fix' };
 
 export const STORAGE_KEY = 'field-exam-prep-v1';
 
@@ -43,7 +58,7 @@ export function codeForRecipe(recipeId, tier = 1) {
   return null;
 }
 
-function loadSaved() {
+export function loadSaved() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
     return {
@@ -52,9 +67,11 @@ function loadSaved() {
       quiz: raw && typeof raw.quiz === 'object' ? raw.quiz : {},
       subnetBest: Number.isFinite(raw?.subnetBest) ? raw.subnetBest : 0,
       blueprint: ['v1', 'v2', 'both'].includes(raw?.blueprint) ? raw.blueprint : 'v1',
+      mocks: Array.isArray(raw?.mocks) ? raw.mocks.slice(-20) : [],
+      simlets: raw && typeof raw.simlets === 'object' && raw.simlets ? raw.simlets : {},
     };
   } catch {
-    return { cards: {}, typeit: {}, quiz: {}, subnetBest: 0, blueprint: 'v1' };
+    return { cards: {}, typeit: {}, quiz: {}, subnetBest: 0, blueprint: 'v1', mocks: [], simlets: {} };
   }
 }
 
@@ -82,7 +99,7 @@ export function prepSnapshot(completedRuns = [], now = Date.now()) {
 // quiz: { deck, title, label, onFinish({ right, total }) } runs one set of
 // questions for another screen (the skill tree's checks and exams) and hands
 // the score back, using the same question screens as everything else here.
-export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScreen = 'home', quiz = null } = {}) {
+export function createExamPrep({ onExit, onLaunch, onPractice, getCompletedRuns, initialScreen = 'home', quiz = null } = {}) {
   const root = el('main', 'exam-prep');
   const saved = loadSaved();
   let storageError = '';
@@ -107,8 +124,43 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
   const mastery = () => masteryOf({ completedRuns: runs(), practice: practiceFrom(saved) });
 
   function stopTicker() { if (ticker) { clearInterval(ticker); ticker = null; } }
-  function go(screen) { stopTicker(); ui.screen = screen; draw(); }
-  function exit() { stopTicker(); onExit?.(); }
+  function closeChild() { ui.child?.destroy?.(); ui.child = null; }
+  function go(screen) { stopTicker(); closeChild(); ui.screen = screen; draw(); }
+  function exit() { stopTicker(); closeChild(); onExit?.(); }
+
+  // A question answered anywhere (quiz, mock) counts as practice on it.
+  function notePractice(q, correct) {
+    const prior = saved.quiz[q.id] ?? { right: 0, seen: 0 };
+    saved.quiz[q.id] = { right: prior.right + (correct ? 1 : 0), seen: prior.seen + 1, last: { ok: correct, at: Date.now() } };
+    save();
+  }
+
+  // ---------- the full mock and simlets ----------
+  function openMock(format, resume = null) {
+    closeChild();
+    ui.child = createMockScreen({
+      format, blueprint: saved.blueprint, resume,
+      onAnswer: notePractice,
+      onFinish: (summary) => { saved.mocks = [...saved.mocks, summary].slice(-20); save(); },
+      onExit: () => go('home'),
+    });
+    ui.screen = 'child';
+    draw();
+    window.scrollTo?.(0, 0);
+  }
+  function openSimlet(kind = null) {
+    closeChild();
+    const k = kind ?? SIMLETS[Math.floor(Math.random() * SIMLETS.length)].kind;
+    ui.child = createSimletScreen({
+      kind: k, seed: Math.floor(Math.random() * 1e9) + 1, mode: 'practice', label: 'Simlet · practice',
+      onDone: (r) => { const p = saved.simlets[r.kind] ?? { right: 0, total: 0, runs: 0 }; saved.simlets[r.kind] = { right: p.right + r.right, total: p.total + r.total, runs: p.runs + 1, last: { right: r.right, total: r.total, at: Date.now() } }; save(); },
+      onAgain: () => openSimlet(),
+      onExit: () => go('home'),
+    });
+    ui.screen = 'child';
+    draw();
+    window.scrollTo?.(0, 0);
+  }
 
   // ---------- quiz and mock exam ----------
   // Generated questions are rebuilt with fresh numbers every time a deck starts.
@@ -118,7 +170,7 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
   }
   function loadQuestion() {
     const q = ui.deck[ui.at];
-    ui.pick = []; ui.graded = null;
+    ui.pick = []; ui.graded = null; ui.sel = null;
     ui.shown = q ? presentation(q) : null;
     draw();
   }
@@ -126,9 +178,7 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
     const q = ui.deck[ui.at];
     const correct = isCorrect(q, q.format === 'single' ? ui.pick[0] : ui.pick);
     if (correct) ui.right += 1;
-    const prior = saved.quiz[q.id] ?? { right: 0, seen: 0 };
-    saved.quiz[q.id] = { right: prior.right + (correct ? 1 : 0), seen: prior.seen + 1, last: { ok: correct, at: Date.now() } };
-    save();
+    notePractice(q, correct);
     ui.graded = { correct };
     draw();
   }
@@ -186,6 +236,25 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
     coll.append(renderPatchPanel(mastery(), { compact: true }));
     root.append(coll);
 
+    drawReadiness();
+
+    // The exam under exam rules comes first: it is what the rest is for.
+    root.append(el('p', 'ep-label', 'Exam rehearsal'));
+    const rehearse = el('div', 'ep-actions');
+    const open = loadRun();
+    if (open && runLeftMs(open) > 0) {
+      const left = Math.ceil(runLeftMs(open) / 60000);
+      rehearse.append(btn('ep-go', `Resume ${MOCKS[open.paper.format]?.label.toLowerCase() ?? 'mock'} · item ${open.index + 1}, ${left} min left`, () => openMock(open.paper.format, open)));
+    } else if (open) {
+      rehearse.append(btn('ep-go', 'Your last mock ran out of time · see its score', () => openMock(open.paper.format, open)));
+    }
+    rehearse.append(btn(open ? 'ep-go ghost' : 'ep-go', `${MOCKS.full.label} · ${MOCKS.full.minutes} min, sims included`, () => openMock('full')));
+    rehearse.append(btn('ep-go ghost', `${MOCKS.half.label} · ${MOCKS.half.minutes} min`, () => openMock('half')));
+    rehearse.append(btn('ep-go ghost', 'Simlet · a live network, four questions', () => openSimlet()));
+    root.append(rehearse);
+    const last = saved.mocks[saved.mocks.length - 1];
+    if (last) root.append(el('p', 'ep-foot', `Last mock ${last.pct}% (${MOCKS[last.format]?.label.toLowerCase() ?? 'mock'}, ${last.minutes} min${last.timedOut ? ', ran out of time' : ''}).`));
+
     root.append(el('p', 'ep-label', 'Blueprint'));
     const seg = el('div', 'ep-seg');
     for (const [id, name, hint] of [['v1', 'V1.1', 'live now'], ['v2', 'V2.0', 'Feb 2027'], ['both', 'Both', 'everything']]) {
@@ -196,7 +265,7 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
     }
     root.append(seg);
 
-    root.append(el('p', 'ep-label', 'Domains'));
+    root.append(el('p', 'ep-label', 'Practice by domain'));
     const doms = el('div', 'ep-domains');
     for (const row of coverage(CCNA_BANK, { blueprint: saved.blueprint })) {
       const on = ui.domains.has(row.domain);
@@ -212,7 +281,7 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
     const quiz = btn('ep-go', `Quiz ${pool.length} questions`, () => begin(presentation({ choices: pool }).choiceOrder.map(i => pool[i]), false));
     quiz.disabled = !pool.length;
     acts.append(quiz);
-    acts.append(btn('ep-go ghost', 'Mock exam, 50 weighted', () => {
+    acts.append(btn('ep-go ghost', 'Quick mock · 50 questions, untimed', () => {
       const { questions, shortfalls } = sampleExam(CCNA_BANK, { count: 50, blueprint: saved.blueprint });
       begin(questions, true, shortfalls);
     }));
@@ -232,12 +301,70 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
     more.append(consoleGo);
     more.append(btn('ep-go ghost', 'Subnet drill', () => { ui.drill = emptySession(ui.drill.tierId); ui.drillQ = null; go('drill'); }));
     more.append(btn('ep-go ghost', `Flashcards · ${dueCards(CARD_IDS, saved.cards, now).length} due`, () => startRecall('cards')));
-    more.append(btn('ep-go ghost', `Type-it · ${dueCards(TYPE_IDS, saved.typeit, now).length} due`, () => startRecall('typeit')));
+    more.append(btn('ep-go ghost', `Command recall · ${dueCards(TYPE_IDS, saved.typeit, now).length} due`, () => startRecall('typeit')));
     root.append(more);
 
     root.append(el('p', 'ep-foot', `A mock draws ${quotas(50).map(x => `${x.domain} ${x.want}`).join(', ')}.`));
     if (storageError) root.append(el('p', 'ep-warn', storageError));
     root.append(btn('ep-quit', 'Back', exit));
+  }
+
+  // ---------- readiness and weak spots ----------
+  function report() {
+    const progress = mapProgress({ record: mapRecord(), completedRuns: runs(), now: Date.now() });
+    return readinessReport({ progress, quiz: saved.quiz, mocks: saved.mocks, simlets: saved.simlets, bank: CCNA_BANK });
+  }
+
+  function drawReadiness() {
+    const r = report();
+    const card = el('section', `ep-card ep-ready is-${r.verdict.key}`);
+    const head = el('div', 'ep-ready-head');
+    const big = el('b', 'ep-ready-num', String(r.overall));
+    const words = el('div', 'ep-ready-words');
+    words.append(el('span', 'ep-label', 'Readiness'), el('p', 'ep-ready-verdict', r.verdict.text));
+    head.append(big, words);
+    card.append(head);
+    const bars = el('div', 'ep-ready-bars');
+    for (const d of r.domains) {
+      const row = el('div', 'ep-ready-row');
+      row.title = `Know ${d.parts.know} · Hands-on ${d.parts.hands ?? '—'} · Mock ${d.parts.mock ?? '—'} · ${d.answered} answers lately`;
+      const meta = el('div', 'ep-ready-meta');
+      meta.append(el('span', null, d.label), el('b', null, String(d.score)));
+      const track = el('div', 'mk-track');
+      const fill = el('i', d.score >= 80 ? 'is-pass' : '');
+      fill.style.width = `${d.score}%`;
+      track.append(fill);
+      row.append(meta, track);
+      bars.append(row);
+    }
+    card.append(bars);
+    card.append(el('p', 'ep-foot', 'Weighted like the blueprint, from recent answers, Do and Fix lights, simlets and your last mock. Lights fade, so it drops when a topic goes untouched.'));
+
+    // The daily set: the branches costing the most, and what to do about them.
+    const weak = r.weak.slice(0, 3);
+    if (weak.length) {
+      card.append(el('p', 'ep-label', 'Weak spots today'));
+      const list = el('ul', 'ep-weak');
+      for (const w of weak) {
+        const li = el('li', null);
+        li.append(el('span', 'ep-weak-name', w.name), el('span', 'ep-weak-meta', `${w.score} · needs ${w.need.map(t => TIER_WORD[t]).join(', ') || 'a refresh'}`));
+        list.append(li);
+      }
+      card.append(list);
+      const acts = el('div', 'ep-actions');
+      const pools = questionPools();
+      const ids = new Set(weak.flatMap(w => pools[w.branchId] ?? []));
+      const pool = CCNA_BANK.filter(q => ids.has(q.id));
+      const set = rotate(pool, saved.quiz, { count: 10 });
+      if (set.length) acts.append(btn('ep-go', `${set.length} questions on these`, () => begin(set, false, [], 'Weak spots')));
+      const hands = weak.find(w => w.need.includes('do') || w.need.includes('fix'));
+      if (hands && onPractice) {
+        const tier = hands.need.includes('do') ? 'do' : 'fix';
+        acts.append(btn('ep-go ghost', `${TIER_WORD[tier]}: ${branchById(hands.branchId)?.name}`, () => { stopTicker(); closeChild(); onPractice({ branchId: hands.branchId, tier }); }));
+      }
+      card.append(acts);
+    }
+    root.append(card);
   }
 
   function drawCollection() {
@@ -261,7 +388,7 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
         ? `Fixed with help, so ${plan.concepts.map(id => conceptById(id).label).join(', ')} counts as practiced. Study it, then take it again without hints to earn it.`
         : `Fixed without help. ${plan.concepts.map(id => conceptById(id).label).join(', ')} is earned.`));
       if (plan.needed && plan.questions.length) {
-        box.append(btn('ep-go', `Study the ${plan.questions.length} questions`, () => begin(CCNA_BANK.filter(q => plan.questions.includes(q.id) && q.format !== 'match' && q.format !== 'order'), false)));
+        box.append(btn('ep-go', `Study the ${plan.questions.length} questions`, () => begin(CCNA_BANK.filter(q => plan.questions.includes(q.id)), false)));
       }
       root.append(box);
     }
@@ -289,7 +416,7 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
         }));
       }
       if (concept.questions.length) {
-        acts.append(btn('ep-mini ghost', 'Study it', () => begin(CCNA_BANK.filter(q => concept.questions.includes(q.id) && q.format !== 'match' && q.format !== 'order'), false)));
+        acts.append(btn('ep-mini ghost', 'Study it', () => begin(CCNA_BANK.filter(q => concept.questions.includes(q.id)), false)));
       }
       card.append(acts);
       list.append(card);
@@ -312,16 +439,16 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
     }
     card.append(el('p', 'ep-prompt', q.prompt));
 
-    if (q.format === 'match') drawMatch(card, q);
-    else if (q.format === 'order') drawOrder(card, q);
-    else drawChoices(card, q);
+    if (isDrag(q)) {
+      if (!ui.graded) card.append(el('p', 'ep-hint', dragHelp(q)));
+      card.append(renderDrag(q, ui.shown, ui, { graded: Boolean(ui.graded), onChange: draw }));
+    } else drawChoices(card, q);
 
     if (!ui.graded) {
       const need = expectedSelections(q);
-      const ready = q.format === 'match' || q.format === 'order'
-        ? ui.pick.filter(v => v !== undefined).length === (q.pairs ?? q.steps).length
-        : ui.pick.length === need;
-      const check = btn('ep-go', need > 1 ? `Check (${ui.pick.length}/${need})` : 'Check', submitQuestion);
+      const prog = isDrag(q) ? dragProgress(q, ui.pick) : null;
+      const ready = prog ? prog.placed === prog.need : ui.pick.length === need;
+      const check = btn('ep-go', prog ? `Check (${prog.placed}/${prog.need})` : need > 1 ? `Check (${ui.pick.length}/${need})` : 'Check', submitQuestion);
       check.disabled = !ready;
       card.append(check);
     } else {
@@ -354,48 +481,6 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
       b.append(el('span', 'ep-choice-text', c.text));
       if (ui.graded) b.append(el('span', 'ep-choice-why', c.why));
       wrap.append(b);
-    }
-    card.append(wrap);
-  }
-
-  function drawMatch(card, q) {
-    const wrap = el('div', 'ep-pairs');
-    q.pairs.forEach((pair, left) => {
-      const row = el('label', 'ep-pair');
-      row.append(el('span', 'ep-pair-left', pair.left));
-      const sel = document.createElement('select');
-      sel.className = 'ep-select';
-      sel.setAttribute('aria-label', pair.left);
-      sel.append(option('', 'choose…'));
-      for (const right of ui.shown.rightOrder) sel.append(option(String(right), q.pairs[right].right));
-      sel.value = ui.pick[left] === undefined ? '' : String(ui.pick[left]);
-      sel.disabled = Boolean(ui.graded);
-      sel.addEventListener('change', () => {
-        const next = [...ui.pick];
-        next[left] = sel.value === '' ? undefined : Number(sel.value);
-        ui.pick = next;
-        draw();
-      });
-      if (ui.graded) row.classList.add(ui.pick[left] === left ? 'right' : 'wrong');
-      row.append(sel);
-      wrap.append(row);
-    });
-    card.append(wrap);
-  }
-
-  function drawOrder(card, q) {
-    const wrap = el('div', 'ep-steps');
-    ui.pick.forEach((i, pos) => {
-      const row = el('div', `ep-step chosen${ui.graded ? (i === pos ? ' right' : ' wrong') : ''}`);
-      row.append(el('span', 'ep-step-n', String(pos + 1)));
-      row.append(el('span', null, q.steps[i]));
-      if (!ui.graded) row.append(btn('ep-step-undo', 'remove', () => { ui.pick = ui.pick.filter(x => x !== i); draw(); }));
-      wrap.append(row);
-    });
-    if (!ui.graded) {
-      for (const i of ui.shown.shownOrder.filter(i => !ui.pick.includes(i))) {
-        wrap.append(btn('ep-step', q.steps[i], () => { ui.pick = [...ui.pick, i]; draw(); }));
-      }
     }
     card.append(wrap);
   }
@@ -434,7 +519,7 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
     }
     const id = ui.queue[ui.recallAt];
     const item = kind === 'cards' ? CCNA_BANK.find(q => q.id === id) : RECALL_DECK.find(c => c.id === id);
-    root.append(el('p', 'ep-crumbs', `${kind === 'cards' ? 'Flashcards' : 'Type-it'} · ${ui.recallAt + 1} of ${ui.queue.length} · box ${saved[kind][id]?.box ?? 'new'}`));
+    root.append(el('p', 'ep-crumbs', `${kind === 'cards' ? 'Flashcards' : 'Command recall'} · ${ui.recallAt + 1} of ${ui.queue.length} · box ${saved[kind][id]?.box ?? 'new'}`));
     const card = el('section', 'ep-card');
 
     if (kind === 'cards') {
@@ -456,7 +541,7 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
       card.append(el('p', 'ep-prompt', item.prompt));
       if (!ui.typed) {
         const input = textInput('ep-type', item.prompt);
-        const check = () => { const r = checkTyped(item, input.value); if (!r.empty) { ui.typed = { value: input.value, ...r }; draw(); } };
+        const check = () => { const r = checkTyped(item, input.value, { sameCommand }); if (!r.empty) { ui.typed = { value: input.value, ...r }; draw(); } };
         input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); check(); } });
         card.append(input);
         card.append(btn('ep-go', 'Check', check));
@@ -547,6 +632,8 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
 
   function draw() {
     root.textContent = '';
+    if (ui.screen === 'child' && ui.child) { root.className = ui.child.classList.contains('exam-mock') ? 'exam-host' : 'exam-host skillmap is-lab is-desk'; root.append(ui.child); return; }
+    root.className = 'exam-prep';
     const back = quiz
       ? btn('screen-back btn-quiet', 'Map', exit)
       : ui.screen === 'home'
@@ -558,7 +645,7 @@ export function createExamPrep({ onExit, onLaunch, getCompletedRuns, initialScre
   }
 
   if (quiz?.deck?.length) begin(quiz.deck, false); else draw();
-  root.destroy = stopTicker;
+  root.destroy = () => { stopTicker(); closeChild(); };
   return root;
 }
 
@@ -580,12 +667,6 @@ function header(title, sub) {
   h.append(el('h1', null, title));
   if (sub) h.append(el('p', 'ep-sub', sub));
   return h;
-}
-function option(value, text) {
-  const o = document.createElement('option');
-  o.value = value;
-  o.textContent = text;
-  return o;
 }
 function tile(big, small) {
   const t = el('div', 'ep-tile');

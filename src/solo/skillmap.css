@@ -514,3 +514,18 @@
 
 .desk-group { margin: 10px 0 0; font: 700 12px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--sk-ink-3); }
 .sk-lab.is-order { border-style: dashed; }
+
+/* ---------- simlets ---------- */
+.simlet-q { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--sk-line); }
+.simlet-prompt { margin: 0; font-size: 15px; line-height: 1.4; font-weight: 600; }
+.simlet-choices { display: grid; gap: 6px; }
+.simlet-choice { text-align: left; min-height: 42px; padding: 9px 12px; border-radius: 9px; border: 1px solid var(--sk-line); background: var(--sk-bg); color: var(--sk-ink); font: 14px/1.35 var(--font-body); cursor: pointer; overflow-wrap: anywhere; }
+.simlet-choice.is-picked { border-color: var(--sk-light); background: rgb(242 193 46 / 0.1); }
+.simlet-choice.is-right { border-color: var(--sk-ok); }
+.simlet-choice.is-wrong { border-color: #ff6b6b; }
+.simlet-choice:disabled { cursor: default; opacity: 1; }
+.simlet-explain { margin: 0; font-size: 13px; line-height: 1.5; color: var(--sk-ink-2); }
+.simlet-score { margin: 6px 0 0; font: 700 20px var(--font-display); color: var(--sk-warn); }
+.simlet-score.is-clean { color: var(--sk-ok); }
+.skillmap .simlet-choice:hover:not(:disabled) { background: var(--sk-panel-2); border-color: var(--sk-ink-3); color: var(--sk-ink); }
+.skillmap .simlet-choice.is-picked:hover:not(:disabled) { background: rgb(242 193 46 / 0.16); border-color: var(--sk-light); }
