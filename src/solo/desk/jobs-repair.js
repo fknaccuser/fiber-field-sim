@@ -9,7 +9,7 @@
 
 import { rngOf, int, pick, sample, privateBase, subnetIn, addHost } from '../study/gen/kit.js';
 import { exchange, requestDhcp, l2Of } from '../labs/world.js';
-import { memberFlag } from '../labs/switching.js';
+import { memberFlag, negotiate } from '../labs/switching.js';
 import { parseIp } from '../labs/ip4.js';
 import { cloneWorld } from './grade.js';
 import { IPV6_REPAIRS } from './jobs-ipv6.js';
@@ -70,7 +70,7 @@ function branchSetup(n, fault) {
     SW1: ['hostname SW1', `vlan ${n.va}`, `name ${n.na}`, `vlan ${n.vb}`, `name ${n.nb}`,
       'interface g0/1', 'switchport mode trunk', `switchport trunk allowed vlan ${f('trunk-pruned') ? n.va : `${n.va},${n.vb}`}`,
       'interface f0/1', 'switchport mode access', `switchport access vlan ${f('wrong-vlan') ? n.vb : n.va}`, ...psec,
-      'interface f0/2', 'switchport mode access', `switchport access vlan ${n.vb}`,
+      'interface f0/2', 'switchport mode access', `switchport access vlan ${n.vb}`, ...(f('duplex') ? ['speed 100', 'duplex full'] : []),
       'interface f0/3', 'switchport mode access', `switchport access vlan ${n.va}`, ...(f('port-shut') ? ['shutdown'] : [])],
     [n.rtr]: [`hostname ${n.rtr}`, 'ip domain name branch.lan', 'crypto key generate rsa modulus 1024', 'username admin secret Adm1n!pass', 'line vty 0 4', 'login local', `transport input ${f('ssh-telnet') ? 'telnet' : 'ssh'}`, 'exit',
       'interface g0/0', 'no shutdown',
@@ -104,6 +104,10 @@ const BRANCH_FAULTS = [
     symptom: (n) => ({ text: 'PC1 reaches the web again', check: (w) => reach(w, 'PC1', n.web, { proto: 'tcp', port: 80 }) }),
     owns: () => ({ SW1: [ifRe('FastEthernet0/1')] }), fix: () => ({ SW1: ['enable', 'configure terminal', 'interface f0/1', 'no switchport port-security mac-address sticky 0050.79aa.0001', 'shutdown', 'no shutdown'] }),
     hint: 'show port-security interface f0/1: the sticky address is the old PC\'s. Remove it, then bounce the port.' },
+  { id: 'duplex', lights: ['t1-physical'], says: 'PC2 is on the network, but everything is painfully slow: file copies crawl and video calls freeze. It started after someone "fixed" its switch port.',
+    symptom: () => ({ text: 'PC2\'s port runs without a duplex mismatch', check: (w) => { const x = negotiate(w, 'SW1', 'FastEthernet0/2'); return Boolean(x?.ok) && !x.mismatch; } }),
+    owns: () => ({ SW1: [ifRe('FastEthernet0/2')] }), fix: () => ({ SW1: ['enable', 'configure terminal', 'interface f0/2', 'speed auto', 'duplex auto'] }),
+    hint: 'show interfaces status on SW1: one port shows hard-set speed and duplex. show interfaces f0/2 shows CRC errors and runts piling up. A PC on auto facing a hard-set port falls back to half duplex.' },
   { id: 'pc-gateway', lights: ['t1-client'], says: 'PC2 can reach the printer on its floor but no websites and not the intranet.',
     symptom: (n) => ({ text: 'PC2 reaches the web again', check: (w) => reach(w, 'PC2', n.web, { proto: 'tcp', port: 80 }) }),
     owns: () => ({ PC2: [/^pc\|/] }), fix: (n) => ({ PC2: [`ipconfig ${addHost(n.netB, 20)} ${M24} ${n.gwB}`] }),
@@ -192,6 +196,55 @@ const CAMPUS_FAULTS = [
     hint: 'show vlan brief on DIST. An access port in a VLAN that does not exist is inactive.' },
 ];
 
+
+// ------------------------------------------------------------ OSPF between sites
+// HQ in the middle, two branches on point links, everything in area 0 with
+// interface-mode OSPF. Each fault is one way an adjacency or a route goes
+// missing.
+function ospfSetup(n, fault) {
+  const f = (id) => fault.id === id;
+  const hq = ['hostname HQ', 'router ospf 1', 'router-id 1.1.1.1', 'passive-interface g0/2', 'exit',
+    'interface g0/0', `ip address ${n.t1h} 255.255.255.252`, 'ip ospf 1 area 0', 'no shutdown',
+    'interface g0/1', `ip address ${n.t2h} 255.255.255.252`, 'ip ospf 1 area 0', 'no shutdown',
+    'interface g0/2', `ip address ${n.gwS} ${M24}`, 'ip ospf 1 area 0', 'no shutdown'];
+  const br1 = ['hostname BR1', 'router ospf 1', 'router-id 2.2.2.2', 'passive-interface g0/1', ...(f('passive-transit') ? ['passive-interface g0/0'] : []), 'exit',
+    'interface g0/0', `ip address ${n.t1b} ${f('mask-mismatch') ? '255.255.255.248' : '255.255.255.252'}`, 'ip ospf 1 area 0', 'no shutdown',
+    'interface g0/1', `ip address ${n.gwA} ${M24}`, ...(f('lan-missing') ? [] : ['ip ospf 1 area 0']), 'no shutdown'];
+  const br2 = ['hostname BR2', 'router ospf 1', `router-id ${f('dup-rid') ? '1.1.1.1' : '3.3.3.3'}`, 'passive-interface g0/1', 'exit',
+    'interface g0/0', `ip address ${n.t2b} 255.255.255.252`, `ip ospf 1 area ${f('area-mismatch') ? n.wrongArea : 0}`, ...(f('type-mismatch') ? ['ip ospf network point-to-point'] : []), 'no shutdown',
+    'interface g0/1', `ip address ${n.gwB} ${M24}`, 'ip ospf 1 area 0', 'no shutdown'];
+  return { HQ: hq, BR1: br1, BR2: br2 };
+}
+
+const reachSrv = (w, n, pc) => reach(w, pc, n.srv, { proto: 'tcp', port: 80 });
+
+const OSPF_FAULTS = [
+  { id: 'area-mismatch', lights: ['t3-ospf'], says: 'The BR2 office lost the intranet after last night\'s routing change. BR1 is fine.',
+    symptom: (n) => ({ text: 'BR2\'s users reach the intranet again', check: (w) => reachSrv(w, n, 'PC2') }),
+    owns: () => ({ BR2: [ifRe('GigabitEthernet0/0')] }), fix: () => ({ BR2: ['enable', 'configure terminal', 'interface g0/0', 'ip ospf 1 area 0'] }),
+    hint: 'show ip ospf neighbor on HQ: BR2 is missing. show ip ospf interface brief on both ends of that link and compare the Area column.' },
+  { id: 'passive-transit', lights: ['t3-ospf', 't0-inspect'], says: 'BR1 can\'t reach anything at HQ since someone "secured" its OSPF.',
+    symptom: (n) => ({ text: 'BR1\'s users reach the intranet again', check: (w) => reachSrv(w, n, 'PC1') }),
+    owns: () => ({ BR1: [/^router ospf/] }), fix: () => ({ BR1: ['enable', 'configure terminal', 'router ospf 1', 'no passive-interface g0/0'] }),
+    hint: 'A passive interface still advertises its subnet but sends no hellos, so no neighbor forms on it. show ip protocols on BR1 lists the passive interfaces.' },
+  { id: 'lan-missing', lights: ['t3-ospf', 't3-forwarding'], says: 'Nobody at HQ or BR2 can reach the BR1 office. BR1\'s own users can still browse the intranet.',
+    symptom: (n) => ({ text: 'HQ and BR2 reach BR1\'s LAN again', check: (w) => reach(w, 'PC2', addHost(n.netA, 20)) && reachSrv(w, n, 'PC1') }),
+    owns: () => ({ BR1: [ifRe('GigabitEthernet0/1')] }), fix: () => ({ BR1: ['enable', 'configure terminal', 'interface g0/1', 'ip ospf 1 area 0'] }),
+    hint: 'show ip route on HQ: there is no O route for BR1\'s LAN. Which interfaces does BR1 run OSPF on? show ip ospf interface brief.' },
+  { id: 'dup-rid', lights: ['t3-ospf'], says: 'BR2 went dark after its router was replaced from a config template. BR1 is fine.',
+    symptom: (n) => ({ text: 'BR2\'s users reach the intranet again', check: (w) => reachSrv(w, n, 'PC2') }),
+    owns: () => ({ BR2: [/^router ospf/] }), fix: () => ({ BR2: ['enable', 'configure terminal', 'router ospf 1', 'router-id 3.3.3.3', 'end', 'clear ip ospf process', 'yes'] }),
+    hint: 'show ip ospf on HQ and BR2, or show ip protocols: compare the router IDs. Two routers with one ID never become neighbors. A new router-id needs clear ip ospf process.' },
+  { id: 'mask-mismatch', lights: ['t3-ospf', 't1-ipv4'], says: 'BR1 dropped off the network after its WAN interface was re-addressed.',
+    symptom: (n) => ({ text: 'BR1\'s users reach the intranet again', check: (w) => reachSrv(w, n, 'PC1') }),
+    owns: () => ({ BR1: [ifRe('GigabitEthernet0/0')] }), fix: (n) => ({ BR1: ['enable', 'configure terminal', 'interface g0/0', `ip address ${n.t1b} 255.255.255.252`] }),
+    hint: 'OSPF neighbors must agree on the subnet mask. show ip interface brief and show running-config interface g0/0 on both ends of the link.' },
+  { id: 'type-mismatch', lights: ['t3-ospf'], says: 'BR2 lost its routes after someone tuned OSPF on its WAN link.',
+    symptom: (n) => ({ text: 'BR2\'s users reach the intranet again', check: (w) => reachSrv(w, n, 'PC2') }),
+    owns: () => ({ BR2: [ifRe('GigabitEthernet0/0')] }), fix: () => ({ BR2: ['enable', 'configure terminal', 'interface g0/0', 'no ip ospf network point-to-point'] }),
+    hint: 'show ip ospf interface brief on both ends: one side says P2P, the other DR or BDR. The network type has to match.' },
+];
+
 function finish(order, fault, n, extra) {
   const sym = fault.symptom(n);
   const owns = { ...fault.owns(n), ...(fault.ownsFn ? fault.ownsFn(n) : {}) };
@@ -237,6 +290,7 @@ export const REPAIR_TEMPLATES = [
           { id: 'webB', text: `${n.nb} reaches the web`, check: (w) => reach(w, 'PC2', n.web, { proto: 'tcp', port: 80 }) },
           { id: 'dhcp', text: 'A DHCP client gets an address and reaches the web', check: (w) => renewReach(w, 'PC3', n.web, { proto: 'tcp', port: 80 }) },
           { id: 'intranet', text: 'The intranet site opens from both VLANs', check: (w) => reach(w, 'PC1', n.srv, { proto: 'tcp', port: 80 }) && reach(w, 'PC2', n.srv, { proto: 'tcp', port: 80 }) },
+          { id: 'links', text: 'Every SW1 port negotiates cleanly, with no duplex mismatch', check: (w) => ['FastEthernet0/1', 'FastEthernet0/2', 'FastEthernet0/3', 'GigabitEthernet0/1'].every(p => !negotiate(w, 'SW1', p)?.mismatch) },
           { id: 'ssh', text: `The router takes SSH and refuses Telnet`, check: (w) => reach(w, 'PC1', n.gwA, { proto: 'tcp', port: 22 }) && !reach(w, 'PC1', n.gwA, { proto: 'tcp', port: 23 }) },
         ],
       });
@@ -272,6 +326,39 @@ export const REPAIR_TEMPLATES = [
           { id: 'cross', text: 'Both VLANs work between the switches', check: (w) => crosses(w, n) },
           { id: 'bundle', text: 'Both uplinks are bundled', check: bundled },
           { id: 'stp', text: 'Nothing is blocked between DIST and ACC', check: (w) => !Object.values(l2Of(w).stp.ACC ?? {}).some(v => Object.values(v.ports).some(p => p.state === 'BLK')) },
+        ],
+      });
+    },
+  },
+  {
+    kind: 'repair-ospf',
+    title: 'Trouble ticket: OSPF between sites',
+    minutes: 12,
+    faults: OSPF_FAULTS,
+    lights: [...new Set(OSPF_FAULTS.flatMap(f => f.lights))],
+    make(seed, { fault = null } = {}) {
+      const rnd = rngOf(seed);
+      const t = ticket(rnd, this.kind);
+      const flt = OSPF_FAULTS.find(f => f.id === fault) ?? pick(rnd, OSPF_FAULTS);
+      const [netA, netB, srvNet] = nets(rnd, 3);
+      const x = int(rnd, 1, 250);
+      const n = { netA, netB, srvNet, gwA: addHost(netA, 1), gwB: addHost(netB, 1), gwS: addHost(srvNet, 1), srv: addHost(srvNet, 10),
+        t1h: `10.254.${x}.1`, t1b: `10.254.${x}.2`, t2h: `10.254.${x}.5`, t2b: `10.254.${x}.6`, wrongArea: pick(rnd, [1, 2, 10]), rtr: 'HQ' };
+      return finish({ ...t, title: this.title, minutes: this.minutes, start: 'HQ' }, flt, n, {
+        devices: [
+          { id: 'HQ', kind: 'router', x: 50, y: 14 }, { id: 'BR1', kind: 'router', x: 20, y: 42 }, { id: 'BR2', kind: 'router', x: 80, y: 42 },
+          { id: 'SRV', kind: 'pc', x: 50, y: 44, pc: { ip: n.srv, mask: M24, gateway: n.gwS, services: [80] } },
+          { id: 'PC1', kind: 'pc', x: 20, y: 66, pc: { ip: addHost(netA, 20), mask: M24, gateway: n.gwA } },
+          { id: 'PC2', kind: 'pc', x: 80, y: 66, pc: { ip: addHost(netB, 20), mask: M24, gateway: n.gwB } },
+        ],
+        links: [L('HQ', 'GigabitEthernet0/0', 'BR1', 'GigabitEthernet0/0'), L('HQ', 'GigabitEthernet0/1', 'BR2', 'GigabitEthernet0/0'), L('HQ', 'GigabitEthernet0/2', 'SRV', NIC),
+          L('BR1', 'GigabitEthernet0/1', 'PC1', NIC), L('BR2', 'GigabitEthernet0/1', 'PC2', NIC)],
+        setup: ospfSetup(n, flt), saved: [],
+        notes: [`HQ–BR1 ${n.t1h.replace(/\.1$/, '.0')}/30, HQ–BR2 ${n.t2h.replace(/\.5$/, '.4')}/30`, `BR1 LAN ${netA}/24 (PC1), BR2 LAN ${netB}/24 (PC2)`, `Intranet server ${n.srv} at HQ`, 'Standard: OSPF process 1, area 0 everywhere, router IDs 1.1.1.1, 2.2.2.2, 3.3.3.3, LANs passive'],
+        tests: [
+          { id: 'br1', text: 'BR1 reaches the intranet', check: (w) => reachSrv(w, n, 'PC1') },
+          { id: 'br2', text: 'BR2 reaches the intranet', check: (w) => reachSrv(w, n, 'PC2') },
+          { id: 'cross', text: 'The two branches reach each other', check: (w) => reach(w, 'PC1', addHost(netB, 20)) },
         ],
       });
     },

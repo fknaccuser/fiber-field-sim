@@ -205,3 +205,21 @@ test('interface range, Tab and ? know the switch commands', () => {
   assert.match(run('SW1', 'switchport port-security violation ?'), /protect\n {2}restrict\n {2}shutdown/);
   assert.match(run('SW1', 'router ospf 1'), /Invalid input/);
 });
+
+test('speed and duplex: auto meets auto at full, auto meets hard-set at half, hard-set speeds that differ stay down', async () => {
+  const { negotiate } = await import('../../src/solo/labs/switching.js');
+  const { world, run } = campus();
+  let n = negotiate(world, 'SW1', 'FastEthernet0/1');
+  assert.deepEqual([n.speed, n.duplex, n.mismatch], [100, 'full', false]);
+  assert.match(run('SW1', 'enable', 'show interfaces status'), /Fa0\/1 .*a-full +a-100/);
+  run('SW1', 'configure terminal', 'interface f0/1', 'speed 100', 'duplex full', 'end');
+  n = negotiate(world, 'SW1', 'FastEthernet0/1');
+  assert.deepEqual([n.speed, n.duplex, n.peerDuplex, n.mismatch], [100, 'full', 'half', true], 'the PC on auto falls back to half');
+  assert.match(run('SW1', 'show interfaces status'), /Fa0\/1 .*full +100 /);
+  assert.match(run('SW1', 'show interfaces f0/1'), /Full-duplex, 100Mb\/s[\s\S]* [1-9]\d* CRC/);
+  assert.match(run('SW1', 'show running-config'), /interface FastEthernet0\/1\n speed 100\n duplex full/);
+  run('SW1', 'configure terminal', 'interface g0/1', 'speed 100', 'duplex full', 'end');
+  run('SW2', 'enable', 'configure terminal', 'interface g0/1', 'speed 10', 'duplex full', 'end');
+  assert.match(run('SW1', 'show interfaces status'), /Gi0\/1 .*notconnect/, 'two hard-set speeds that differ never come up');
+  assert.match(run('SW1', 'configure terminal', 'interface f0/2', 'speed 1000'), /Invalid input/, 'a Fast Ethernet port has no gigabit');
+});

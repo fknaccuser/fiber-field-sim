@@ -75,10 +75,11 @@ export function makeSwitch(id, { ports = SWITCH_PORTS, mac = null } = {}) {
 }
 
 // A PC: one NIC, an address, a gateway.
-export function makePc(id, { ip = null, mask = null, gateway = null, mac = null, services = [], dhcp = false, v6 = null } = {}) {
+export function makePc(id, { ip = null, mask = null, gateway = null, mac = null, services = [], dhcp = false, v6 = null, nic = null } = {}) {
   const config = makeDevice('x', []).config;
   config.hostname = id;
-  config.interfaces = { FastEthernet0: makeInterface('FastEthernet0', { shutdown: false, ip: ip === null ? null : parseIp(ip), mask: mask === null ? null : parseIp(mask) }) };
+  // nic: { speed, duplex } for a device whose port is hard-set and cannot be changed from here.
+  config.interfaces = { FastEthernet0: makeInterface('FastEthernet0', { shutdown: false, ip: ip === null ? null : parseIp(ip), mask: mask === null ? null : parseIp(mask), ...(nic ? { speed: nic.speed ?? 'auto', duplex: nic.duplex ?? 'auto' } : {}) }) };
   config.gateway = gateway === null ? null : parseIp(gateway);
   config.dns = null;
   // A server is a PC that listens: services lists its open TCP ports.

@@ -21,6 +21,13 @@ import { createLabScreen } from '../labs/screen.js';
 import { createDesk } from '../desk/screen.js';
 import { TEMPLATES } from '../desk/jobs.js';
 import { repairFor } from '../desk/jobs-repair.js';
+import { WLC_TEMPLATES } from '../wlc/model.js';
+import { createWlcScreen } from '../wlc/screen.js';
+import { JSON_TEMPLATES } from '../json/work.js';
+import { createJsonScreen } from '../json/screen.js';
+
+// Work orders that run in their own screen rather than on consoles.
+const EXTRA_ORDERS = [...WLC_TEMPLATES, ...JSON_TEMPLATES];
 import { suggestedStage, STAGE_LABEL } from '../labs/coach.js';
 import { GLOSSARY, TERM_BY_ID, searchGlossary } from '../glossary/terms.js';
 
@@ -223,9 +230,10 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
       start,
       getRecord: () => record,
       onRecord: (r) => { record = recordDesk(record, r); save(); },
+      onWlc: (kind, mode) => openWlc(kind, mode, () => openDesk()),
       onExit: () => { ui.deskEl?.destroy?.(); ui.deskEl = null; ui.view = ui.back === 'tree' ? 'tree' : 'map'; draw(); window.scrollTo?.(0, 0); },
     });
-    ui.back = ui.view === 'tree' ? 'tree' : 'map';
+    if (ui.view !== 'desk') ui.back = ui.view === 'tree' ? 'tree' : 'map';
     ui.view = 'desk';
     draw();
     window.scrollTo?.(0, 0);
@@ -244,10 +252,31 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
     if (code) onLaunch?.(code);
   }
 
-  const ordersFor = (branchId) => TEMPLATES.filter(t => !t.kind.startsWith('repair') && t.lights.includes(branchId));
+  const ordersFor = (branchId) => [...TEMPLATES, ...EXTRA_ORDERS].filter(t => !t.kind.startsWith('repair') && t.lights.includes(branchId));
   function startOrder(branchId, kind = null) {
-    const t = kind ? TEMPLATES.find(x => x.kind === kind) : ordersFor(branchId)[0];
-    if (t) openDesk({ kind: t.kind, seed: freshSeed(), mode: modeFor(record.deskDo?.[branchId]) });
+    const t = kind ? [...TEMPLATES, ...EXTRA_ORDERS].find(x => x.kind === kind) : ordersFor(branchId)[0];
+    if (!t) return;
+    const mode = modeFor(record.deskDo?.[branchId]);
+    if (EXTRA_ORDERS.includes(t)) openWlc(t.kind, mode); else openDesk({ kind: t.kind, seed: freshSeed(), mode });
+  }
+
+  // The wireless controller's GUI and the API workspace run in the desk's frame.
+  function openWlc(kind, mode = 'learn', returnTo = null) {
+    ui.deskEl?.destroy?.();
+    if (ui.view !== 'desk') ui.back = ui.view === 'tree' ? 'tree' : 'map';
+    const make = kind.startsWith('json') ? createJsonScreen : createWlcScreen;
+    ui.deskEl = make({
+      kind, seed: freshSeed(), mode,
+      onRecord: (r) => { record = recordDesk(record, r); save(); },
+      onExit: () => {
+        ui.deskEl?.destroy?.(); ui.deskEl = null;
+        if (returnTo) { returnTo(); return; }
+        ui.view = ui.back === 'tree' ? 'tree' : 'map'; draw(); window.scrollTo?.(0, 0);
+      },
+    });
+    ui.view = 'desk';
+    draw();
+    window.scrollTo?.(0, 0);
   }
 
   // The dock's Next: run the step itself, one tap from the map.

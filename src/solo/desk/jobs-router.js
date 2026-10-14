@@ -5,9 +5,10 @@
 // Checks that test behavior run on a copy of the world, so grading never
 // changes the learner's network, hit counters or leases.
 
-import { rngOf, int, pick, sample, privateBase, subnetIn, addHost } from '../study/gen/kit.js';
+import { rngOf, int, pick, sample, privateBase, subnetIn, addHost, maskOf } from '../study/gen/kit.js';
 import { interfaceState, exchange, requestDhcp, routingTable, neighbors } from '../labs/world.js';
 import { aceMatches } from '../labs/services.js';
+import { negotiate } from '../labs/switching.js';
 import { parseIp } from '../labs/ip4.js';
 import { cloneWorld } from './grade.js';
 
@@ -379,6 +380,106 @@ export const ROUTER_TEMPLATES = [
             hint: 'service timestamps log datetime msec.', show: { [rtr]: ['service timestamps log datetime msec'] } },
         ],
         tests: [{ id: 'sync', text: `${rtr} can reach its NTP server`, check: (w) => reach(w, rtr, ntp) }],
+      };
+    },
+  },
+
+  // ------------------------------------------------------------ subnetting
+  {
+    kind: 'build-subnet',
+    title: 'Carve a block into subnets and address them',
+    minutes: 10,
+    lights: ['t1-ipv4', 't1-client'],
+    make(seed) {
+      const rnd = rngOf(seed);
+      const f = frame(rnd, this.kind);
+      const rtr = pick(rnd, ROUTERS);
+      const base = pick(rnd, [`10.${int(rnd, 1, 250)}.${int(rnd, 0, 250)}.0`, `172.${int(rnd, 16, 31)}.${int(rnd, 0, 250)}.0`, `192.168.${int(rnd, 0, 250)}.0`]);
+      // Host counts that need three different prefix lengths and fit a /24
+      // when allocated largest first.
+      const sizes = pick(rnd, [[100, 50, 20], [60, 28, 12], [120, 60, 25], [110, 40, 10], [55, 25, 6]]);
+      const names = sample(rnd, VLAN_NAMES, 3);
+      const lenFor = (hosts) => { let len = 30; while ((2 ** (32 - len)) - 2 < hosts) len -= 1; return len; };
+      let at = 0;
+      const plan = sizes.map((hosts, k) => {
+        const len = lenFor(hosts);
+        const net = addHost(base, at);
+        at += 2 ** (32 - len);
+        return { hosts, len, net, mask: maskOf(len), first: addHost(net, 1), last: addHost(net, (2 ** (32 - len)) - 2), name: names[k], port: `GigabitEthernet0/${k}`, pc: `PC${k + 1}` };
+      });
+      const devices = [{ id: rtr, kind: 'router', x: 50, y: 16 }, ...plan.map((p, k) => ({ id: p.pc, kind: 'pc', x: 18 + 32 * k, y: 58, pc: {} }))];
+      const links = plan.map(p => L(rtr, p.port, p.pc, NIC));
+      const reqs = plan.flatMap((p, k) => [
+        { id: `if${k}`, text: `${short(p.port)}: the ${p.name} LAN, ${p.hosts} hosts. Smallest subnet that fits, router on the first usable address`, device: rtr,
+          check: (w) => { const i = port(w, rtr, p.port); return i.ip === ip(p.first) && i.mask === ip(p.mask) && up(w, rtr, p.port); }, owns: { [rtr]: [ifRe(p.port)] },
+          hint: `${p.hosts} hosts need ${p.hosts} + 2 addresses, so /${p.len} (${(2 ** (32 - p.len)) - 2} usable). Allocated largest first from ${base}, this one is ${p.net}/${p.len}.`,
+          show: { [rtr]: [...(k === 0 ? ['enable', 'configure terminal'] : []), `interface ${lower(p.port)}`, `ip address ${p.first} ${p.mask}`, 'no shutdown'] } },
+        { id: `pc${k}`, text: `${p.pc} on the ${p.name} LAN: the last usable address, gateway ${short(p.port)}`, device: p.pc,
+          check: (w) => { const n = port(w, p.pc, NIC); return n.ip === ip(p.last) && n.mask === ip(p.mask) && cfg(w, p.pc).gateway === ip(p.first); }, owns: { [p.pc]: [PC_LINES] },
+          hint: `The last usable address is one below the broadcast of ${p.net}/${p.len}.`, show: { [p.pc]: [`ipconfig ${p.last} ${p.mask} ${p.first}`] } },
+      ]);
+      return {
+        ...f, title: this.title, minutes: this.minutes, lights: this.lights, start: rtr,
+        summary: `${f.site} has been given ${base}/24 for three LANs on ${rtr}. Carve it with VLSM, largest LAN first from the start of the block, and address the router and one PC on each.`,
+        devices, links, setup: { [rtr]: [`hostname ${rtr}`] }, saved: [],
+        notes: [`Block ${base}/24`, ...plan.map(p => `${p.name}: ${p.hosts} hosts, on ${short(p.port)} (${p.pc})`), 'Allocate largest first, no gaps; router takes the first usable, the PC the last'],
+        requirements: reqs,
+        tests: [
+          { id: 'ab', text: `${plan[0].pc} reaches ${plan[1].pc}`, check: (w) => reach(w, plan[0].pc, plan[1].last) },
+          { id: 'bc', text: `${plan[1].pc} reaches ${plan[2].pc}`, check: (w) => reach(w, plan[1].pc, plan[2].last) },
+        ],
+      };
+    },
+  },
+
+  // ------------------------------------------------------------ physical layer
+  {
+    kind: 'build-legacy',
+    title: 'Connect a device that will not negotiate',
+    minutes: 6,
+    lights: ['t1-physical', 't2-vlans'],
+    make(seed) {
+      const rnd = rngOf(seed);
+      const f = frame(rnd, this.kind);
+      const what = pick(rnd, [['BMS', 'building management controller'], ['HVAC', 'HVAC controller'], ['DOOR', 'door access panel'], ['PLC', 'line PLC'], ['CAM', 'old IP camera recorder']]);
+      const [dev, label] = what;
+      const p = int(rnd, 5, 20);
+      const portName = `FastEthernet0/${p}`;
+      const v = pick(rnd, [30, 40, 60, 90, 120]);
+      const vname = pick(rnd, ['FACILITIES', 'OT', 'BUILDING', 'SECURITY']);
+      const [net] = nets(rnd, 1);
+      const gw = addHost(net, 1);
+      const rtr = pick(rnd, ROUTERS);
+      const devices = [
+        { id: rtr, kind: 'router', x: 50, y: 12 }, { id: 'SW1', kind: 'switch', x: 50, y: 36 },
+        { id: dev, kind: 'pc', x: 50, y: 62, pc: { ip: addHost(net, 50), mask: M24, gateway: gw, nic: { speed: 100, duplex: 'full' } } },
+      ];
+      const links = [L(rtr, 'GigabitEthernet0/0', 'SW1', 'GigabitEthernet0/1'), L(dev, NIC, 'SW1', portName)];
+      const desc = `${dev} ${label}`.slice(0, 40);
+      const reqs = [
+        { id: 'vlan', text: `${short(portName)} is an access port in VLAN ${v} (${vname})`, device: 'SW1',
+          check: (w) => swp(w, 'SW1', portName)?.mode === 'access' && swp(w, 'SW1', portName)?.access === v, owns: { SW1: [ifRe(portName)] },
+          hint: 'switchport mode access, then switchport access vlan.', show: { SW1: ['enable', 'configure terminal', `interface ${lower(portName)}`, 'switchport mode access', `switchport access vlan ${v}`] } },
+        { id: 'speed', text: `Hard-set ${short(portName)} to match the ${label}: 100 Mb/s, full duplex`, device: 'SW1',
+          check: (w) => port(w, 'SW1', portName).speed === 100 && port(w, 'SW1', portName).duplex === 'full', owns: { SW1: [ifRe(portName)] },
+          hint: `The ${label} has autonegotiation off. A switch port left on auto senses 100 Mb/s but cannot learn the duplex, so it falls back to half while the device runs full: a duplex mismatch. Set both speed and duplex to match it.`,
+          show: { SW1: ['speed 100', 'duplex full'] } },
+        { id: 'desc', text: `Label the port "${desc}"`, device: 'SW1',
+          check: (w) => (port(w, 'SW1', portName).description ?? '').toLowerCase() === desc.toLowerCase(), owns: { SW1: [ifRe(portName)] },
+          hint: 'description, in interface configuration. The next tech to find a hard-set port will want to know why.', show: { SW1: [`description ${desc}`] } },
+      ];
+      return {
+        ...f, title: this.title, minutes: this.minutes, lights: this.lights, start: 'SW1',
+        summary: `Facilities are cabling a ${label} into SW1 ${short(portName)}. Its port is fixed at 100 Mb/s full duplex with autonegotiation turned off, and the vendor says it drops off the network on auto ports. Put it in the ${vname} VLAN and match its settings.`,
+        devices, links,
+        setup: { SW1: ['hostname SW1', `vlan ${v}`, `name ${vname}`, 'interface g0/1', 'switchport mode trunk'], [rtr]: [`hostname ${rtr}`, 'interface g0/0', 'no shutdown', `interface g0/0.${v}`, `encapsulation dot1q ${v}`, `ip address ${gw} ${M24}`] },
+        saved: [],
+        notes: [`${dev}: ${label}, fixed 100 Mb/s full duplex, no autonegotiation`, `${vname}: VLAN ${v}, ${net}/24, gateway ${gw}`],
+        requirements: reqs,
+        tests: [
+          { id: 'clean', text: `${short(portName)} runs without a duplex mismatch`, check: (w) => { const n = negotiate(w, 'SW1', portName); return Boolean(n?.ok) && !n.mismatch; } },
+          { id: 'gw', text: `The ${label} reaches its gateway`, check: (w) => reach(w, dev, gw) },
+        ],
       };
     },
   },

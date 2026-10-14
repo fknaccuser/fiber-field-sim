@@ -40,6 +40,8 @@ export function renderTopology(world, order, { onPick, current = null } = {}) {
   // Parallel cables between the same two devices fan out side by side.
   const pairs = {};
   for (const link of world.links) {
+    // A one-ended segment is a LAN the diagram does not draw.
+    if (link.ends.length !== 2) continue;
     const [a, b] = link.ends;
     const key = [a[0], b[0]].sort().join('|');
     (pairs[key] ??= []).push(link);

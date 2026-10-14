@@ -12,6 +12,8 @@ import { TEMPLATES, makeOrder } from './jobs.js';
 import { buildWorld, baselineOf, grade, requirementStates } from './grade.js';
 import { renderTopology } from './topology.js';
 import { createConsoles } from './console.js';
+import { WLC_TEMPLATES } from '../wlc/model.js';
+import { JSON_TEMPLATES } from '../json/work.js';
 import { branchById } from '../tree/ccna.js';
 
 function el(tag, cls, text) {
@@ -42,7 +44,7 @@ const byGroup = (a, b) => GROUPS.indexOf(groupOf(a.kind)) - GROUPS.indexOf(group
 // start = { kind, seed, fault?, mode } opens straight onto that order.
 // mode 'exam' is a sim inside the mock exam: no clock of its own (the mock
 // runs one), no way back, no note, and the grade goes to onSubmit unseen.
-export function createDesk({ getRecord, onRecord, onExit, start = null, onSubmit = null, examLabel = 'Simulation' } = {}) {
+export function createDesk({ getRecord, onRecord, onExit, onWlc = null, start = null, onSubmit = null, examLabel = 'Simulation' } = {}) {
   const root = el('section', 'desk');
   const ui = { view: 'queue', batch: TEMPLATES.map(t => ({ kind: t.kind, seed: newSeed() })).sort(byGroup), tab: 'order' };
   let run = null;
@@ -83,6 +85,22 @@ export function createDesk({ getRecord, onRecord, onExit, start = null, onSubmit
       row.append(btn('sk-go sk-go-small', 'Learning', () => openOrder(item, 'learn')), btn('sk-go sk-go-small ghost', `Sim · ${order.minutes} min`, () => openOrder(item, 'sim')));
       card.append(row);
       list.append(card);
+    }
+    // The wireless controller's orders run in its web GUI, not a console.
+    for (const [group, list, where] of onWlc ? [['Wireless controller', WLC_TEMPLATES, 'Controller GUI'], ['Automation', JSON_TEMPLATES, 'REST API']] : []) {
+      root.append(el('h2', 'desk-group', group));
+      const wl = el('div', 'desk-queue');
+      for (const t of list) {
+        const card = el('article', 'desk-card');
+        card.append(el('h2', null, t.title), el('p', 'desk-card-tags', `${where} · ${t.lights.map(b => branchById(b)?.name).filter(Boolean).join(' · ')}`));
+        const past = record.desk?.[t.kind];
+        if (past) card.append(el('p', 'desk-card-past', `Best ${past.best}%${past.bestSim !== null && past.bestSim !== undefined ? ` · best sim ${past.bestSim}%` : ''} · ${past.runs} run${past.runs === 1 ? '' : 's'}`));
+        const row = el('div', 'desk-card-go');
+        row.append(btn('sk-go sk-go-small', 'Learning', () => onWlc(t.kind, 'learn')), btn('sk-go sk-go-small ghost', `Sim · ${t.minutes} min`, () => onWlc(t.kind, 'sim')));
+        card.append(row);
+        wl.append(card);
+      }
+      root.append(wl);
     }
     root.append(btn('sk-back desk-reroll', 'New batch of orders', () => { ui.batch = TEMPLATES.map(t => ({ kind: t.kind, seed: newSeed() })).sort(byGroup); draw(); }));
   }

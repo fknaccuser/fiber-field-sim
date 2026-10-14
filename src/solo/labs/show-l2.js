@@ -5,7 +5,7 @@
 import { interfaceState, l2Of } from './world.js';
 import {
   keyOf, operMode, memberFlag, channelProtocol, formatVlanList, allowedHas, physState, peersOf,
-  macOf, isPo, shortName, kindOf,
+  macOf, isPo, shortName, kindOf, negotiate,
 } from './switching.js';
 import { formatIp } from './ip4.js';
 
@@ -82,8 +82,11 @@ export function showInterfacesStatus(world, d) {
     const gig = name.startsWith('Gig');
     const type = isPo(name) ? '' : gig ? '10/100/1000BaseTX' : '10/100BaseTX';
     const word = isPo(name) ? (st.up ? 'connected' : 'notconnect') : STATUS_WORD(st);
-    const duplex = st.up ? 'a-full' : 'auto';
-    const speed = st.up ? (gig || isPo(name) ? 'a-1000' : 'a-100') : 'auto';
+    const neg = st.up && !isPo(name) ? negotiate(world, d, name) : null;
+    const duplex = !st.up ? (intf.duplex && intf.duplex !== 'auto' ? intf.duplex : 'auto')
+      : neg?.ok ? (neg.autoDuplex ? `a-${neg.duplex}` : neg.duplex) : 'a-full';
+    const speed = !st.up ? (intf.speed && intf.speed !== 'auto' ? String(intf.speed) : 'auto')
+      : neg?.ok ? (neg.autoSpeed ? `a-${neg.speed}` : String(neg.speed)) : (gig || isPo(name) ? 'a-1000' : 'a-100');
     out.push(`${pad(shortName(name), 10)}${pad((intf.description ?? '').slice(0, 18), 19)}${pad(word, 13)}${pad(vlan, 11)}${pad(duplex, 7)}${pad(speed, 6)}${type}`);
   }
   return out.join('\n');
@@ -145,8 +148,21 @@ export function showInterface(world, d, name) {
   if (intf.description) lines.push(`  Description: ${intf.description}`);
   if (intf.ip !== null) lines.push(`  Internet address is ${formatIp(intf.ip)}/${maskLen(intf.mask)}`);
   lines.push(`  MTU 1500 bytes, BW ${name.startsWith('Fast') ? '100000' : '1000000'} Kbit/sec, DLY 10 usec,`);
-  if (intf.sw) lines.push(`  ${st.up ? 'Full-duplex' : 'Auto-duplex'}, ${st.up ? (name.startsWith('Fast') ? '100Mb/s' : '1000Mb/s') : 'Auto-speed'}, media type is 10/100BaseTX`);
-  lines.push('     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored', '     0 output errors, 0 collisions, 0 interface resets');
+  const neg = st.up && !name.startsWith('Vlan') && !name.startsWith('Port') ? negotiate(world, d, name) : null;
+  if (!name.startsWith('Vlan') && !name.startsWith('Loop')) {
+    const dup = neg?.ok ? `${neg.duplex === 'full' ? 'Full' : 'Half'}-duplex` : st.up ? 'Full-duplex' : 'Auto-duplex';
+    const spd = neg?.ok ? `${neg.speed}Mb/s` : st.up ? (name.startsWith('Fast') ? '100Mb/s' : '1000Mb/s') : 'Auto-speed';
+    lines.push(`  ${dup}, ${spd}, media type is ${name.startsWith('Fast') ? '10/100BaseTX' : '10/100/1000BaseTX'}`);
+  }
+  // A duplex mismatch shows on both ends: the full side counts CRC errors
+  // and runts from frames cut short, the half side counts late collisions.
+  const bad = neg?.ok && neg.mismatch;
+  const crc = bad && neg.duplex === 'full' ? 1847 : 0;
+  const late = bad && neg.duplex === 'half' ? 932 : 0;
+  lines.push(`     ${crc ? 214 : 0} runts, 0 giants, 0 throttles`);
+  lines.push(`     ${crc} input errors, ${crc} CRC, 0 frame, 0 overrun, 0 ignored`);
+  lines.push(`     ${late ? late + 61 : 0} output errors, ${late ? late + 61 : 0} collisions, 0 interface resets`);
+  lines.push(`     ${late} late collision, 0 deferred`);
   return lines.join('\n');
 }
 

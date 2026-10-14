@@ -11,10 +11,12 @@ import { CCNA_BANK } from '../study/questions.js';
 import { inBlueprint, sampleExam } from '../study/bank.js';
 import { labsForBranch } from '../labs/catalog.js';
 import { TEMPLATES } from '../desk/jobs.js';
+import { WLC_TEMPLATES } from '../wlc/model.js';
+import { JSON_TEMPLATES } from '../json/work.js';
 
 // Branches the Field desk can light: builds and changes light Do, repair
 // tickets light Fix.
-const DESK_DO = new Set(TEMPLATES.filter(t => !t.kind.startsWith('repair')).flatMap(t => t.lights));
+const DESK_DO = new Set([...TEMPLATES, ...WLC_TEMPLATES, ...JSON_TEMPLATES].filter(t => !t.kind.startsWith('repair')).flatMap(t => t.lights));
 const DESK_FIX = new Set(TEMPLATES.filter(t => t.kind.startsWith('repair')).flatMap(t => t.lights));
 export const deskLights = (branchId, tier) => (tier === 'fix' ? DESK_FIX : DESK_DO).has(branchId);
 

@@ -430,7 +430,7 @@ test.describe('Do labs', () => {
   test('the Field desk takes a work order from the queue to a grade', async ({ page }) => {
     await enableMap(page);
     await page.click('.sk-dock-btn.is-field');
-    await expect(page.locator('.desk-group')).toHaveText(['Switch builds', 'Router builds', 'Changes', 'Trouble tickets']);
+    await expect(page.locator('.desk-group')).toHaveText(['Switch builds', 'Router builds', 'Changes', 'Trouble tickets', 'Wireless controller', 'Automation']);
     await page.locator('.desk-card', { hasText: 'Lock a switch down to SSH' }).locator('.sk-go:has-text("Learning")').click();
     await expect(page.locator('.desk-req')).toHaveCount(6);
     // Help shows the exact commands; type them on the console tab.
@@ -567,3 +567,126 @@ test.describe('Map home', () => {
   });
 });
 
+
+test.describe('Exam rehearsal', () => {
+  // Answer whatever is on screen, the quickest legal way, and move on.
+  async function answerItem(page) {
+    const kind = (await page.locator('.mk-kind').textContent()).trim();
+    if (kind === 'Simulation') { await page.click('.desk-submit'); await page.click('.desk-confirm'); return kind; }
+    if (kind === 'Simlet') {
+      for (const q of await page.locator('.simlet-q').all()) await q.locator('.simlet-choice').first().click();
+      await page.click('.desk-submit'); await page.click('.desk-confirm');
+      return kind;
+    }
+    if (await page.locator('.dd').count()) {
+      while (await page.locator('.dd-tray .dd-chip').count()) {
+        await page.locator('.dd-tray .dd-chip').first().click();
+        const empty = page.locator('.dd-slot:not(:has(.dd-chip))').first();
+        await (await empty.count() ? empty : page.locator('.dd-slot').first()).locator('.dd-slot-label').click();
+      }
+    } else {
+      const label = await page.locator('.mk-next').textContent();
+      const need = /\/(\d+)/.exec(label)?.[1];
+      for (let k = 0; k < (need ? Number(need) : 1); k += 1) await page.locator('.ep-choice').nth(k).click();
+    }
+    await page.click('.mk-next');
+    return kind;
+  }
+
+  test('a half mock runs forward only under one clock, resumes after a reload, and scores by domain', async ({ page }) => {
+    test.setTimeout(240000);
+    await enableMap(page);
+    await page.click('.sk-dock-btn.is-exam');
+    await expect(page.locator('.ep-ready')).toBeVisible();
+    await page.click('.ep-go:has-text("Half mock")');
+    await expect(page.locator('.mk-rules')).toContainText('One direction only');
+    await page.click('.ep-go:has-text("Start the clock")');
+    await expect(page.locator('.mk-clock')).toHaveText(/^(59|60):\d\d$/);
+    await expect(page.locator('.sk-back:has-text("Back"), .ep-quit')).toHaveCount(0);
+    for (let i = 0; i < 3; i += 1) await answerItem(page);
+    await expect(page.locator('.mk-count')).toHaveText(/^4 \//);
+    // Closing the app does not stop the clock or lose the place.
+    await page.reload();
+    await page.fill('#opening-command', 'enable');
+    await page.press('#opening-command', 'Enter');
+    await page.click('.sk-dock-btn.is-exam');
+    await page.click('.ep-go:has-text("Resume half mock · item 4")');
+    await expect(page.locator('.mk-count')).toHaveText(/^4 \//);
+    const kinds = new Set();
+    while (await page.locator('.mk-bar').count()) kinds.add(await answerItem(page));
+    expect([...kinds].sort()).toEqual(['Question', 'Simlet', 'Simulation']);
+    await expect(page.locator('.mk-pct')).toBeVisible();
+    await expect(page.locator('.mk-dom')).toHaveCount(6);
+    await page.click('.ep-go:has-text("Back to exam prep")');
+    await expect(page.locator('.ep-foot', { hasText: /^Last mock \d+%/ })).toBeVisible();
+  });
+
+  test('a simlet is answered from show commands and explained after Check', async ({ page }) => {
+    await enableMap(page);
+    await page.click('.sk-dock-btn.is-exam');
+    await page.click('.ep-go:has-text("Simlet")');
+    await page.click('.desk-tab[data-tab="console"]');
+    for (const l of ['en', 'show running-config']) { await page.fill('#simlet-cmd', l); await page.press('#simlet-cmd', 'Enter'); }
+    await expect(page.locator('.lab-screen')).toContainText('hostname');
+    await page.click('.desk-tab[data-tab="questions"]');
+    for (const q of await page.locator('.simlet-q').all()) await q.locator('.simlet-choice').first().click();
+    await page.click('.desk-submit');
+    await page.click('.desk-confirm');
+    await expect(page.locator('.simlet-score')).toHaveText(/\d of \d right/);
+    await expect(page.locator('.simlet-explain').first()).toBeVisible();
+  });
+
+  test('a guest WLAN built through the controller GUI scores 100', async ({ page }) => {
+    await enableMap(page);
+    await page.click('.sk-dock-btn.is-field');
+    await page.locator('.desk-card', { hasText: 'Put a guest WLAN' }).locator('.sk-go:has-text("Learning")').click();
+    const notes = await page.locator('.desk-notes').textContent();
+    const reqs = await page.locator('.desk-reqs').textContent();
+    const vlan = /Guest VLAN (\d+)/.exec(notes)[1];
+    const [, net] = /: (\d+\.\d+\.\d+)\.0\/24/.exec(notes);
+    // The notes are list items, so their text runs together: read each
+    // value up to where the next note starts.
+    const [, ssid, id, profile] = /SSID (\S+), WLAN ID (\d+), profile (.+?)Passphrase/.exec(notes);
+    const pass = /Passphrase (\S+?)(?=Controller|$)/.exec(notes)[1];
+    const ifName = /dynamic interface "([^"]+)"/.exec(reqs)[1];
+    const qos = /QoS to (\w+)/.exec(reqs)[1].toLowerCase();
+    await page.click('.desk-tab[data-tab="gui"]');
+    await page.click('.wlc-tab[data-page="controller"]');
+    await page.click('.wlc-btn:has-text("New")');
+    await page.fill('.wlc-field:has-text("Interface Name") input', ifName);
+    await page.fill('.wlc-field:has-text("VLAN Id") input', vlan);
+    await page.click('.wlc-btn:has-text("Apply")');
+    for (const [label, value] of [['Port Number', '1'], ['IP Address', `${net}.5`], ['Netmask', '255.255.255.0'], ['Gateway', `${net}.1`], ['Primary DHCP Server', `${net}.1`]]) {
+      await page.fill(`.wlc-field:has-text("${label}") input`, value);
+    }
+    await page.click('.wlc-btn:has-text("Apply")');
+    await page.click('.wlc-tab[data-page="wlans"]');
+    await page.click('.wlc-btn:has-text("Create New")');
+    await page.fill('.wlc-field:has-text("Profile Name") input', profile);
+    await page.fill('.wlc-field:has-text("SSID") input', ssid);
+    await page.selectOption('.wlc-field:has-text("ID") select', id);
+    await page.click('.wlc-btn:has-text("Apply")');
+    await page.check('.wlc-check:has-text("Status") input');
+    await page.selectOption('.wlc-field:has-text("Interface") select', ifName);
+    await page.click('.wlc-subtab[data-sub="security"]');
+    await page.selectOption('.wlc-field:has-text("Auth Key Management") select', 'psk');
+    await page.fill('.wlc-field:has-text("PSK") input', pass);
+    await page.click('.wlc-subtab[data-sub="qos"]');
+    await page.selectOption('.wlc-field:has-text("Quality of Service") select', qos);
+    await page.click('.wlc-btn:has-text("Apply")');
+    await page.click('.desk-tab[data-tab="order"]');
+    await expect(page.locator('.desk-req.is-done')).toHaveCount(6);
+    await page.click('.desk-submit');
+    await expect(page.locator('.desk-pct')).toHaveText('100%');
+  });
+
+  test('the API workspace says at once whether a payload parses', async ({ page }) => {
+    await enableMap(page);
+    await page.click('.sk-dock-btn.is-field');
+    await page.locator('.desk-card', { hasText: 'controller API' }).locator('.sk-go:has-text("Learning")').click();
+    await page.click('.desk-tab[data-tab="work"]');
+    await expect(page.locator('.jw-editor').nth(1).locator('.jw-bad')).toContainText('Does not parse');
+    await page.fill('.jw-text[data-field="body"]', '{"vlan": {"id": 40, "name": "SALES", "shutdown": false}}');
+    await expect(page.locator('.jw-editor').first().locator('.jw-ok')).toHaveText('Valid JSON');
+  });
+});

@@ -223,6 +223,8 @@ export function runningConfig(dev) {
     const i = c.interfaces[n];
     L.push(`interface ${n}`);
     if (i.description) L.push(` description ${i.description}`);
+    if (i.speed && i.speed !== 'auto') L.push(` speed ${i.speed}`);
+    if (i.duplex && i.duplex !== 'auto') L.push(` duplex ${i.duplex}`);
     if (i.sw) {
       L.push(...switchportLines(i.sw));
       if (i.shutdown) L.push(' shutdown');
@@ -1187,6 +1189,19 @@ const IFACE_COMMON = [
   }, { key: 'shutdown', no: (_, s) => { here(s).shutdown = false; } }),
   cmd(['description', W('text', 'rest')], ({ text }, s) => { here(s).description = text; return { out: '' }; }, { key: 'description', no: (_, s) => { here(s).description = null; }, noShape: ['description', W('text', 'rest', { opt: true })] }),
   cmd(['cdp', 'enable'], (_, s) => { here(s).cdp = true; return { out: '' }; }, { key: 'cdp enable', no: (_, s) => { here(s).cdp = false; } }),
+  cmd(['speed', ALT('v', ['10', '100', '1000', 'auto'])], ({ v }, s) => {
+    const name = s.ctx.intf;
+    if (!/^(Fast|Gigabit)Ethernet/.test(name) || isSub(name)) return { out: invalidAt(s, 0) };
+    if (v === '1000' && name.startsWith('Fast')) return { out: invalidAt(s, s.line.search(/\S+\s*$/)) };
+    here(s).speed = v === 'auto' ? 'auto' : Number(v);
+    return { out: '' };
+  }, { key: 'speed', no: (_, s) => { here(s).speed = 'auto'; }, noShape: ['speed', W('v', 'word', { opt: true })] }),
+  cmd(['duplex', ALT('v', ['auto', 'full', 'half'])], ({ v }, s) => {
+    const name = s.ctx.intf;
+    if (!/^(Fast|Gigabit)Ethernet/.test(name) || isSub(name)) return { out: invalidAt(s, 0) };
+    here(s).duplex = v;
+    return { out: '' };
+  }, { key: 'duplex', no: (_, s) => { here(s).duplex = 'auto'; }, noShape: ['duplex', W('v', 'word', { opt: true })] }),
   END,
   cmd(['exit'], (_, s) => { s.mode = 'config'; s.ctx = {}; return { out: '' }; }, { once: true }),
 ];

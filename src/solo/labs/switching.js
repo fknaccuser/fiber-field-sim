@@ -72,6 +72,52 @@ export function peersOf(world, d, i) {
 
 export const kindOf = (world, d) => world.devices[d]?.kind ?? 'router';
 
+// ---------- speed and duplex ----------
+// Each end of a cable is speed auto|10|100|1000 and duplex auto|half|full.
+// IOS keeps autonegotiation on unless both are hard-set. Two negotiating
+// ends agree on the fastest common speed and full duplex. A negotiating end
+// facing a hard-set one senses the speed but cannot learn the duplex, so it
+// falls back to half at 10 and 100: the classic duplex mismatch. Two
+// hard-set ends at different speeds never bring the link up.
+const capOf = (name) => (name.startsWith('Fast') ? 100 : 1000);
+const SPEEDS = [10, 100, 1000];
+const endOf = (world, d, i) => {
+  const intf = world.devices[d]?.config.interfaces[i];
+  const speed = intf?.speed ?? 'auto';
+  const duplex = intf?.duplex ?? 'auto';
+  return { speed, duplex, cap: capOf(i), auto: speed === 'auto' || duplex === 'auto' };
+};
+
+// negotiate(world, d, i) -> null (no cable to a single far end) or
+// { ok, speed, duplex, peerDuplex, mismatch, autoSpeed, autoDuplex }
+export function negotiate(world, d, i) {
+  const link = linkOf(world, d, i);
+  if (!link || link.segment || link.ends.length !== 2) return null;
+  const [od, oi] = link.ends.find(([a, b]) => !(a === d && b === i));
+  const me = endOf(world, d, i);
+  const them = endOf(world, od, oi);
+  const can = (e) => (e.speed === 'auto' ? SPEEDS.filter(x => x <= e.cap) : [Number(e.speed)]);
+  const common = can(me).filter(x => can(them).includes(x));
+  let speed;
+  if (me.auto && them.auto) speed = common.length ? Math.max(...common) : null;
+  else if (!me.auto && !them.auto) speed = Number(me.speed) === Number(them.speed) ? Number(me.speed) : null;
+  else {
+    // Parallel detection: the negotiating end takes the fixed end's speed.
+    const fixed = me.auto ? them : me;
+    const flex = me.auto ? me : them;
+    speed = can(flex).includes(Number(fixed.speed)) ? Number(fixed.speed) : null;
+  }
+  if (speed === null) return { ok: false };
+  const duplexOf = (e, other) => {
+    if (e.duplex !== 'auto') return e.duplex;
+    if (other.auto) return other.duplex === 'half' ? 'half' : 'full';
+    return speed >= 1000 ? 'full' : 'half';
+  };
+  const duplex = duplexOf(me, them);
+  const peerDuplex = duplexOf(them, me);
+  return { ok: true, speed, duplex, peerDuplex, mismatch: duplex !== peerDuplex, autoSpeed: me.speed === 'auto', autoDuplex: me.duplex === 'auto' };
+}
+
 // A port's own state: shut, err-disabled, no cable, or a cable to something
 // that is itself shut.
 export function physState(world, d, i) {
@@ -87,6 +133,7 @@ export function physState(world, d, i) {
   const pdev = other && world.devices[other[0]];
   const peer = pdev?.config.interfaces[other[1]];
   if (!peer || peer.shutdown || pdev.err?.[other[1]]) return DOWN;
+  if (negotiate(world, d, i)?.ok === false) return DOWN;
   return UP;
 }
 

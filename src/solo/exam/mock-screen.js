@@ -312,7 +312,15 @@ export function createMockScreen({ format = 'full', blueprint = 'v1', resume = n
     }
     root.className = 'exam-mock skillmap is-lab is-desk';
     root.append(examBar());
-    root.append(item.type === 'sim' ? mountSim(item) : mountSimlet(item));
+    try {
+      root.append(item.type === 'sim' ? mountSim(item) : mountSimlet(item));
+    } catch (e) {
+      // A broken item must not strand the paper: say so and let it be skipped.
+      const box = el('section', 'desk-pane');
+      box.append(el('p', 'desk-summary', 'This item failed to load. It will be scored as zero.'), el('p', 'desk-small', String(e?.message ?? e)));
+      box.append(btn('sk-go', 'Skip it', () => record(item.type === 'sim' ? { pct: 0, domain: item.domain } : { right: 0, total: 4, domain: item.domain })));
+      root.append(box);
+    }
   }
 
   root.destroy = () => { stop(); child?.destroy?.(); };

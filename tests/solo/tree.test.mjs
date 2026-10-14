@@ -69,7 +69,8 @@ test('fix lights come from tickets: clean is mastered, with help is practiced', 
   assert.equal(tierState(branch, 'fix', { completedRuns: helped, now: NOW }).state, 'practiced');
   const clean = [...helped, { mode: 'repair', recipes: ['V1'], assisted: false, completedAt: new Date(NOW).toISOString() }];
   assert.equal(tierState(branch, 'fix', { completedRuns: clean, now: NOW }).state, 'mastered');
-  assert.equal(tierState(branchById('t3-ospf'), 'fix', { now: NOW }).state, 'soon', 'no OSPF tickets yet');
+  assert.equal(tierState(branchById('t3-ospf'), 'fix', { now: NOW }).state, 'off', 'OSPF tickets light it now');
+  for (const b of CCNA_MAP.trees.flatMap(t => t.branches)) assert.notEqual(tierState(b, 'fix', { now: NOW }).state, 'soon', `${b.id} Fix has nothing behind it`);
   assert.equal(tierState(branchById('t6-ai'), 'fix', { now: NOW }).state, 'none');
 });
 
