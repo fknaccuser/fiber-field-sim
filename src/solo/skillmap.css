@@ -617,3 +617,7 @@
 .sb-theirs { padding: 0 2px; }
 .desk-card.is-sandbox { border-color: rgb(242 193 46 / 0.35); }
 .sb-level { font: 700 11px var(--font-mono); color: var(--sk-light); letter-spacing: .08em; }
+.sk-capstone { border-color: rgb(242 193 46 / 0.45); }
+.sk-capstone .sk-final-text b { color: var(--sk-light); }
+.sk-quiz { opacity: .92; }
+.cap-score .desk-pct { font-size: 40px; }

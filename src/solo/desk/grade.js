@@ -9,7 +9,7 @@ const G3 = ['GigabitEthernet0/0', 'GigabitEthernet0/1', 'GigabitEthernet0/2'];
 
 export function buildWorld(order) {
   const make = (d) => (d.kind === 'switch' ? makeSwitch(d.id, { mac: order.macs?.[d.id] ?? null })
-    : d.kind === 'pc' ? makePc(d.id, d.pc ?? {}) : makeDevice(d.id, G3));
+    : d.kind === 'pc' ? makePc(d.id, d.pc ?? {}) : makeDevice(d.id, d.ports ?? G3));
   const world = makeWorld(order.devices.map(make), order.links);
   for (const [id, lines] of Object.entries(order.setup ?? {})) {
     const s = createSession(world, id);

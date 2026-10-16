@@ -256,6 +256,7 @@ export function runningConfig(dev) {
     L.push(`router ospf ${c.ospf.pid}`);
     if (c.ospf.routerId) L.push(` router-id ${formatIp(c.ospf.routerId)}`);
     for (const p of c.ospf.passive) L.push(` passive-interface ${p}`);
+    if (c.ospf.defaultOriginate) L.push(' default-information originate');
     for (const n of c.ospf.networks) L.push(` network ${formatIp(n.ip)} ${formatIp(n.wildcard)} area ${n.area}`);
     L.push('!');
   }
@@ -307,6 +308,7 @@ function showIpRoute(world, deviceId, filter = null) {
   const line = (r, indent) => {
     let code = typeCode[r.type];
     if (r.net === 0 && r.len === 0) code += '*';
+    if (r.ext) code += r.ext;
     const prefix = `${formatIp(r.net)}/${r.len}`;
     const lead = pad(code, indent);
     if (r.type === 'connected' || r.type === 'local') return [`${lead}${prefix} is directly connected, ${r.hops[0].intf}`];
@@ -1535,6 +1537,7 @@ const ROUTER = [
     const target = (parseIp(ip) & (~parseIp(wild) >>> 0)) >>> 0;
     o.networks = o.networks.filter(x => !(x.ip === target && x.wildcard === parseIp(wild)));
   }, noShape: ['network', W('ip', 'ip'), W('wild', 'wild'), 'area', W('area', 'num')] }),
+  cmd(['default-information', 'originate'], (_, s) => { s.dev.config.ospf.defaultOriginate = true; return { out: '' }; }, { key: 'default-information originate', no: (_, s) => { s.dev.config.ospf.defaultOriginate = false; } }),
   cmd(['passive-interface', W('name', 'intf')], ({ name }, s) => {
     const o = s.dev.config.ospf;
     if (!s.dev.config.interfaces[name]) return { out: invalidAt(s, s.line.search(/\S+\s*$/)) };

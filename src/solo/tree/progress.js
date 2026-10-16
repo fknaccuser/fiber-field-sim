@@ -32,7 +32,7 @@ export const FINAL_SIZE = 50;
 export const EXAM_PASS = 0.85;
 
 export function emptyRecord() {
-  return { know: {}, labs: {}, exams: {}, final: null, seen: {}, desk: {}, deskDo: {}, deskFix: {} };
+  return { know: {}, labs: {}, exams: {}, capstones: {}, final: null, seen: {}, desk: {}, deskDo: {}, deskFix: {} };
 }
 
 export function normalizeRecord(raw) {
@@ -41,6 +41,7 @@ export function normalizeRecord(raw) {
     know: r.know && typeof r.know === 'object' ? r.know : {},
     labs: r.labs && typeof r.labs === 'object' ? r.labs : {},
     exams: r.exams && typeof r.exams === 'object' ? r.exams : {},
+    capstones: r.capstones && typeof r.capstones === 'object' ? r.capstones : {},
     final: r.final && typeof r.final === 'object' ? r.final : null,
     seen: r.seen && typeof r.seen === 'object' ? r.seen : {},
     desk: r.desk && typeof r.desk === 'object' ? r.desk : {},
@@ -177,14 +178,17 @@ export function mapProgress(ctx, map = CCNA_MAP) {
     const lights = branches.reduce((n, b) => n + b.mastered, 0);
     const possible = branches.reduce((n, b) => n + b.testable, 0);
     const exam = record.exams[tree.id] ?? null;
-    const examFresh = exam?.passed ? freshness(exam.at, ctx.now ?? Date.now()) : 0;
+    // The capstone crowns a tree; the tree quiz only lights Know.
+    const capstone = record.capstones?.[tree.id] ?? null;
+    const capFresh = capstone?.passed ? freshness(capstone.at, ctx.now ?? Date.now()) : 0;
     return {
       id: tree.id,
       branches,
       lights,
       possible,
       complete: branches.every(b => b.complete),
-      crowned: Boolean(exam?.passed) && examFresh > 0,
+      crowned: Boolean(capstone?.passed) && capFresh > 0,
+      capstone,
       exam,
     };
   });
@@ -257,6 +261,17 @@ function creditBranches(record, deck, at) {
     if (branch && branch.tiers.includes('know')) know[branch.id] = { state: 'mastered', at, source: 'exam' };
   }
   return know;
+}
+
+// A capstone run: crowned when every outcome test passes. The best pass is
+// kept; a later failed run does not take the crown away while it is fresh.
+export function recordCapstone(record, treeId, { passed, got, total }, now = Date.now()) {
+  const at = new Date(now).toISOString();
+  const prior = record.capstones?.[treeId];
+  const runs = (prior?.runs ?? 0) + 1;
+  const run = { passed, got, total, at, runs };
+  const keep = prior?.passed && !passed ? { ...prior, runs, last: { passed, got, total, at } } : run;
+  return { ...record, capstones: { ...(record.capstones ?? {}), [treeId]: keep } };
 }
 
 export function recordTreeExam(record, treeId, deck, { right, total }, now = Date.now()) {

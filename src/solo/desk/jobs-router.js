@@ -517,7 +517,6 @@ export const ROUTER_TEMPLATES = [
         CORE: ['hostname CORE', 'interface g0/0', `ip address ${t}.2 255.255.255.252`, 'no shutdown', 'interface g0/1', `ip address ${t}.6 255.255.255.252`, 'no shutdown', 'interface loopback0', 'ip address 10.255.255.1 255.255.255.255', 'exit',
           `ip route ${lan} ${M24} ${t}.1`, `ip route ${lan} ${M24} ${t}.5 5`],
       };
-      const leadIp = lead === ra ? aIp : bIp;
       const other = lead === ra ? rb : ra;
       const h = (w, d) => port(w, d, 'GigabitEthernet0/0').hsrp?.[g];
       const reqs = [

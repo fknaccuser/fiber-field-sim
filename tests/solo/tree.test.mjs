@@ -98,6 +98,18 @@ test('a tree exam covers every branch with questions and a pass credits what it 
   assert.equal(rec.know['t2-vlans'].source, 'exam');
   rec = recordTreeExam(rec, 't2', deck, { right: 5, total: 20 }, NOW);
   assert.equal(rec.exams.t2.passed, true, 'a later fail keeps the earlier pass');
+  assert.equal(mapProgress({ record: rec, now: NOW }).trees.find(t => t.id === 't2').crowned, false, 'the quiz lights Know but does not crown');
+});
+
+test('the CLI capstone crowns a tree, keeps the crown through a later fail, and fades like a light', async () => {
+  const { recordCapstone } = await import('../../src/solo/tree/progress.js');
+  let rec = recordCapstone(emptyRecord(), 't2', { passed: false, got: 4, total: 6 }, NOW);
+  assert.equal(mapProgress({ record: rec, now: NOW }).trees.find(t => t.id === 't2').crowned, false);
+  rec = recordCapstone(rec, 't2', { passed: true, got: 6, total: 6 }, NOW);
+  assert.equal(mapProgress({ record: rec, now: NOW }).trees.find(t => t.id === 't2').crowned, true);
+  rec = recordCapstone(rec, 't2', { passed: false, got: 2, total: 6 }, NOW);
+  assert.equal(mapProgress({ record: rec, now: NOW }).trees.find(t => t.id === 't2').crowned, true, 'a later fail keeps it');
+  assert.equal(mapProgress({ record: rec, now: NOW + 60 * DAY }).trees.find(t => t.id === 't2').crowned, false, 'it fades');
 });
 
 test('the final is 50 questions weighted like the real exam', () => {

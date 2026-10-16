@@ -17,6 +17,7 @@ import { parseIp } from '../labs/ip4.js';
 import { ROUTER_TEMPLATES } from './jobs-router.js';
 import { REPAIR_TEMPLATES } from './jobs-repair.js';
 import { IPV6_TEMPLATES } from './jobs-ipv6.js';
+import { CAPSTONES } from '../capstone/capstones.js';
 
 const ip = parseIp;
 const NIC = 'FastEthernet0';
@@ -394,7 +395,8 @@ export const TEMPLATES = [
 
 TEMPLATES.push(...ROUTER_TEMPLATES, ...IPV6_TEMPLATES, ...REPAIR_TEMPLATES);
 
-export const templateOf = (kind) => TEMPLATES.find(t => t.kind === kind) ?? null;
+// Capstones open through the same desk, but are not work orders in the queue.
+export const templateOf = (kind) => TEMPLATES.find(t => t.kind === kind) ?? CAPSTONES.find(t => t.kind === kind) ?? null;
 
 export function makeOrder(kind, seed, opts = {}) {
   const t = templateOf(kind);

@@ -323,7 +323,19 @@ function ospfRoutes(world, deviceId) {
       else if (metric === prior.metric) for (const h of first[rid]) if (!prior.hops.some(x => x.nh === h.nh)) prior.hops.push(h);
     }
   }
-  return [...best.values()].map(r => ({ type: 'ospf', net: r.net, len: r.len, ad: AD.ospf, metric: r.metric, hops: r.hops.map(h => ({ nh: h.nh, intf: h.intf })) }));
+  // default-information originate: a router with its own default route
+  // advertises 0.0.0.0/0 into OSPF as an external (E2) route, metric 1.
+  let def = null;
+  for (const [rid, d] of Object.entries(dist)) {
+    if (rid === deviceId || !world.devices[rid].config.ospf?.defaultOriginate) continue;
+    const hasDefault = staticRoutes(world, rid, connectedRoutes(world, rid)).some(r => r.net === 0 && r.len === 0);
+    if (!hasDefault) continue;
+    if (!def || d < def.d) def = { d, hops: [...first[rid]] };
+    else if (d === def.d) for (const h of first[rid]) if (!def.hops.some(x => x.nh === h.nh)) def.hops.push(h);
+  }
+  const out = [...best.values()].map(r => ({ type: 'ospf', net: r.net, len: r.len, ad: AD.ospf, metric: r.metric, hops: r.hops.map(h => ({ nh: h.nh, intf: h.intf })) }));
+  if (def) out.push({ type: 'ospf', ext: 'E2', net: 0, len: 0, ad: AD.ospf, metric: 1, hops: def.hops.map(h => ({ nh: h.nh, intf: h.intf })) });
+  return out;
 }
 
 // ---------- the routing table ----------

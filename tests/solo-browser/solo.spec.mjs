@@ -690,3 +690,38 @@ test.describe('Exam rehearsal', () => {
     await expect(page.locator('.jw-editor').first().locator('.jw-ok')).toHaveText('Valid JSON');
   });
 });
+
+test.describe('CLI first', () => {
+  test('the sandbox keeps what you typed after you leave and come back', async ({ page }) => {
+    await enableMap(page);
+    await page.click('.sk-dock-btn.is-field');
+    await expect(page.locator('.desk-group').first()).toHaveText('Sandbox · free practice');
+    await page.locator('.desk-card', { hasText: 'One router, one switch' }).locator('.sk-go').click();
+    await page.click('.desk-tab[data-tab="console"]');
+    await page.click('.lab-tab[data-device="SW1"]');
+    for (const l of ['en', 'conf t', 'hostname SW-LAB', 'vlan 10', 'name SALES', 'end']) { await page.fill('#sandbox-cmd', l); await page.press('#sandbox-cmd', 'Enter'); }
+    await page.click('.sk-back:has-text("Back")');
+    await expect(page.locator('.desk-card', { hasText: 'One router, one switch' }).locator('.sk-go')).toHaveText('Continue');
+    await page.locator('.desk-card', { hasText: 'One router, one switch' }).locator('.sk-go').click();
+    await page.click('.desk-tab[data-tab="console"]');
+    await page.click('.lab-tab[data-device="SW1"]');
+    for (const l of ['en', 'show vlan brief']) { await page.fill('#sandbox-cmd', l); await page.press('#sandbox-cmd', 'Enter'); }
+    await expect(page.locator('.lab-screen')).toContainText('SALES');
+    await expect(page.locator('.lab-prompt')).toHaveText('SW-LAB#');
+  });
+
+  test('a tree capstone gives goals only, and tests the network on submit', async ({ page }) => {
+    await enableMap(page);
+    await page.click('.sk-back:has-text("Map")');
+    await page.click('.sk-node[data-tree="t2"]');
+    await page.click('.sk-capstone .sk-go');
+    await expect(page.locator('.desk-h', { hasText: 'Goals' })).toBeVisible();
+    await expect(page.locator('.desk-hint-btn')).toHaveCount(0);
+    await expect(page.locator('.lab-check')).toHaveCount(0);
+    await page.click('.desk-submit');
+    await page.click('.desk-confirm');
+    await expect(page.locator('.cap-score .desk-pct')).toHaveText(/^0 of \d+$/);
+    await page.click('.sk-go:has-text("Back to the network")');
+    await expect(page.locator('.desk-h', { hasText: 'Goals' })).toBeVisible();
+  });
+});

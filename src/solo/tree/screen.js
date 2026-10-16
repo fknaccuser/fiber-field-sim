@@ -12,7 +12,7 @@
 import { CCNA_MAP, TIERS, treeById, branchById } from './ccna.js';
 import {
   emptyRecord, normalizeRecord, mapProgress, knowCheckDeck, treeExamDeck, finalDeck,
-  recordKnowCheck, recordTreeExam, recordFinal, recordLab, recordDesk, deskLights, newlyLit, markSeen, nextStep,
+  recordKnowCheck, recordTreeExam, recordFinal, recordLab, recordDesk, recordCapstone, deskLights, newlyLit, markSeen, nextStep,
   EXAM_PASS, KNOW_CHECK_SIZE, TREE_EXAM_SIZE, FINAL_SIZE,
 } from './progress.js';
 import { codeForRecipe } from '../study/hub.js';
@@ -26,6 +26,7 @@ import { createWlcScreen } from '../wlc/screen.js';
 import { JSON_TEMPLATES } from '../json/work.js';
 import { createJsonScreen } from '../json/screen.js';
 import { createSandbox } from '../sandbox/screen.js';
+import { capstoneFor } from '../capstone/capstones.js';
 
 // Work orders that run in their own screen rather than on consoles.
 const EXTRA_ORDERS = [...WLC_TEMPLATES, ...JSON_TEMPLATES];
@@ -192,8 +193,8 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
     const tree = treeById(treeId);
     const deck = treeExamDeck(treeId);
     quiz(deck, {
-      label: `Tree exam · ${tree.name}`,
-      result: ({ pct }) => (pct >= EXAM_PASS * 100 ? `Passed. ${tree.name} is crowned, and every branch it covered lights Know.` : `${Math.round(EXAM_PASS * 100)}% passes. Light more of the tree's branches, then try again.`),
+      label: `Tree quiz · ${tree.name}`,
+      result: ({ pct }) => (pct >= EXAM_PASS * 100 ? `Passed. Every branch it covered lights Know. The capstone crowns ${tree.name}.` : `${Math.round(EXAM_PASS * 100)}% passes. Light more of the tree's branches, then try again.`),
       onFinish: (score) => { record = recordTreeExam(record, treeId, deck, score); },
     });
   }
@@ -260,6 +261,36 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
     if (!t) return;
     const mode = modeFor(record.deskDo?.[branchId]);
     if (EXTRA_ORDERS.includes(t)) openWlc(t.kind, mode); else openDesk({ kind: t.kind, seed: freshSeed(), mode });
+  }
+
+  // A tree's capstone: the desk in capstone mode, or for Automation the API
+  // work order as a sim, which crowns at 100 with no help.
+  function startCapstone(treeId) {
+    const cap = capstoneFor(treeId);
+    if (!cap) {
+      ui.deskEl?.destroy?.();
+      ui.back = 'tree';
+      ui.deskEl = createJsonScreen({
+        kind: 'json-api', seed: freshSeed(), mode: 'sim',
+        onRecord: (r) => { record = recordDesk(record, r); record = recordCapstone(record, treeId, { passed: r.pct === 100 && !r.helped, got: Math.round(r.pct / 25), total: 4 }); save(); },
+        onExit: () => { ui.deskEl?.destroy?.(); ui.deskEl = null; ui.view = 'tree'; draw(); window.scrollTo?.(0, 0); },
+      });
+      ui.view = 'desk';
+      draw();
+      window.scrollTo?.(0, 0);
+      return;
+    }
+    ui.deskEl?.destroy?.();
+    ui.back = 'tree';
+    ui.deskEl = createDesk({
+      start: { kind: cap.kind, seed: freshSeed(), mode: 'capstone' },
+      getRecord: () => record,
+      onRecord: (r) => { record = recordCapstone(record, treeId, r); save(); },
+      onExit: () => { ui.deskEl?.destroy?.(); ui.deskEl = null; ui.view = 'tree'; draw(); window.scrollTo?.(0, 0); },
+    });
+    ui.view = 'desk';
+    draw();
+    window.scrollTo?.(0, 0);
   }
 
   // The sandbox: free practice on a prebuilt network, saved as you go.
@@ -506,14 +537,25 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
     });
     root.append(spine);
 
+    // The capstone crowns the tree: a CLI build tested only on outcomes.
+    const cap = capstoneFor(tree.id);
+    const capRow = el('section', `sk-final sk-capstone${t.crowned ? ' is-passed' : ''}`);
+    const ctext = el('div', 'sk-final-text');
+    ctext.append(el('b', null, t.crowned ? 'Capstone · crowned' : 'Capstone'));
+    const past = t.capstone;
+    const what = cap ? cap.title : 'The API work order, as a sim, no help';
+    ctext.append(el('span', null, `${what}. ${past ? (past.passed ? 'Passed. ' : `Last run ${past.last?.got ?? past.got} of ${past.last?.total ?? past.total}. `) : ''}No ticks, no hints: the network is tested when you submit, and every goal must hold.`));
+    capRow.append(ctext, btn('sk-go', past?.passed ? 'Build it again' : 'Start', () => startCapstone(tree.id)));
+    root.append(capRow);
+
     const knowLit = t.branches.filter(b => b.tiers.know.state === 'mastered').length;
-    const exam = el('section', `sk-final${t.crowned ? ' is-passed' : ''}`);
+    const exam = el('section', 'sk-final sk-quiz');
     const text = el('div', 'sk-final-text');
-    text.append(el('b', null, 'Tree exam'));
+    text.append(el('b', null, 'Tree quiz'));
     const note = t.exam ? `Best ${t.exam.right}/${t.exam.total}${t.exam.passed ? ', passed' : ''}. ` : '';
-    const warn = knowLit < t.branches.length / 2 ? 'Likely too hard yet; passing anyway lights what it covers.' : `${TREE_EXAM_SIZE} questions, ${Math.round(EXAM_PASS * 100)}% passes.`;
+    const warn = knowLit < t.branches.length / 2 ? 'Likely too hard yet; passing anyway lights Know on what it covers.' : `${TREE_EXAM_SIZE} questions, ${Math.round(EXAM_PASS * 100)}% lights Know on every branch it covers.`;
     text.append(el('span', null, note + warn));
-    exam.append(text, btn('sk-go', 'Take it', () => startTreeExam(tree.id)));
+    exam.append(text, btn('sk-go ghost', 'Take it', () => startTreeExam(tree.id)));
     root.append(exam);
 
     if (ui.branchId) drawBranchSheet(p, tree, t);

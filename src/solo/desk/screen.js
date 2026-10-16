@@ -10,6 +10,7 @@
 
 import { TEMPLATES, makeOrder } from './jobs.js';
 import { buildWorld, baselineOf, grade, requirementStates } from './grade.js';
+import { capstonePassed } from '../capstone/capstones.js';
 import { renderTopology } from './topology.js';
 import { createConsoles } from './console.js';
 import { WLC_TEMPLATES } from '../wlc/model.js';
@@ -150,14 +151,19 @@ export function createDesk({ getRecord, onRecord, onExit, onWlc = null, onSandbo
   function drawOrder() {
     const { order, mode } = run;
     const top = el('header', 'sk-top');
-    if (mode !== 'exam') {
+    if (mode === 'capstone') {
+      top.append(btn('sk-back', 'Back', () => {
+        if (run.con.started() && !window.confirm?.('Leave the capstone? Your work on it is lost.')) return;
+        run = null; onExit?.();
+      }));
+    } else if (mode !== 'exam') {
       top.append(btn('sk-back', 'Queue', () => {
         if (run.con.started() && !window.confirm?.('Leave this order? Your work on it is lost.')) return;
         stopTimer(); run = null; ui.view = 'queue'; draw();
       }));
     }
     const title = el('div', 'sk-title');
-    title.append(el('span', 'sk-kicker', mode === 'exam' ? examLabel : `${order.number} · ${mode === 'sim' ? 'Sim' : 'Learning'}`), el('h1', null, order.title));
+    title.append(el('span', 'sk-kicker', mode === 'exam' ? examLabel : mode === 'capstone' ? `${order.number} · Capstone` : `${order.number} · ${mode === 'sim' ? 'Sim' : 'Learning'}`), el('h1', null, order.title));
     top.append(title);
     if (mode === 'sim') { tick(); top.append(timerChip); }
     root.append(top);
@@ -188,6 +194,19 @@ export function createDesk({ getRecord, onRecord, onExit, onWlc = null, onSandbo
     for (const n of order.notes ?? []) notes.append(el('li', null, n));
     pane.append(notes);
 
+    if (mode === 'capstone') {
+      pane.append(el('h3', 'desk-h', 'Goals'));
+      const goals = el('ol', 'desk-reqs');
+      for (const g of order.goals) goals.append(el('li', 'desk-req', g));
+      pane.append(goals);
+      pane.append(el('p', 'desk-small', 'No ticks and no help. Build it however you like; when you submit, the network is tested against these goals, and every one has to hold for the crown.'));
+      if (!run.submitting) { pane.append(btn('sk-go desk-submit', 'Submit the network', () => { run.submitting = true; draw(); })); return pane; }
+      const box = el('div', 'desk-close');
+      box.append(el('p', 'desk-small', 'Test the network now?'));
+      box.append(btn('sk-go desk-confirm', 'Test it', () => finish()), btn('sk-back', 'Keep working', () => { run.submitting = false; draw(); }));
+      pane.append(box);
+      return pane;
+    }
     pane.append(el('h3', 'desk-h', 'Requirements'));
     const states = mode === 'learn' ? requirementStates(order, world) : null;
     const list = el('ol', 'desk-reqs');
@@ -276,13 +295,37 @@ export function createDesk({ getRecord, onRecord, onExit, onWlc = null, onSandbo
     const g = grade(run.order, run.world, run.baseline, { elapsedMs: Date.now() - run.started });
     run.result = g;
     run.submitting = false;
-    onRecord?.({ kind: run.order.kind, mode: run.mode, pct: g.pct, helped: run.helped.size > 0, seed: run.item.seed, note: run.note, lights: run.order.lights });
+    if (run.mode === 'capstone') onRecord?.({ kind: run.order.kind, mode: 'capstone', tree: run.order.tree ?? null, passed: capstonePassed(g), got: g.tests.filter(t => t.ok).length, total: g.tests.length });
+    else onRecord?.({ kind: run.order.kind, mode: run.mode, pct: g.pct, helped: run.helped.size > 0, seed: run.item.seed, note: run.note, lights: run.order.lights });
     ui.view = 'result';
     draw();
     window.scrollTo?.(0, 0);
   }
 
+  function drawCapstoneResult() {
+    const { order, result: g } = run;
+    const top = el('header', 'sk-top');
+    top.append(btn('sk-back', 'Back', () => { run = null; onExit?.(); }));
+    const title = el('div', 'sk-title');
+    title.append(el('span', 'sk-kicker', `${order.number} · tested`), el('h1', null, order.title));
+    top.append(title);
+    root.append(top);
+    const passed = capstonePassed(g);
+    const head = el('section', `desk-score cap-score${passed ? ' is-clean' : ''}`);
+    head.append(el('b', 'desk-pct', passed ? 'Crowned' : `${g.tests.filter(t => t.ok).length} of ${g.tests.length}`));
+    head.append(el('p', null, passed ? 'Every goal holds. The tree is crowned.' : 'Not every goal holds yet. The network stays as you left it: go back in, find why, and test again.'));
+    root.append(head);
+    const list = el('ul', 'desk-graded');
+    for (const t of g.tests) { const li = el('li', t.ok ? 'is-ok' : 'is-miss'); li.append(el('span', 'desk-mark', t.ok ? '✓' : '✗'), el('span', null, t.text)); list.append(li); }
+    root.append(list);
+    const row = el('div', 'desk-card-go');
+    if (!passed) row.append(btn('sk-go', 'Back to the network', () => { run.result = null; run.submitting = false; ui.view = 'order'; draw(); }));
+    row.append(btn('sk-back', 'Done', () => { run = null; onExit?.(); }));
+    root.append(row);
+  }
+
   function drawResult() {
+    if (run.mode === 'capstone') { drawCapstoneResult(); return; }
     const { order, result: g, mode } = run;
     const top = el('header', 'sk-top');
     top.append(btn('sk-back', 'Queue', () => { run = null; ui.view = 'queue'; draw(); }));
