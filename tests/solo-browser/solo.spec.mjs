@@ -430,7 +430,7 @@ test.describe('Do labs', () => {
   test('the Field desk takes a work order from the queue to a grade', async ({ page }) => {
     await enableMap(page);
     await page.click('.sk-dock-btn.is-field');
-    await expect(page.locator('.desk-group')).toHaveText(['Switch builds', 'Router builds', 'Changes', 'Trouble tickets', 'Wireless controller', 'Automation']);
+    await expect(page.locator('.desk-group')).toHaveText(['Sandbox · free practice', 'Switch builds', 'Router builds', 'Changes', 'Trouble tickets', 'Wireless controller', 'Automation']);
     await page.locator('.desk-card', { hasText: 'Lock a switch down to SSH' }).locator('.sk-go:has-text("Learning")').click();
     await expect(page.locator('.desk-req')).toHaveCount(6);
     // Help shows the exact commands; type them on the console tab.

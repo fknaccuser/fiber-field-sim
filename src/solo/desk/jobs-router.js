@@ -6,7 +6,7 @@
 // changes the learner's network, hit counters or leases.
 
 import { rngOf, int, pick, sample, privateBase, subnetIn, addHost, maskOf } from '../study/gen/kit.js';
-import { interfaceState, exchange, requestDhcp, routingTable, neighbors } from '../labs/world.js';
+import { interfaceState, exchange, requestDhcp, routingTable, neighbors, refresh as refreshWorld } from '../labs/world.js';
 import { aceMatches } from '../labs/services.js';
 import { negotiate } from '../labs/switching.js';
 import { parseIp } from '../labs/ip4.js';
@@ -480,6 +480,101 @@ export const ROUTER_TEMPLATES = [
           { id: 'clean', text: `${short(portName)} runs without a duplex mismatch`, check: (w) => { const n = negotiate(w, 'SW1', portName); return Boolean(n?.ok) && !n.mismatch; } },
           { id: 'gw', text: `The ${label} reaches its gateway`, check: (w) => reach(w, dev, gw) },
         ],
+      };
+    },
+  },
+
+  // ------------------------------------------------------------ HSRP
+  {
+    kind: 'build-hsrp',
+    title: 'Give a LAN two gateways with HSRP',
+    minutes: 10,
+    lights: ['t3-fhrp'],
+    make(seed) {
+      const rnd = rngOf(seed);
+      const f = frame(rnd, this.kind);
+      const [lan] = nets(rnd, 1);
+      const x = int(rnd, 1, 200);
+      const g = pick(rnd, [1, 10, 20, 50]);
+      const vip = addHost(lan, pick(rnd, [1, 254]));
+      const [aIp, bIp] = vip.endsWith('.1') ? [addHost(lan, 2), addHost(lan, 3)] : [addHost(lan, 252), addHost(lan, 253)];
+      const pri = pick(rnd, [105, 110, 120, 150]);
+      const [ra, rb] = pick(rnd, [['GW1', 'GW2'], ['R1', 'R2'], ['EDGE-A', 'EDGE-B']]);
+      const lead = pick(rnd, [ra, rb]);
+      const devices = [
+        { id: ra, kind: 'router', x: 26, y: 14 }, { id: rb, kind: 'router', x: 74, y: 14 }, { id: 'CORE', kind: 'router', x: 50, y: 4 },
+        { id: 'SW1', kind: 'switch', x: 50, y: 38 },
+        { id: 'PC1', kind: 'pc', x: 30, y: 62, pc: { ip: addHost(lan, 50), mask: M24, gateway: vip } }, { id: 'PC2', kind: 'pc', x: 70, y: 62, pc: { ip: addHost(lan, 51), mask: M24, gateway: vip } },
+      ];
+      const t = `10.250.${x}`;
+      const links = [L(ra, 'GigabitEthernet0/0', 'SW1', 'GigabitEthernet0/1'), L(rb, 'GigabitEthernet0/0', 'SW1', 'GigabitEthernet0/2'),
+        L(ra, 'GigabitEthernet0/1', 'CORE', 'GigabitEthernet0/0'), L(rb, 'GigabitEthernet0/1', 'CORE', 'GigabitEthernet0/1'),
+        L('PC1', NIC, 'SW1', 'FastEthernet0/1'), L('PC2', NIC, 'SW1', 'FastEthernet0/2')];
+      const setup = {
+        SW1: ['hostname SW1'],
+        [ra]: [`hostname ${ra}`, 'interface g0/0', `ip address ${aIp} ${M24}`, 'no shutdown', 'interface g0/1', `ip address ${t}.1 255.255.255.252`, 'no shutdown', 'exit', `ip route 0.0.0.0 0.0.0.0 ${t}.2`],
+        [rb]: [`hostname ${rb}`, 'interface g0/0', `ip address ${bIp} ${M24}`, 'no shutdown', 'interface g0/1', `ip address ${t}.5 255.255.255.252`, 'no shutdown', 'exit', `ip route 0.0.0.0 0.0.0.0 ${t}.6`],
+        CORE: ['hostname CORE', 'interface g0/0', `ip address ${t}.2 255.255.255.252`, 'no shutdown', 'interface g0/1', `ip address ${t}.6 255.255.255.252`, 'no shutdown', 'interface loopback0', 'ip address 10.255.255.1 255.255.255.255', 'exit',
+          `ip route ${lan} ${M24} ${t}.1`, `ip route ${lan} ${M24} ${t}.5 5`],
+      };
+      const leadIp = lead === ra ? aIp : bIp;
+      const other = lead === ra ? rb : ra;
+      const h = (w, d) => port(w, d, 'GigabitEthernet0/0').hsrp?.[g];
+      const reqs = [
+        { id: 'a', text: `${ra}: HSRP group ${g} with virtual address ${vip}`, device: ra, check: (w) => h(w, ra)?.ip === ip(vip), owns: { [ra]: [ifRe('GigabitEthernet0/0')] },
+          hint: 'standby GROUP ip ADDRESS, on the LAN interface. The PCs already point at the virtual address as their gateway.', show: { [ra]: ['enable', 'configure terminal', 'interface g0/0', `standby ${g} ip ${vip}`] } },
+        { id: 'b', text: `${rb}: the same group and virtual address`, device: rb, check: (w) => h(w, rb)?.ip === ip(vip), owns: { [rb]: [ifRe('GigabitEthernet0/0')] },
+          hint: 'Both routers need the group; they elect between themselves.', show: { [rb]: ['enable', 'configure terminal', 'interface g0/0', `standby ${g} ip ${vip}`] } },
+        { id: 'lead', text: `${lead} is active, priority ${pri}, and takes the job back after a failure`, device: lead,
+          check: (w) => h(w, lead)?.priority === pri && h(w, lead)?.preempt && Object.values(w.hsrp ?? {}).some(e => e.group === g && e.active === lead), owns: { [lead]: [ifRe('GigabitEthernet0/0')] },
+          hint: 'standby GROUP priority N (higher wins; 100 is the default) and standby GROUP preempt. Without preempt, a router that comes back stays standby.', show: { [lead]: [`standby ${g} priority ${pri}`, `standby ${g} preempt`] } },
+      ];
+      return {
+        ...f, title: this.title, minutes: this.minutes, lights: this.lights, start: ra,
+        summary: `${f.site}'s LAN has two routers but every PC uses one gateway, ${vip}, and nothing answers it. Make it a virtual gateway shared by ${ra} and ${rb}, with ${lead} doing the work while it is healthy.`,
+        devices, links, setup, saved: [],
+        notes: [`LAN ${lan}/24: ${ra} ${aIp}, ${rb} ${bIp}, PCs use ${vip}`, `HSRP group ${g}`, `${other} stays the backup`],
+        requirements: reqs,
+        tests: [
+          { id: 'gw', text: `PC1 reaches its gateway ${vip}`, check: (w) => reach(w, 'PC1', vip) },
+          { id: 'core', text: 'PC1 reaches the core (10.255.255.1)', check: (w) => reach(w, 'PC1', '10.255.255.1') },
+          { id: 'fail', text: `If ${lead} fails, PC1 still reaches the core`, check: (w) => tryIt(w, c => { for (const i of ['GigabitEthernet0/0', 'GigabitEthernet0/1']) c.devices[lead].config.interfaces[i].shutdown = true; refreshWorld(c); return reachOn(c, 'PC1', '10.255.255.1'); }) },
+        ],
+      };
+    },
+  },
+
+  // ------------------------------------------------------------ SNMP
+  {
+    kind: 'build-snmp',
+    title: 'Let the monitoring server poll the routers',
+    minutes: 6,
+    lights: ['t4-snmp'],
+    make(seed) {
+      const rnd = rngOf(seed);
+      const f = frame(rnd, this.kind);
+      const rtr = pick(rnd, ROUTERS);
+      const [mgmt] = nets(rnd, 1);
+      const nms = addHost(mgmt, int(rnd, 20, 60));
+      const ro = `${pick(rnd, ['N0c', 'Watch', 'Mon', 'Poll'])}${int(rnd, 10, 99)}ro`;
+      const loc = pick(rnd, ['Closet 2B', 'MDF rack 3', 'IDF 4 shelf 1', 'Server room row A']);
+      const devices = [{ id: rtr, kind: 'router', x: 40, y: 30 }, { id: 'SW1', kind: 'switch', x: 64, y: 30 }, { id: 'NMS', kind: 'pc', x: 86, y: 30, pc: { ip: nms, mask: M24, gateway: addHost(mgmt, 1) } }];
+      const links = [L(rtr, 'GigabitEthernet0/1', 'SW1', 'GigabitEthernet0/1'), L('NMS', NIC, 'SW1', 'FastEthernet0/1')];
+      const sn = (w) => cfg(w, rtr).snmp;
+      return {
+        ...f, title: this.title, minutes: this.minutes, lights: this.lights, start: rtr,
+        summary: `The monitoring server at ${f.site} shows ${rtr} as unknown. Let it read the router over SNMP, read-only, record where the router lives, and send traps to the server.`,
+        devices, links, setup: { [rtr]: [`hostname ${rtr}`, 'interface g0/1', `ip address ${addHost(mgmt, 1)} ${M24}`, 'no shutdown'], SW1: ['hostname SW1'] }, saved: [],
+        notes: [`NMS ${nms}`, `Read-only community ${ro}`, `Location: ${loc}`],
+        requirements: [
+          { id: 'ro', text: `Read-only community ${ro}`, device: rtr, check: (w) => sn(w)?.communities?.[ro]?.mode === 'ro', owns: { [rtr]: [globalRe('snmp-server community')] },
+            hint: 'snmp-server community NAME ro. RO only reads; RW could change the configuration, so it is rarely what you want.', show: { [rtr]: ['enable', 'configure terminal', `snmp-server community ${ro} ro`] } },
+          { id: 'loc', text: `Location "${loc}"`, device: rtr, check: (w) => sn(w)?.location === loc, owns: { [rtr]: [globalRe('snmp-server location')] },
+            hint: 'snmp-server location TEXT. The monitoring server shows it next to the device.', show: { [rtr]: [`snmp-server location ${loc}`] } },
+          { id: 'traps', text: `Send traps to ${nms} with SNMPv2c`, device: rtr, check: (w) => Boolean(sn(w)?.traps) && (sn(w)?.hosts ?? []).some(h => h.ip === ip(nms) && h.version === '2c' && h.community === ro), owns: { [rtr]: [globalRe('snmp-server')] },
+            hint: 'snmp-server enable traps turns them on; snmp-server host ADDRESS version 2c COMMUNITY says where they go.', show: { [rtr]: ['snmp-server enable traps', `snmp-server host ${nms} version 2c ${ro}`] } },
+        ],
+        tests: [{ id: 'poll', text: `The NMS can poll ${rtr} on UDP 161`, check: (w) => tryIt(w, c => exchange(c, 'NMS', ip(addHost(mgmt, 1)), { proto: 'udp', port: 161 }).ok) }],
       };
     },
   },

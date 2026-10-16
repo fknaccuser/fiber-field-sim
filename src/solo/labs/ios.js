@@ -12,7 +12,7 @@
 
 import {
   interfaceState, routingTable, neighbors, ospfEnabled, ospfRole, ospfCost, ping as pingWorld, trace as traceWorld, exchange, requestDhcp,
-  refresh, clearOspf, save, unsaved, reload, makeInterface, l2Of, takeNotices,
+  refresh, clearOspf, save, unsaved, reload, makeInterface, l2Of, takeNotices, resolveName,
 } from './world.js';
 import { parseIp, formatIp, maskToLen, lenToMask, network, isIp, isMask, classfulLen } from './ip4.js';
 import { makeSwitchport, parseVlanList, formatVlanList, isSub, isSvi, isPo, parentOf } from './switching.js';
@@ -242,6 +242,7 @@ export function runningConfig(dev) {
     if (i.ospf.cost !== null) L.push(` ip ospf cost ${i.ospf.cost}`);
     if (i.ospf.pid !== null) L.push(` ip ospf ${i.ospf.pid} area ${i.ospf.area}`);
     L.push(...v6InterfaceLines(i));
+    L.push(...hsrpLines(i));
     if (i.helper) L.push(` ip helper-address ${formatIp(i.helper)}`);
     if (i.aclIn) L.push(` ip access-group ${i.aclIn} in`);
     if (i.aclOut) L.push(` ip access-group ${i.aclOut} out`);
@@ -265,6 +266,7 @@ export function runningConfig(dev) {
   if (r6.length) L.push(...r6, '!');
   const svc = [...natConfigLines(dev), ...aclConfigLines(dev)];
   if (svc.length) L.push(...svc, '!');
+  L.push(...snmpLines(c));
   const ops = [...(c.logHosts ?? []).map(h => `logging host ${formatIp(h)}`), ...(c.ntp ?? []).map(h => `ntp server ${formatIp(h)}`)];
   if (ops.length) L.push(...ops, '!');
   if (c.banner) L.push(`banner motd ^C${c.banner}^C`, '!');
@@ -770,8 +772,114 @@ const PC_V6 = [
   }, { key: 'tracert ipv6' }),
 ];
 
+// ---------- HSRP and SNMP ----------
+const ensureHsrp = (i, g) => { i.hsrp ??= {}; return (i.hsrp[g] ??= { ip: null, priority: 100, preempt: false }); };
+const groupOf = (g) => (g === undefined ? 0 : g);
+
+const IFACE_FHRP = [
+  cmd(['standby', W('g', 'num', { opt: true }), 'ip', W('vip', 'ip')], ({ g, vip }, s) => {
+    const i = here(s);
+    if (i.sw) return { out: invalidAt(s, 0) };
+    if (i.ip === null) return { out: '% Address not configured on the interface.' };
+    ensureHsrp(i, groupOf(g)).ip = parseIp(vip);
+    return { out: '' };
+  }, { key: 'standby ip', no: ({ g }, s) => { const i = here(s); if (i.hsrp?.[groupOf(g)]) i.hsrp[groupOf(g)].ip = null; }, noShape: ['standby', W('g', 'num', { opt: true }), 'ip', W('vip', 'ip', { opt: true })] }),
+  cmd(['standby', W('g', 'num', { opt: true }), 'priority', W('p', 'num')], ({ g, p }, s) => {
+    if (p > 255) return { out: invalidAt(s, s.line.search(/\S+\s*$/)) };
+    ensureHsrp(here(s), groupOf(g)).priority = p;
+    return { out: '' };
+  }, { key: 'standby priority', no: ({ g }, s) => { const h = here(s).hsrp?.[groupOf(g)]; if (h) h.priority = 100; }, noShape: ['standby', W('g', 'num', { opt: true }), 'priority', W('p', 'num', { opt: true })] }),
+  cmd(['standby', W('g', 'num', { opt: true }), 'preempt'], ({ g }, s) => { ensureHsrp(here(s), groupOf(g)).preempt = true; return { out: '' }; },
+    { key: 'standby preempt', no: ({ g }, s) => { const h = here(s).hsrp?.[groupOf(g)]; if (h) h.preempt = false; } }),
+  cmd(['standby', 'version', ALT('v', ['1', '2'])], ({ v }, s) => { here(s).hsrpVersion = Number(v); return { out: '' }; }, { key: 'standby version', no: (_, s) => { here(s).hsrpVersion = 1; } }),
+];
+
+function hsrpLines(i) {
+  const L = [];
+  if (i.hsrpVersion === 2) L.push(' standby version 2');
+  for (const [g, h] of Object.entries(i.hsrp ?? {})) {
+    const pre = Number(g) === 0 ? 'standby' : `standby ${g}`;
+    if (h.ip !== null) L.push(` ${pre} ip ${formatIp(h.ip)}`);
+    if (h.priority !== 100) L.push(` ${pre} priority ${h.priority}`);
+    if (h.preempt) L.push(` ${pre} preempt`);
+  }
+  return L;
+}
+
+function showStandby(world, deviceId, brief) {
+  const mine = Object.values(world.hsrp ?? {}).filter(e => e.members.some(m => m.device === deviceId));
+  const configured = Object.values(world.devices[deviceId].config.interfaces).filter(i => i.hsrp && Object.keys(i.hsrp).length);
+  if (!configured.length) return '';
+  const rows = [];
+  for (const i of configured) {
+    for (const [g, h] of Object.entries(i.hsrp)) {
+      const e = mine.find(x => x.group === Number(g) && x.members.some(m => m.device === deviceId && m.intf === i.name));
+      const me = e?.members.find(m => m.device === deviceId);
+      const state = !e ? 'Init' : e.active === deviceId ? 'Active' : e.standby === deviceId ? 'Standby' : 'Listen';
+      const ipOf = (d) => (d === deviceId ? 'local' : d ? formatIp(e.members.find(m => m.device === d).ip) : 'unknown');
+      const vip = e?.vip ?? h.ip;
+      rows.push({ name: i.name, g, pri: me?.priority ?? h.priority, pre: h.preempt, state, active: e ? ipOf(e.active) : 'unknown', standby: e ? ipOf(e.standby) : 'unknown', vip: vip === null ? 'unknown' : formatIp(vip) });
+    }
+  }
+  if (brief) {
+    const out = ['                     P indicates configured to preempt.', '                     |', `${pad('Interface', 12)}${pad('Grp', 5)}${pad('Pri', 4)}P ${pad('State', 8)}${pad('Active', 16)}${pad('Standby', 16)}Virtual IP`];
+    for (const r of rows) out.push(`${pad(shortIf(r.name), 12)}${pad(r.g, 5)}${pad(r.pri, 4)}${r.pre ? 'P' : ' '} ${pad(r.state, 8)}${pad(r.active, 16)}${pad(r.standby, 16)}${r.vip}`);
+    return out.join('\n');
+  }
+  return rows.map(r => [`${r.name} - Group ${r.g}`, `  State is ${r.state}`, `  Virtual IP address is ${r.vip}`, `  Active router is ${r.active}`, `  Standby router is ${r.standby}`, `  Priority ${r.pri} (default 100)${r.pre ? '' : ', may preempt: no'}`, ...(r.pre ? ['  Preemption enabled'] : [])].join('\n')).join('\n');
+}
+
+const ensureSnmp = (c) => (c.snmp ??= { communities: {}, location: null, contact: null, hosts: [], traps: false });
+const GLOBAL_SNMP = [
+  cmd(['snmp-server', 'community', W('name', 'word'), ALT('rw', ['ro', 'rw'], { opt: true }), W('acl', 'word', { opt: true })], ({ name, rw, acl }, s) => {
+    ensureSnmp(s.dev.config).communities[name] = { mode: rw ?? 'ro', acl: acl ?? null };
+    return { out: '' };
+  }, { key: 'snmp-server community', no: ({ name }, s) => { delete ensureSnmp(s.dev.config).communities[name]; }, noShape: ['snmp-server', 'community', W('name', 'word'), W('rest', 'rest', { opt: true })] }),
+  cmd(['snmp-server', 'location', W('text', 'rest')], ({ text }, s) => { ensureSnmp(s.dev.config).location = text; return { out: '' }; }, { key: 'snmp-server location', no: (_, s) => { ensureSnmp(s.dev.config).location = null; }, noShape: ['snmp-server', 'location', W('text', 'rest', { opt: true })] }),
+  cmd(['snmp-server', 'contact', W('text', 'rest')], ({ text }, s) => { ensureSnmp(s.dev.config).contact = text; return { out: '' }; }, { key: 'snmp-server contact', no: (_, s) => { ensureSnmp(s.dev.config).contact = null; }, noShape: ['snmp-server', 'contact', W('text', 'rest', { opt: true })] }),
+  cmd(['snmp-server', 'host', W('ip', 'ip'), W('rest', 'rest')], ({ ip, rest }, s) => {
+    const m = /^(?:(?:traps|informs)\s+)?(?:version\s+(1|2c|3)\s+)?(\S+)$/i.exec(rest.trim());
+    if (!m) return { out: invalidAt(s, s.line.indexOf(rest)) };
+    const c = ensureSnmp(s.dev.config);
+    c.hosts = c.hosts.filter(h => h.ip !== parseIp(ip));
+    c.hosts.push({ ip: parseIp(ip), version: m[1] ?? '1', community: m[2] });
+    return { out: '' };
+  }, { key: 'snmp-server host', no: ({ ip }, s) => { const c = ensureSnmp(s.dev.config); c.hosts = c.hosts.filter(h => h.ip !== parseIp(ip)); }, noShape: ['snmp-server', 'host', W('ip', 'ip'), W('rest', 'rest', { opt: true })] }),
+  cmd(['snmp-server', 'enable', 'traps', W('rest', 'rest', { opt: true })], (_, s) => { ensureSnmp(s.dev.config).traps = true; return { out: '' }; }, { key: 'snmp-server enable traps', no: (_, s) => { ensureSnmp(s.dev.config).traps = false; } }),
+];
+
+function snmpLines(c) {
+  const n = c.snmp;
+  if (!n) return [];
+  const L = [];
+  for (const [name, x] of Object.entries(n.communities)) L.push(`snmp-server community ${name} ${x.mode.toUpperCase()}${x.acl ? ` ${x.acl}` : ''}`);
+  if (n.location) L.push(`snmp-server location ${n.location}`);
+  if (n.contact) L.push(`snmp-server contact ${n.contact}`);
+  if (n.traps) L.push('snmp-server enable traps');
+  for (const h of n.hosts) L.push(`snmp-server host ${formatIp(h.ip)}${h.version !== '1' ? ` version ${h.version}` : ''} ${h.community}`);
+  return L.length ? [...L, '!'] : [];
+}
+
+function showSnmp(dev) {
+  const n = dev.config.snmp;
+  if (!n || !Object.keys(n.communities).length) return '%SNMP agent not enabled';
+  return [`Chassis: ${dev.config.hostname}`, ...(n.contact ? [`Contact: ${n.contact}`] : []), ...(n.location ? [`Location: ${n.location}`] : []), '0 SNMP packets input', '    0 Bad SNMP version errors', '    0 Unknown community name',
+    `SNMP logging: ${n.hosts.length ? 'enabled' : 'disabled'}`, ...n.hosts.map(h => `    Logging to ${formatIp(h.ip)}.162, 0/10, 0 sent, 0 dropped.`)].join('\n');
+}
+function showSnmpCommunity(dev) {
+  const n = dev.config.snmp;
+  return Object.entries(n?.communities ?? {}).map(([name, x]) => `\nCommunity name: ${name}\nCommunity Index: ${name}\nCommunity SecurityName: ${name}\nstorage-type: nonvolatile        active${x.acl ? `\naccess-list: ${x.acl}` : ''}`).join('\n');
+}
+
+const SHOW_FHRP_SNMP = [
+  cmd(['show', 'standby', ALT('b', ['brief'], { opt: true })], ({ b }, s) => ({ out: showStandby(s.world, s.deviceId, Boolean(b)) }), { key: 'show standby' }),
+  cmd(['show', 'snmp'], (_, s) => ({ out: showSnmp(s.dev) }), { key: 'show snmp' }),
+  cmd(['show', 'snmp', 'community'], (_, s) => ({ out: showSnmpCommunity(s.dev) }), { key: 'show snmp community' }),
+];
+
 const SHOW = [
   ...SHOW_SERVICES,
+  ...SHOW_FHRP_SNMP,
   ...SHOW_V6,
   cmd(['show', 'ip', 'route', ALT('filter', ['connected', 'static', 'ospf'], { opt: true })], ({ filter }, s) => ({ out: showIpRoute(s.world, s.deviceId, filter ?? null) }), { key: 'show ip route' }),
   cmd(['show', 'ip', 'ospf', 'neighbor'], (_, s) => ({ out: showOspfNeighbor(s.world, s.deviceId) }), { key: 'show ip ospf neighbor' }),
@@ -781,6 +889,7 @@ const SHOW = [
 ];
 
 const SHOW_SWITCH = [
+  ...SHOW_FHRP_SNMP.slice(1),
   cmd(['show', 'ip', 'route'], (_, s) => ({ out: showHostRoute(s.world, s.deviceId) }), { key: 'show ip route' }),
   cmd(['show', 'vlan', ALT('brief', ['brief'], { opt: true })], ({ brief }, s) => ({ out: showVlanBrief(s.world, s.deviceId, !brief) }), { key: 'show vlan brief' }),
   cmd(['show', 'interfaces', 'status'], (_, s) => ({ out: showInterfacesStatus(s.world, s.deviceId) }), { key: 'show interfaces status' }),
@@ -1093,6 +1202,7 @@ const DHCP_MODE = [
 const GLOBAL = [
   ...GLOBAL_COMMON,
   ...ACL_GLOBAL,
+  ...GLOBAL_SNMP,
   ...GLOBAL_V6,
   cmd(['ip', 'route', W('net', 'ip'), W('mask', 'mask'), W('via', 'rest')], ({ net, mask, via }, s) => {
     const parsed = parseRouteTail(via);
@@ -1127,6 +1237,7 @@ function vlanName(v) { return `VLAN${String(v).padStart(4, '0')}`; }
 
 const GLOBAL_SWITCH = [
   ...GLOBAL_COMMON,
+  ...GLOBAL_SNMP,
   cmd(['vlan', W('list', 'word')], ({ list }, s) => {
     const ids = parseVlanList(list);
     if (!ids) return { out: invalidAt(s, s.line.indexOf(list)) };
@@ -1223,6 +1334,7 @@ const IP_ADDRESS = cmd(['ip', 'address', W('ip', 'ip'), W('mask', 'mask')], ({ i
 
 const IFACE = [
   IP_ADDRESS,
+  ...IFACE_FHRP,
   ...IFACE_V6,
   ...IFACE_SERVICES,
   cmd(['encapsulation', ALT('e', ['dot1q']), W('vlan', 'num'), ALT('native', ['native'], { opt: true })], ({ vlan, native }, s) => {
@@ -1468,6 +1580,46 @@ function pcPing(s, dstText) {
   return { text: `\nPinging ${dstText} with 32 bytes of data:\n\n${replies.join('\n')}\n\n${stats}`, ok: r.ok, src: nic.ip };
 }
 
+// ---------- names, on a PC ----------
+// nslookup asks the PC's DNS server; ping, tracert and telnet take a name
+// and look it up first, the way Windows does.
+const nsHead = (r) => `Server:  UnKnown\nAddress:  ${r.server === null ? '' : formatIp(r.server)}\n`;
+function nslookupText(s, name) {
+  const r = resolveName(s.world, s.deviceId, name);
+  s.events.push({ kind: 'dns', name: name.toLowerCase(), ok: r.ok });
+  if (r.reason === 'no-server') return '*** Default servers are not available\nServer:  UnKnown\nAddress:  127.0.0.1\n\n*** UnKnown can\'t find ' + name + ': No response from server';
+  if (r.reason === 'timeout') return `DNS request timed out.\n    timeout was 2 seconds.\n${nsHead(r)}\n*** Request to UnKnown timed-out`;
+  if (!r.ok) return `${nsHead(r)}\n*** UnKnown can't find ${name}: Non-existent domain`;
+  return `${nsHead(r)}\nName:    ${name}\nAddress:  ${formatIp(r.ip)}`;
+}
+function byName(s, name, run) {
+  const r = resolveName(s.world, s.deviceId, name);
+  s.events.push({ kind: 'dns', name: name.toLowerCase(), ok: r.ok });
+  if (!r.ok) return { out: `Ping request could not find host ${name}. Please check the name and try again.` };
+  return run(formatIp(r.ip));
+}
+const isName = (t) => /^[a-z][a-z0-9.-]*$/i.test(t) && !isIp(t);
+const PC_NAMES = [
+  cmd(['nslookup', W('name', 'word')], ({ name }, s) => ({ out: nslookupText(s, name) }), { key: 'nslookup' }),
+  cmd(['ping', W('name', 'word')], ({ name }, s) => {
+    if (!isName(name)) return { out: `Ping request could not find host ${name}. Please check the name and try again.` };
+    return byName(s, name, (ip) => {
+      const r = pcPing(s, ip);
+      s.events.push({ kind: 'ping', dst: parseIp(ip), src: r.src, ok: r.ok, name: name.toLowerCase() });
+      return { out: r.text.replace(`Pinging ${ip} with`, `Pinging ${name} [${ip}] with`) };
+    });
+  }, { key: 'ping name' }),
+  cmd(['telnet', W('name', 'word'), W('port', 'num', { opt: true })], ({ name, port }, s) => {
+    if (!isName(name)) return { out: `Connecting To ${name}...Could not open connection to the host` };
+    return byName(s, name, (ip) => {
+      const p = port ?? 23;
+      const r = exchange(s.world, s.deviceId, parseIp(ip), { proto: 'tcp', port: p });
+      s.events.push({ kind: 'tcp', dst: parseIp(ip), port: p, ok: r.ok, name: name.toLowerCase() });
+      return { out: r.ok ? `Connecting To ${name}...\nConnected to ${name} on port ${p}. (Closed: this lab only tests the connection.)` : `Connecting To ${name}...Could not open connection to the host, on port ${p}: Connect failed` };
+    });
+  }, { key: 'telnet name' }),
+];
+
 const PC = [
   cmd(['ipconfig', ALT('op', ['/renew', '/release'])], ({ op }, s) => {
     const c = s.dev.config;
@@ -1508,12 +1660,13 @@ const PC = [
     if (all) lines.push(`   DNS Servers . . . . . . . . . . . : ${s.dev.config.dns === null ? '' : formatIp(s.dev.config.dns)}`);
     return { out: lines.join('\n') };
   }, { key: 'ipconfig' }),
-  cmd(['ipconfig', W('ip', 'ip'), W('mask', 'mask'), W('gw', 'ip', { opt: true })], ({ ip, mask, gw }, s) => {
+  cmd(['ipconfig', W('ip', 'ip'), W('mask', 'mask'), W('gw', 'ip', { opt: true }), W('dns', 'ip', { opt: true })], ({ ip, mask, gw, dns }, s) => {
     const nic = s.dev.config.interfaces.FastEthernet0;
     nic.ip = parseIp(ip);
     nic.mask = parseIp(mask);
     s.dev.config.dhcp = false;
     if (gw !== undefined) s.dev.config.gateway = parseIp(gw);
+    if (dns !== undefined) s.dev.config.dns = parseIp(dns);
     return { out: '' };
   }, { key: 'ipconfig set' }),
   cmd(['ping', W('dst', 'ip')], ({ dst }, s) => {
@@ -1531,6 +1684,7 @@ const PC = [
     return { out: `\nTracing route to ${dst} over a maximum of 30 hops: \n\n${rows.join('\n')}\n\nTrace complete.` };
   }, { key: 'tracert' }),
   ...PC_V6,
+  ...PC_NAMES,
 ];
 
 const MODES = {

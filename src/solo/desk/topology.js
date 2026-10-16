@@ -97,7 +97,7 @@ export function renderTopology(world, order, { onPick, current = null } = {}) {
     g.setAttribute('aria-label', `Open the console on ${name}`);
     g.append(s('rect', { x: d.x - w / 2, y: d.y - h / 2, width: w, height: h, rx: d.kind === 'router' ? 4.5 : 1.6 }));
     g.append(s('text', { x: d.x, y: d.y - 0.6, class: 'desk-node-name' }, name));
-    g.append(s('text', { x: d.x, y: d.y + 2.9, class: 'desk-node-kind' }, KIND[d.kind]));
+    g.append(s('text', { x: d.x, y: d.y + 2.9, class: 'desk-node-kind' }, world.devices[d.id].config.server ? 'SERVER' : KIND[d.kind]));
     const pick = () => onPick?.(d.id);
     g.addEventListener('click', pick);
     g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });

@@ -14,6 +14,8 @@ import { renderTopology } from './topology.js';
 import { createConsoles } from './console.js';
 import { WLC_TEMPLATES } from '../wlc/model.js';
 import { JSON_TEMPLATES } from '../json/work.js';
+import { SANDBOXES } from '../sandbox/networks.js';
+import { sandboxSaved } from '../sandbox/screen.js';
 import { branchById } from '../tree/ccna.js';
 
 function el(tag, cls, text) {
@@ -44,7 +46,7 @@ const byGroup = (a, b) => GROUPS.indexOf(groupOf(a.kind)) - GROUPS.indexOf(group
 // start = { kind, seed, fault?, mode } opens straight onto that order.
 // mode 'exam' is a sim inside the mock exam: no clock of its own (the mock
 // runs one), no way back, no note, and the grade goes to onSubmit unseen.
-export function createDesk({ getRecord, onRecord, onExit, onWlc = null, start = null, onSubmit = null, examLabel = 'Simulation' } = {}) {
+export function createDesk({ getRecord, onRecord, onExit, onWlc = null, onSandbox = null, start = null, onSubmit = null, examLabel = 'Simulation' } = {}) {
   const root = el('section', 'desk');
   const ui = { view: 'queue', batch: TEMPLATES.map(t => ({ kind: t.kind, seed: newSeed() })).sort(byGroup), tab: 'order' };
   let run = null;
@@ -62,6 +64,20 @@ export function createDesk({ getRecord, onRecord, onExit, onWlc = null, start = 
     root.append(top);
     root.append(el('p', 'desk-intro', 'Builds, changes and trouble tickets on switches and routers. Every order is new: other names, other addresses, other ports. Learning ticks as you go; Sim runs against the clock and grades like the exam.'));
     const record = getRecord?.() ?? {};
+    // The sandbox first: free practice on prebuilt networks, simplest first.
+    if (onSandbox) {
+      root.append(el('h2', 'desk-group', 'Sandbox · free practice'));
+      const sb = el('div', 'desk-queue');
+      for (const n of SANDBOXES) {
+        const card = el('article', 'desk-card is-sandbox');
+        card.append(el('span', 'sb-level', `LEVEL ${n.level}`), el('h2', null, n.title), el('p', 'desk-card-site', n.blurb));
+        const row = el('div', 'desk-card-go');
+        row.append(btn('sk-go sk-go-small', sandboxSaved(n.id) ? 'Continue' : 'Open', () => onSandbox(n.id)));
+        card.append(row);
+        sb.append(card);
+      }
+      root.append(sb);
+    }
     let list = null;
     let group = null;
     for (const item of ui.batch) {

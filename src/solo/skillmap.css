@@ -589,3 +589,31 @@
 .jw-ok { color: var(--sk-ok); }
 .jw-bad { color: #ff8a80; }
 .skillmap .desk-tab.is-on:hover { background: var(--sk-light); color: #1d1700; }
+
+/* ---------- the sandbox ---------- */
+.sb-tries { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; counter-reset: try; }
+.sb-try { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; align-items: start; padding: 8px 10px; border: 1px solid var(--sk-line); border-radius: 9px; background: var(--sk-bg); }
+.sb-try input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--sk-ok); }
+.sb-try label { display: grid; gap: 3px; cursor: pointer; }
+.sb-try b { font-size: 14px; }
+.sb-try span { font: 12.5px/1.45 var(--font-mono); color: var(--sk-ink-2); }
+.sb-try.is-done b { color: var(--sk-ink-3); text-decoration: line-through; }
+.sb-reset { justify-self: start; }
+.desk-pane-group { display: grid; gap: 12px; min-width: 0; }
+.desk-pane-group > .lab-console { padding: 0; }
+.sb-services { gap: 12px; }
+.sb-svc { display: grid; gap: 8px; padding-top: 8px; border-top: 1px solid var(--sk-line); }
+.sb-svc > b { font: 700 14px var(--font-display); letter-spacing: .06em; text-transform: uppercase; color: var(--sk-light); }
+.sb-toggle { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.sb-toggle input { width: 20px; height: 20px; accent-color: var(--sk-ok); }
+.sb-table { width: 100%; border-collapse: collapse; font: 13px var(--font-mono); }
+.sb-table th, .sb-table td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--sk-line); overflow-wrap: anywhere; }
+.sb-add, .sb-pool { display: grid; gap: 6px; }
+.sb-add { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; }
+@media (max-width: 480px) { .sb-add { grid-template-columns: 1fr; } }
+.sb-field { display: grid; grid-template-columns: minmax(0, 130px) minmax(0, 1fr); gap: 8px; align-items: center; font-size: 13px; color: var(--sk-ink-2); }
+.sb-input { width: 100%; box-sizing: border-box; min-height: 38px; background: #06090b; color: var(--sk-ink); border: 1px solid var(--sk-line); border-radius: 8px; padding: 6px 9px; font: 14px var(--font-mono); }
+.sb-del { min-height: 30px; padding: 0 10px; background: transparent; border: 1px solid var(--sk-line); border-radius: 999px; color: var(--sk-ink-2); font: 12px var(--font-body); }
+.sb-theirs { padding: 0 2px; }
+.desk-card.is-sandbox { border-color: rgb(242 193 46 / 0.35); }
+.sb-level { font: 700 11px var(--font-mono); color: var(--sk-light); letter-spacing: .08em; }

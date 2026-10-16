@@ -25,6 +25,7 @@ import { WLC_TEMPLATES } from '../wlc/model.js';
 import { createWlcScreen } from '../wlc/screen.js';
 import { JSON_TEMPLATES } from '../json/work.js';
 import { createJsonScreen } from '../json/screen.js';
+import { createSandbox } from '../sandbox/screen.js';
 
 // Work orders that run in their own screen rather than on consoles.
 const EXTRA_ORDERS = [...WLC_TEMPLATES, ...JSON_TEMPLATES];
@@ -231,6 +232,7 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
       getRecord: () => record,
       onRecord: (r) => { record = recordDesk(record, r); save(); },
       onWlc: (kind, mode) => openWlc(kind, mode, () => openDesk()),
+      onSandbox: (id) => openSandbox(id, () => openDesk()),
       onExit: () => { ui.deskEl?.destroy?.(); ui.deskEl = null; ui.view = ui.back === 'tree' ? 'tree' : 'map'; draw(); window.scrollTo?.(0, 0); },
     });
     if (ui.view !== 'desk') ui.back = ui.view === 'tree' ? 'tree' : 'map';
@@ -258,6 +260,23 @@ export function createSkillMap({ getCompletedRuns, onExit, onLaunch, onQuiz, hom
     if (!t) return;
     const mode = modeFor(record.deskDo?.[branchId]);
     if (EXTRA_ORDERS.includes(t)) openWlc(t.kind, mode); else openDesk({ kind: t.kind, seed: freshSeed(), mode });
+  }
+
+  // The sandbox: free practice on a prebuilt network, saved as you go.
+  function openSandbox(id, returnTo = null) {
+    ui.deskEl?.destroy?.();
+    if (ui.view !== 'desk') ui.back = ui.view === 'tree' ? 'tree' : 'map';
+    ui.deskEl = createSandbox({
+      id,
+      onExit: () => {
+        ui.deskEl?.destroy?.(); ui.deskEl = null;
+        if (returnTo) { returnTo(); return; }
+        ui.view = ui.back === 'tree' ? 'tree' : 'map'; draw(); window.scrollTo?.(0, 0);
+      },
+    });
+    ui.view = 'desk';
+    draw();
+    window.scrollTo?.(0, 0);
   }
 
   // The wireless controller's GUI and the API workspace run in the desk's frame.

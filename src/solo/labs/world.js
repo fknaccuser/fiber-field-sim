@@ -12,7 +12,7 @@ import {
   computeL2, enforce, nativeMismatches, physState, makeSwitchport, macFrom, OUI, keyOf,
   isSub, isSvi, isPo, isLoop, parentOf,
 } from './switching.js';
-import { aclPermits, natRole, natIn, natOut, natClaims, poolFor, lease } from './services.js';
+import { aclPermits, natRole, natIn, natOut, natClaims, poolFor, lease, servesDhcp, dnsRecordsOf } from './services.js';
 
 // The derived layer 2 state of each world, rebuilt by refresh().
 const L2 = new WeakMap();
@@ -75,7 +75,7 @@ export function makeSwitch(id, { ports = SWITCH_PORTS, mac = null } = {}) {
 }
 
 // A PC: one NIC, an address, a gateway.
-export function makePc(id, { ip = null, mask = null, gateway = null, mac = null, services = [], dhcp = false, v6 = null, nic = null } = {}) {
+export function makePc(id, { ip = null, mask = null, gateway = null, mac = null, services = [], dhcp = false, v6 = null, nic = null, server = null } = {}) {
   const config = makeDevice('x', []).config;
   config.hostname = id;
   // nic: { speed, duplex } for a device whose port is hard-set and cannot be changed from here.
@@ -85,9 +85,20 @@ export function makePc(id, { ip = null, mask = null, gateway = null, mac = null,
   // A server is a PC that listens: services lists its open TCP ports.
   config.services = [...services];
   config.dhcp = dhcp;
+  // A server also runs DNS and DHCP services, set the way a server's
+  // service pages set them (addresses given as text here, kept as numbers).
+  if (server) config.server = makeServerConfig(server);
   // IPv6 keeps addresses as text: { addrs: [{ addr, len }], gw, auto }.
   config.v6 = v6 ? { addrs: [...(v6.addrs ?? [])], gw: v6.gw ?? null, auto: Boolean(v6.auto) } : { addrs: [], gw: null, auto: false };
   return { id, kind: 'pc', ports: ['FastEthernet0'], mac: mac ?? macFrom(`pc|${id}`, OUI.pc), config, startup: null, rsaBits: null, ospfRid: null };
+}
+
+const ipOrNull = (x) => (x === null || x === undefined || x === '' ? null : typeof x === 'number' ? x : parseIp(x));
+export function makeServerConfig({ dns = {}, dhcp = {} } = {}) {
+  return {
+    dns: { on: Boolean(dns.on), records: Object.fromEntries(Object.entries(dns.records ?? {}).map(([n, a]) => [n, ipOrNull(a)])) },
+    dhcp: { on: Boolean(dhcp.on), pools: (dhcp.pools ?? []).map(p => ({ name: p.name ?? 'serverPool', start: ipOrNull(p.start), mask: ipOrNull(p.mask), gateway: ipOrNull(p.gateway), dns: ipOrNull(p.dns), max: p.max ?? null })) },
+  };
 }
 
 export function blankConfig(dev) {
@@ -398,6 +409,9 @@ function ownerIn(world, ip, fromDevice, fromIntf) {
     const intf = world.devices[id]?.config.interfaces[name];
     if (intf?.ip === ip && interfaceState(world, id, name).up) return { device: id, intf: name };
   }
+  // The active HSRP router answers for the virtual address.
+  const v = world.hsrpVip?.[ip];
+  if (v && [...reach.ends].includes(`${v.device}|${v.intf}`)) return { device: v.device, intf: v.intf };
   // A NAT router answers for its static and pool addresses on the outside.
   for (const k of reach.ends) {
     const [id, name] = k.split('|');
@@ -418,7 +432,7 @@ function heard(world, deviceId, ifName) {
   }
 }
 
-const owns = (world, d, ip) => Object.values(world.devices[d].config.interfaces).some(i => i.ip === ip && interfaceState(world, d, i.name).up);
+const owns = (world, d, ip) => Object.values(world.devices[d].config.interfaces).some(i => i.ip === ip && interfaceState(world, d, i.name).up) || world.hsrpVip?.[ip]?.device === d;
 
 // Walk one packet hop by hop: routing, ACLs in and out, and NAT where an
 // inside interface meets an outside one.
@@ -461,7 +475,9 @@ export function walk(world, fromDevice, pkt, { trail = null } = {}) {
 export function listens(world, d, proto, port) {
   if (proto === 'icmp') return true;
   const dev = world.devices[d];
-  if (proto === 'udp' && port === 67) return Object.keys(dev.config.dhcp?.pools ?? {}).length > 0;
+  if (proto === 'udp' && port === 67) return servesDhcp(dev);
+  if (proto === 'udp' && port === 53) return dnsRecordsOf(dev) !== null;
+  if (proto === 'udp' && port === 161) return Object.keys(dev.config.snmp?.communities ?? {}).length > 0;
   if (dev.kind === 'pc') return (dev.config.services ?? []).includes(port);
   if (proto === 'tcp' && port === 23) return ['telnet', 'all'].includes(dev.config.lines.vty.transport ?? 'all') && Boolean(dev.config.lines.vty.login);
   if (proto === 'tcp' && port === 22) return Boolean(dev.rsaBits) && ['ssh', 'all', 'ssh telnet'].includes(dev.config.lines.vty.transport ?? 'all');
@@ -508,7 +524,7 @@ export function requestDhcp(world, pcId) {
   for (const k of reach?.ends ?? []) {
     const [d, i] = k.split('|');
     const dev = world.devices[d];
-    if (d === pcId || (dev.kind ?? 'router') === 'pc') continue;
+    if (d === pcId || ((dev.kind ?? 'router') === 'pc' && !servesDhcp(dev))) continue;
     const intf = dev.config.interfaces[i];
     if (intf?.ip === null || intf?.ip === undefined || !interfaceState(world, d, i).up) continue;
     let server = null;
@@ -554,7 +570,48 @@ export function refresh(world) {
   world.mismatch = now;
   settleRouterIds(world);
   runElections(world);
+  runHsrp(world);
   return world;
+}
+
+// ---------- HSRP ----------
+// intf.hsrp = { [group]: { ip, priority, preempt } }
+// Routers in one broadcast domain with the same group elect an active one:
+// highest priority, then highest interface address. The active router
+// answers for the virtual address. Like a DR, it keeps the job when a better
+// router appears later, unless that router is set to preempt.
+const hsrpRank = (a, b) => (b.priority - a.priority) || (b.ip - a.ip);
+export function runHsrp(world) {
+  world.hsrp ??= {};
+  const vip = {};
+  const live = new Set();
+  const notes = [];
+  for (const dom of domains(world)) {
+    const groups = {};
+    for (const [d, i] of dom.ends) {
+      const dev = world.devices[d];
+      const intf = dev?.config.interfaces[i];
+      if (!intf?.hsrp || intf.ip === null || !interfaceState(world, d, i).up) continue;
+      for (const [g, h] of Object.entries(intf.hsrp)) (groups[g] ??= []).push({ device: d, intf: i, ip: intf.ip, priority: h.priority ?? 100, preempt: Boolean(h.preempt), vip: h.ip ?? null });
+    }
+    for (const [g, members] of Object.entries(groups)) {
+      const key = `${dom.id}:${g}`;
+      live.add(key);
+      const virtual = members.find(m => m.vip !== null)?.vip ?? null;
+      const ranked = [...members].sort(hsrpRank);
+      const prior = world.hsrp[key];
+      let active = members.find(m => m.device === prior?.active) ?? null;
+      const challenger = ranked.find(m => m.preempt && active && hsrpRank(m, active) < 0);
+      if (!active || challenger) active = challenger ?? ranked[0];
+      const standby = ranked.find(m => m.device !== active.device) ?? null;
+      if (prior?.active !== active.device) notes.push([active.device, `%HSRP-6-STATECHANGE: ${active.intf} Grp ${g} state ${prior?.standby === active.device ? 'Standby' : 'Speak'} -> Active`]);
+      world.hsrp[key] = { active: active.device, standby: standby?.device ?? null, group: Number(g), vip: virtual, members: members.map(m => ({ device: m.device, intf: m.intf, ip: m.ip, priority: m.priority, preempt: m.preempt })) };
+      if (virtual !== null) vip[virtual] = { device: active.device, intf: active.intf };
+    }
+  }
+  for (const k of Object.keys(world.hsrp)) if (!live.has(k)) delete world.hsrp[k];
+  for (const [d, line] of notes) (world.notices[d] ??= []).push(line);
+  world.hsrpVip = vip;
 }
 
 // The log lines a device has queued since its console last printed.
@@ -615,3 +672,19 @@ export function reload(world, deviceId) {
 }
 
 export { parseIp, formatIp, maskToLen, lenToMask, network };
+
+// resolveName(world, pcId, name) -> { ok, ip, server } or { ok: false, reason, server }
+//   reason: 'no-server' (no DNS server set), 'timeout' (the server never
+//   answered), 'nxdomain' (it answered: no such name)
+export function resolveName(world, pcId, name) {
+  const pc = world.devices[pcId];
+  const server = pc.config.dns ?? null;
+  if (server === null || server === undefined) return { ok: false, reason: 'no-server', server: null };
+  const r = exchange(world, pcId, server, { proto: 'udp', port: 53 });
+  if (!r.ok) return { ok: false, reason: 'timeout', server };
+  const owner = Object.keys(world.devices).find(id => owns(world, id, server));
+  const records = dnsRecordsOf(world.devices[owner]) ?? {};
+  const want = String(name).toLowerCase().replace(/\.$/, '');
+  const hit = Object.entries(records).find(([n]) => n.toLowerCase().replace(/\.$/, '') === want);
+  return hit ? { ok: true, ip: hit[1], server } : { ok: false, reason: 'nxdomain', server };
+}

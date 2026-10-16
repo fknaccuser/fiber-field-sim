@@ -291,8 +291,33 @@ export const emptyNat = () => ({ statics: [], rules: [], pools: {} });
 
 export const emptyDhcp = () => ({ excluded: [], pools: {} });
 
+// A server (a PC-kind device with config.server) runs DHCP the way a
+// server's DHCP service is set up in a GUI: a pool by start address, mask,
+// gateway, DNS and a maximum number of users. Addresses below the start are
+// left out, the same as an excluded range on a router.
+//   config.server = { dns: { on, records: { name: ip } }, dhcp: { on, pools: [{ name, start, mask, gateway, dns, max }] } }
+export function dhcpView(dev) {
+  if (!dev) return null;
+  if (dev.kind === 'pc') {
+    const s = dev.config.server?.dhcp;
+    if (!s?.on) return null;
+    const pools = {};
+    const excluded = [];
+    for (const p of s.pools ?? []) {
+      if (p.start === null || p.mask === null) continue;
+      const len = maskToLen(p.mask);
+      const net = network(p.start, len);
+      pools[p.name] = { net, len, router: p.gateway ?? null, dns: p.dns ?? null, domain: null, max: p.max ?? null };
+      if (p.start > net + 1) excluded.push([(net + 1) >>> 0, (p.start - 1) >>> 0]);
+    }
+    return { excluded, pools };
+  }
+  return dev.config.dhcp ?? null;
+}
+export const servesDhcp = (dev) => Object.keys(dhcpView(dev)?.pools ?? {}).length > 0;
+
 export function poolFor(dev, gi) {
-  const pools = Object.entries(dev.config.dhcp?.pools ?? {});
+  const pools = Object.entries(dhcpView(dev)?.pools ?? {});
   const hit = pools.find(([, p]) => p.net !== null && inSubnet(gi, p.net, p.len));
   return hit ? { name: hit[0], pool: hit[1] } : null;
 }
@@ -301,13 +326,16 @@ export function poolFor(dev, gi) {
 // any interface in the lab (IOS pings before it offers, to catch conflicts).
 export function lease(world, server, poolName, mac) {
   const dev = world.devices[server];
-  const p = dev.config.dhcp.pools[poolName];
+  const view = dhcpView(dev);
+  const p = view.pools[poolName];
   world.dhcpLeases ??= {};
   const leases = world.dhcpLeases[server] ??= {};
   const mine = Object.entries(leases).find(([, m]) => m === mac);
   if (mine && inSubnet(Number(mine[0]), p.net, p.len)) return Number(mine[0]);
   const taken = new Set(Object.values(world.devices).flatMap(d => Object.values(d.config.interfaces).map(i => i.ip).filter(x => x !== null)));
-  const excluded = (a) => (dev.config.dhcp.excluded ?? []).some(([lo, hi]) => a >= lo && a <= hi);
+  const excluded = (a) => (view.excluded ?? []).some(([lo, hi]) => a >= lo && a <= hi);
+  const inPool = Object.keys(leases).filter(a => inSubnet(Number(a), p.net, p.len)).length;
+  if (p.max && inPool >= p.max) return null;
   const first = (network(p.net, p.len) + 1) >>> 0;
   const last = ((network(p.net, p.len) | (~lenToMask(p.len) >>> 0)) - 1) >>> 0;
   for (let a = first; a <= last; a += 1) {
@@ -343,4 +371,12 @@ export function dhcpConfigLines(dev) {
     out.push('!');
   }
   return out;
+}
+
+// ---------- DNS ----------
+// A name lookup from a PC: ask its DNS server over UDP 53, then read the
+// server's records. Names match without case, with or without a final dot.
+export function dnsRecordsOf(dev) {
+  const d = dev?.config.server?.dns;
+  return d?.on ? d.records ?? {} : null;
 }
