@@ -916,10 +916,6 @@ function renderOpening() {
   line.className = 'opening-line';
   line.setAttribute('aria-hidden', 'true');
 
-  const brand = document.createElement('p');
-  brand.className = 'opening-brand';
-  brand.textContent = 'The Field';
-
   const prompt = document.createElement('span');
   prompt.className = 'opening-prompt';
   prompt.textContent = 'field>';
@@ -973,19 +969,28 @@ function renderOpening() {
     }
   });
 
-  // The ritual stays, but nobody should be stuck on screen one. The hint
-  // names the command and says what it does, which is the first IOS lesson.
+  // Only the prompt and a blinking cursor: whoever has the link has to know
+  // the first IOS command. A tiny "hint" at the very bottom gives it away
+  // for anyone who is stuck.
   const hint = document.createElement('p');
   hint.className = 'opening-hint';
+  hint.hidden = true;
   const cmd = document.createElement('kbd');
   cmd.textContent = 'enable';
   hint.append('Type ', cmd, ' and press Enter. On a Cisco device it unlocks privileged mode, and here it lets you in.');
 
-  const tap = document.createElement('p');
-  tap.className = 'opening-tap';
-  tap.textContent = 'Tap anywhere to bring up the keyboard.';
+  const reveal = document.createElement('button');
+  reveal.type = 'button';
+  reveal.className = 'opening-reveal';
+  reveal.textContent = 'hint';
+  reveal.addEventListener('click', (event) => {
+    event.stopPropagation();
+    hint.hidden = false;
+    reveal.hidden = true;
+    input.focus();
+  });
 
-  container.append(brand, line, label, input, errorLine, hint, tap);
+  container.append(line, label, input, errorLine, hint, reveal);
 
   queueMicrotask(() => input.focus());
 

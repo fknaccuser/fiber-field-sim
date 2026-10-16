@@ -609,8 +609,8 @@ button.patch-port:hover .patch-jack { border-color: var(--ink-2); }
   background: var(--accent-soft);
   color: var(--accent-text);
 }
-.opening-tap { margin: 8px 0 0; font-size: 13px; color: var(--ink-3); }
-@media (hover: hover) and (pointer: fine) { .opening-tap { display: none; } }
+.opening-reveal { position: fixed; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); transform: translateX(-50%); min-height: 24px; padding: 2px 8px; background: transparent; border: 0; color: var(--ink-3); font: 10px var(--font-mono); letter-spacing: .08em; opacity: .55; cursor: pointer; }
+.opening-reveal:hover, .opening-reveal:focus-visible { opacity: 1; background: transparent; border: 0; }
 .opening-error { position: static; margin-top: 16px; font-family: var(--font-mono); font-size: 15px; color: var(--fault); min-height: 1.4em; }
 .init-lines { font-family: var(--font-mono); font-size: 15px; color: var(--ink-2); }
 .init-lines li { margin-bottom: 6px; }

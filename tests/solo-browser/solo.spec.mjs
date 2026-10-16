@@ -376,7 +376,13 @@ test.describe('Skill map', () => {
     await page.click('.sk-tier.is-off .sk-go >> nth=0');
 
     // The check runs in the exam prep question screens; answer every question.
-    while (await page.locator('.ep-choices, .ep-pairs, .ep-order').count()) {
+    while (await page.locator('.ep-choices, .dd').count()) {
+      // Drag-and-drop: tap each piece, then a slot, until all are placed.
+      while (await page.locator('.dd-tray .dd-chip').count()) {
+        await page.locator('.dd-tray .dd-chip').first().click();
+        const empty = page.locator('.dd-slot:not(:has(.dd-chip))').first();
+        await (await empty.count() ? empty : page.locator('.dd-slot').first()).locator('.dd-slot-label').click();
+      }
       // Pick choices in order until Check unlocks (multi-select needs more than one).
       const choices = page.locator('.ep-choices button');
       for (let i = 0; i < await choices.count() && await page.locator('.ep-go:has-text("Check")').isDisabled(); i += 1) await choices.nth(i).click();
